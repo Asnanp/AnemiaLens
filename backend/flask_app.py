@@ -38,9 +38,7 @@ CORS(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
-        "https://anemia-lens.vercel.app",
-        # Allow all Vercel preview deployments
-        r"https://.*\.vercel\.app",
+        "https://anemia-lens.vercel.app"
     ],
     supports_credentials=False,
 )
