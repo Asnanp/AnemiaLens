@@ -1,128 +1,96 @@
 # AnemiaLens
 
-AnemiaLens is a mobile-first screening app for early anemia risk checks from smartphone eye images. It combines a conjunctiva image-quality gate, a PyTorch screening model, symptom fusion, rule-based triage, grounded GenAI guidance, and clinician-ready handoff output.
+AnemiaLens is a mobile-first screening app for early anemia risk detection from smartphone eye images. It combines a conjunctiva image-quality gate, a PyTorch EfficientNet-B0 screening model, symptom fusion, rule-based triage, Mistral AI guidance, and clinician-ready handoff output.
 
-This is a screening tool, not a diagnostic device. It is designed to help users decide when to retake an image, when to monitor, and when to seek formal medical follow-up.
+> This is a screening tool, not a diagnostic device.
 
-## Why this project matters
+## How it works
 
-Anemia is common, but early detection is still limited by cost, distance, and access to laboratory testing. AnemiaLens focuses on a simple real-world workflow:
-
-1. Capture an inner lower eyelid image on a phone.
-2. Block unsafe or low-quality inputs before prediction.
-3. Estimate screening risk from the eye image.
-4. Combine that signal with symptoms.
-5. Generate grounded, non-diagnostic next-step guidance.
-
-The goal is not to replace clinical testing. The goal is to create an accessible screening and triage layer that can help people act sooner and more safely.
-
-## Why the GenAI layer is core
-
-AnemiaLens does not use GenAI as cosmetic chat. The GenAI layer is responsible for converting structured medical-AI output into safe, useful guidance.
-
-- It explains the result in plain language.
-- It personalizes urgency and food advice from the current screening result.
-- It adapts wording using language and region when provided.
-- It stays grounded to only the current triage result, uncertainty, symptoms, and locale context.
-- It falls back to deterministic rules when live GenAI is unavailable or the screening signal is too weak.
-
-Current provider in this repo:
-
-- `Qwen/Qwen2.5-7B-Instruct` via Hugging Face Inference Providers on the `together` route
-- Safe local fallback when Qwen is disabled, unavailable, or intentionally skipped
-
-## System layers
-
-- Image quality and capture: blur, lighting, framing, ROI visibility, retake blocking
-- Clinical prediction: anemia risk, hemoglobin estimate, confidence, uncertainty, reliability flag
-- Safety and triage: low-risk, moderate-risk, high-concern, uncertain-retake-needed
-- Symptom fusion: fatigue, dizziness, pale skin, shortness of breath, heavy menstrual bleeding, low iron intake
-- GenAI guidance: grounded explanation, urgency, food advice, next steps
-- Handoff and explainability: clinical brief, decision audit, runtime provenance, shareable summary
-
-## Submission docs
-
-- [Impact narrative](./docs/IMPACT_NARRATIVE.md)
-- [AI stack and GenAI architecture](./docs/AI_STACK.md)
-- [Judge guide](./docs/JUDGE_GUIDE.md)
-- [Video script](./docs/VIDEO_SCRIPT.md)
-- [Deployment guide](./docs/DEPLOYMENT.md)
-- [Submission checklist](./docs/SUBMISSION_CHECKLIST.md)
+1. Capture an inner lower eyelid image on a phone
+2. Image quality gate blocks blurry or poorly lit inputs
+3. EfficientNet-B0 estimates anemia risk from conjunctival pallor
+4. Symptom signals (fatigue, dizziness, etc.) are fused with image output
+5. Four-band triage: Low Risk / Moderate Risk / High Concern / Retake Needed
+6. Mistral AI generates personalized, grounded next-step guidance
+7. Clinician-ready handoff summary is produced
 
 ## Stack
 
-- Frontend: React + TypeScript + Vite
-- Backend: FastAPI + Flask compatibility API + Pydantic
-- Vision model: PyTorch EfficientNet-B0 checkpoint with archive-model fusion fallback
-- GenAI: Qwen 2.5 Instruct through Hugging Face Inference Providers
-- Testing: Pytest for backend, TypeScript build checks for frontend
+| Layer | Technology |
+|---|---|
+| Frontend | React + TypeScript + Vite |
+| Backend | Flask + Pydantic |
+| Vision model | PyTorch EfficientNet-B0 + archive model fusion |
+| GenAI guidance | Mistral AI (`mistral-small-latest`) |
+| Testing | Pytest (backend), TypeScript build (frontend) |
 
 ## Quick start
 
-Backend:
-
+**Backend:**
 ```bash
 cd backend
 pip install -r requirements.txt
 python flask_app.py
 ```
 
-FastAPI alternative:
-
-```bash
-cd backend
-uvicorn app.main:app --reload
-```
-
-Frontend:
-
+**Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The frontend defaults to `http://127.0.0.1:5000` in development. Override with `VITE_API_BASE_URL` if needed.
+Frontend proxies to `http://127.0.0.1:5000` in dev mode automatically.
 
-## GenAI provider setup
+## Mistral AI setup
 
-Create `backend/.env` or export these variables:
+Create `backend/.env`:
 
-- `ANEMIALENS_HF_API_KEY`
-- `ANEMIALENS_QWEN_MODEL=Qwen/Qwen2.5-7B-Instruct`
-- `ANEMIALENS_HF_PROVIDER=together`
-- `ANEMIALENS_QWEN_ENABLED=true`
-
-You can start from [backend/.env.example](./backend/.env.example).
-
-PowerShell example:
-
-```powershell
-$env:ANEMIALENS_HF_API_KEY="your_key_here"
-$env:ANEMIALENS_QWEN_MODEL="Qwen/Qwen2.5-7B-Instruct"
-$env:ANEMIALENS_HF_PROVIDER="together"
-python flask_app.py
+```env
+ANEMIALENS_MISTRAL_API_KEY=your_mistral_key_here
+ANEMIALENS_MISTRAL_MODEL=mistral-small-latest
+ANEMIALENS_MISTRAL_ENABLED=true
+ANEMIALENS_GUIDANCE_TIMEOUT=20
 ```
 
-## Verification
+Get a
+ free API key at [console.mistral.ai](https://console.mistral.ai).
 
-Backend:
+## Deployment (Railway + Vercel)
 
-```bash
-python -m pytest backend/tests
-```
+**Backend → Railway:**
+1. New Project → Deploy from GitHub → select this repo
+2. Add env vars in Railway dashboard:
+   - `ANEMIALENS_MISTRAL_API_KEY`
+   - `ANEMIALENS_MISTRAL_ENABLED=true`
+   - `ANEMIALENS_MISTRAL_MODEL=mistral-small-latest`
+   - `ANEMIALENS_GUIDANCE_TIMEOUT=20`
+3. Railway uses the `Dockerfile` and `railway.toml` automatically
 
-Frontend:
+**Frontend → Vercel:**
+1. Import repo on Vercel, set root to `frontend`
+2. Add env var: `VITE_API_BASE_URL` = your Railway backend URL
 
-```bash
-cd frontend
-npm run build
-```
+## System layers
+
+- Image quality gate: blur, brightness, framing, ROI visibility, retake blocking
+- Vision model: anemia risk score, hemoglobin estimate, confidence, uncertainty, reliability flag
+- Triage: low-risk / moderate-risk / high-concern / uncertain-retake-needed
+- Symptom fusion: fatigue, dizziness, pale skin, shortness of breath, heavy menstrual bleeding, low iron intake
+- Mistral AI guidance: explanation, urgency, dietary advice, next steps — grounded to screening data only
+- Handoff: clinical brief, decision audit, shareable summary
 
 ## Safety
 
-- Screening only: not a diagnosis and not a substitute for clinical evaluation
-- Image quality gating runs before prediction
-- Uncertainty and reliability are exposed in the response
-- Guidance is constrained to grounded inputs and blocked from diagnostic claims
-- Retake-first behavior is preferred over overconfident output
+- Screening only — not a diagnosis, not a substitute for clinical evaluation
+- Image quality gating runs before any prediction
+- Uncertainty and reliability are always exposed in the response
+- Mistral guidance is constrained to grounded inputs only — no diagnostic claims allowed
+- Retake-first behavior preferred over overconfident output
+
+## Run tests
+
+```bash
+cd backend
+python -m pytest tests/
+```
