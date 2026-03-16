@@ -258,7 +258,6 @@ class GuidanceService:
         return not (
             prediction is None
             or triage.band == "uncertain_retake_needed"
-            or prediction.reliability_flag == "low"
         )
 
     def _cache_key(self, payload: dict[str, object]) -> str:
