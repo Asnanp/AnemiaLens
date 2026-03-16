@@ -314,7 +314,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
 function Hero() {
   return (
     <section className="section-hero" style={{ position:'relative', zIndex:1, minHeight:'100vh', display:'flex', alignItems:'center', padding:'0 4rem' }}>
-      <div className="hero-grid" style={{ display:'grid', gridTemplateColumns:'1.1fr 0.9fr', gap:'5rem', width:'100%', maxWidth:1320, margin:'0 auto' }}>
+      <div className="hero-grid" style={{ display:'grid', gridTemplateColumns:'1.15fr 0.85fr', gap:'5rem', width:'100%', maxWidth:1400, margin:'0 auto' }}>
 
         {/* Left */}
         <div style={{ display:'flex', flexDirection:'column', gap:'2.5rem', paddingTop:'7rem' }}>
@@ -326,12 +326,12 @@ function Hero() {
             </span>
           </motion.div>
 
-          {/* Headline — #6 per-line animation */}
+          {/* Headline */}
           <h1 className="display-hero">
-            <span className="hero-line-1" style={{ display:'block', fontWeight:300, color:'var(--text-muted)' }}>See what</span>
-            <span className="hero-line-2" style={{ display:'block', fontStyle:'italic', fontWeight:400, color:'rgba(242,240,236,0.7)' }}>your blood</span>
-            <span className="hero-line-3" style={{ display:'block', fontWeight:700, color:'var(--text-primary)', background:'linear-gradient(135deg, #F2F0EC 30%, rgba(200,0,30,0.9) 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
-              reveals<span className="crimson-dot" style={{ WebkitTextFillColor:'var(--crimson)' }}>.</span>
+            <span className="hero-line-1" style={{ display:'block', fontWeight:900, color:'var(--text)' }}>See what</span>
+            <span className="hero-line-2" style={{ display:'block', fontStyle:'italic', fontWeight:300, color:'var(--text-muted)', fontFamily:'var(--serif)' }}>your blood</span>
+            <span className="hero-line-3" style={{ display:'block', fontWeight:900 }}>
+              <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>reveals.</span>
             </span>
           </h1>
 
@@ -359,15 +359,22 @@ function Hero() {
             </button>
           </motion.div>
 
-          {/* Stat chips — #6 stagger */}
-          <div className="hero-chips" style={{ display:'flex', gap:'0.75rem', flexWrap:'wrap', paddingTop:'1rem' }}>
-            {[['1.6B+','Affected Globally'],['92%','Sensitivity'],['$0','Marginal Cost']].map(([v,l], i) => (
-              <div key={l} className="stat-chip" style={{ animationDelay: `${900 + i*80}ms` }}>
-                <span className="stat-chip-val">{v}</span>
-                <span style={{ color:'var(--text-dim)', fontSize:'0.62rem' }}>{l}</span>
+          {/* Stats — large serif display like prototype */}
+          <motion.div
+            initial={{ opacity:0 }} animate={{ opacity:1 }}
+            transition={{ delay:0.7, duration:0.8 }}
+            style={{ display:'flex', gap:'3.5rem', paddingTop:'2.5rem', borderTop:'1px solid var(--glass-border)', marginTop:'0.5rem' }}
+          >
+            {[['1.6B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
+              <div key={label}>
+                <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
+                  {val.replace(/[^0-9.]/g,'')}
+                  <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', fontSize:'1.4rem' }}>{val.replace(/[0-9.]/g,'')}</span>
+                </div>
+                <div className="label-tag" style={{ marginTop:'0.4rem' }}>{label}</div>
               </div>
             ))}
-          </div>
+          </motion.div>
         </div>
 
         {/* Right — Eye with orbit rings */}
@@ -779,23 +786,6 @@ function ScreeningSection() {
 // ── #9 TERMINAL CARD — char-by-char typewriter ────────────────────────────────
 // ── #11 TECH SECTION — icon rotate on hover ───────────────────────────────────
 function TechSection() {
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-    const onMove = (e: MouseEvent) => {
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5;
-      const y = (e.clientY - r.top) / r.height - 0.5;
-      el.style.transform = `perspective(800px) rotateY(${x*6}deg) rotateX(${-y*6}deg) scale3d(1.01,1.01,1.01)`;
-    };
-    const onLeave = () => { el.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)'; };
-    el.addEventListener('mousemove', onMove);
-    el.addEventListener('mouseleave', onLeave);
-    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave); };
-  }, []);
-
   return (
     <section id="technology" style={{ position:'relative', zIndex:1, padding:'10rem 4rem', background:'linear-gradient(180deg, transparent 0%, rgba(2,2,8,0.5) 100%)' }} className="section-pad">
       {/* Ambient orb */}
@@ -840,56 +830,31 @@ function TechSection() {
           </div>
         </div>
 
-        {/* Clinical brief card — tilt + code block */}
-        <motion.div
-          ref={cardRef}
-          className="glass"
-          initial={{ opacity:0, x:30 }} whileInView={{ opacity:1, x:0 }}
-          viewport={{ once:true }} transition={{ duration:0.8, ease:E }}
-          style={{
-            padding:'3rem', borderLeft:'3px solid var(--crimson)',
-            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 40px rgba(200,0,30,0.12), 0 48px 100px rgba(0,0,0,0.6)',
-            transition:'transform 0.1s ease',
-          }}
-        >
-          <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
-            <ShieldCheck size={18} style={{ color:'var(--accent-bright)' }} />
-            <h4 style={{ fontWeight:700, fontSize:'1.05rem' }}>Clinician-Ready Handoff</h4>
-          </div>
-          <p style={{ fontSize:'0.88rem', color:'var(--text-muted)', lineHeight:1.7, marginBottom:'2rem' }}>
-            AnemiaLens generates a structured "Clinical Brief" for formal medical follow-up, ensuring screening data is properly communicated to healthcare professionals.
-          </p>
-
-          {/* Static code block — cleaner than typewriter */}
-          <div style={{
-            background:'rgba(0,0,0,0.55)', padding:'1.5rem', borderRadius:'0.875rem',
-            fontFamily:'var(--mono)', fontSize:'0.68rem', color:'var(--text-muted)',
-            border:'1px solid rgba(255,255,255,0.06)', lineHeight:1.9,
-            borderLeft:'3px solid var(--crimson)',
-          }}>
-            {[
-              ['Provider',    'EfficientNet-B0',   'var(--text-dim)'],
-              ['Risk Score',  '68.4% (Moderate)',  '#F59E0B'],
-              ['Hb Estimate', '9.8 g/dL',          'var(--accent-bright)'],
-              ['Confidence',  '88%',               'var(--accent-bright)'],
-              ['Triage Band', 'Band 2 — Monitor',  '#F59E0B'],
-            ].map(([k, v, c]) => (
-              <div key={k} style={{ display:'flex', gap:'1rem' }}>
-                <span style={{ color:'var(--text-dim)', minWidth:90 }}>{k}:</span>
-                <span style={{ color: c }}>{v}</span>
+        {/* Tech layer cards — right side */}
+        <div style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+          {TECH_LAYERS.map((item, i) => (
+            <motion.div
+              key={item.title}
+              className="glass glass-hover glass-shimmer"
+              initial={{ opacity:0, x:30 }} whileInView={{ opacity:1, x:0 }}
+              viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
+              style={{ padding:'2rem', display:'flex', gap:'1.5rem', alignItems:'flex-start' }}
+            >
+              <div style={{
+                width:52, height:52, borderRadius:'1rem', flexShrink:0,
+                background:'linear-gradient(135deg, rgba(200,0,30,0.2) 0%, rgba(200,0,30,0.06) 100%)',
+                border:'1px solid rgba(200,0,30,0.25)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'var(--accent-bright)',
+                boxShadow:'0 0 20px rgba(200,0,30,0.15)',
+              }}>{item.icon}</div>
+              <div>
+                <h4 style={{ fontWeight:700, fontSize:'0.95rem', marginBottom:'0.4rem' }}>{item.title}</h4>
+                <p style={{ fontSize:'0.82rem', color:'var(--text-muted)', lineHeight:1.65 }}>{item.desc}</p>
               </div>
-            ))}
-          </div>
-
-          <div style={{ display:'flex', gap:'0.875rem', marginTop:'2rem' }}>
-            <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
-              <Share2 size={13} /> Share Summary
-            </button>
-            <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
-              <Download size={13} /> Export Report
-            </button>
-          </div>
-        </motion.div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -901,13 +866,13 @@ function Footer() {
     <footer style={{ position:'relative', zIndex:1, borderTop:'1px solid var(--glass-border)' }}>
       <div className="glass" style={{ borderRadius:0, padding:'5rem 4rem 3rem', background:'rgba(2,2,8,0.7)' }}>
         <div style={{ maxWidth:1400, margin:'0 auto' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', gap:'5rem', marginBottom:'4rem' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr', gap:'5rem', marginBottom:'4rem' }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
-                <div style={{ width:32, height:32, borderRadius:'10px', background:'linear-gradient(135deg, #C8001E, #E8294A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.6rem', fontWeight:800, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 4px 16px rgba(200,0,30,0.4)' }}>AL</div>
-                <span style={{ fontWeight:700, fontSize:'0.95rem' }}>Anemia<span style={{ color:'var(--accent-bright)' }}>Lens</span></span>
+                <div style={{ width:38, height:38, borderRadius:'10px', background:'linear-gradient(135deg, #C8001E, #E8294A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:900, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 6px 20px rgba(200,0,30,0.4)' }}>AL</div>
+                <span style={{ fontWeight:800, fontSize:'1.1rem', letterSpacing:'-0.02em' }}>Anemia<span style={{ color:'var(--accent-bright)' }}>Lens</span></span>
               </div>
-              <p style={{ fontSize:'0.8rem', color:'var(--text-dim)', lineHeight:1.8, maxWidth:320, marginBottom:'2rem' }}>
+              <p style={{ fontSize:'0.82rem', color:'var(--text-dim)', lineHeight:1.8, maxWidth:340, marginBottom:'2rem' }}>
                 Smartphone-first anemia screening powered by computer vision and grounded GenAI. Designed for accessibility, safety, and clinical credibility.
               </p>
               <div style={{ display:'flex', gap:'0.6rem', flexWrap:'wrap' }}>
@@ -919,13 +884,12 @@ function Footer() {
             {[
               { title:'Technology', links:['Vision Backbone','GenAI Grounding','Safety Gating','Clinical Brief'] },
               { title:'Resources',  links:['Impact Narrative','Research Hub','Deployment Guide','Legal Disclaimer'] },
-              { title:'Company',    links:['About','Contact','Privacy','Terms'] },
             ].map(col => (
               <div key={col.title}>
                 <div className="label-tag" style={{ color:'var(--text)', marginBottom:'1.5rem' }}>{col.title}</div>
                 <ul style={{ listStyle:'none', display:'flex', flexDirection:'column', gap:'0.875rem' }}>
                   {col.links.map(l => (
-                    <li key={l} style={{ fontSize:'0.8rem', color:'var(--text-dim)', cursor:'none', transition:'color 0.2s' }}
+                    <li key={l} style={{ fontSize:'0.82rem', color:'var(--text-dim)', cursor:'none', transition:'color 0.2s' }}
                       onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
                       onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                     >{l}</li>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 /* ── DESIGN TOKENS — #12 color refinement ──────────────────────────────────── */
@@ -26,8 +26,8 @@
   --text-muted:      rgba(242,240,236,0.50);
   --text-dim:        rgba(242,240,236,0.28);
   --serif:           'Cormorant Garamond', Georgia, serif;
-  --sans:            'DM Sans', system-ui, sans-serif;
-  --mono:            'DM Mono', monospace;
+  --sans:            'Barlow', system-ui, sans-serif;
+  --mono:            'IBM Plex Mono', monospace;
   --ease:            cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring:     cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -208,9 +208,9 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 /* ── TYPOGRAPHY ────────────────────────────────────────────────────────────── */
 .display-hero {
   font-family: var(--serif);
-  font-size: clamp(4rem, 9vw, 9rem);
+  font-size: clamp(3.2rem, 7vw, 6.8rem);
   line-height: 0.88;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
 }
 .label-tag {
   font-family: var(--mono);
