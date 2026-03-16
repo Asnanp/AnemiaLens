@@ -39,7 +39,10 @@ CORS(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "https://anemia-lens.vercel.app",
+        # Allow all Vercel preview deployments
+        r"https://.*\.vercel\.app",
     ],
+    supports_credentials=False,
 )
 
 quality_service = ImageQualityService()

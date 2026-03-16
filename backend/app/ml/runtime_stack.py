@@ -54,34 +54,46 @@ def build_runtime_stack_prediction(
     uncertainty = archive_uncertainty
 
     if efficientnet_prediction is not None:
-        risk_weight = risk_archive_weight_for_source(source_hint)
-        hb_weight = hb_archive_weight_for_source(source_hint)
         efficientnet_risk = float(efficientnet_prediction["anemia_risk"])
         efficientnet_hb = float(efficientnet_prediction["predicted_hemoglobin"])
         efficientnet_uncertainty = float(efficientnet_prediction.get("uncertainty", 0.35))
+
+        # Confidence-weighted ensemble: lower uncertainty → higher weight
+        archive_conf = clamp(1.0 - archive_uncertainty)
+        efficientnet_conf = clamp(1.0 - efficientnet_uncertainty)
+        total_conf = archive_conf + efficientnet_conf + 1e-9
+
+        # Apply source-specific floor weight for archive (it has calibrated features)
+        source_floor = risk_archive_weight_for_source(source_hint)
+        raw_archive_w = archive_conf / total_conf
+        # Blend floor weight with confidence-derived weight
+        archive_w = clamp(0.5 * source_floor + 0.5 * raw_archive_w, 0.25, 0.80)
+        efficientnet_w = 1.0 - archive_w
+
         disagreement = abs(archive_risk - efficientnet_risk)
         hemoglobin_gap = abs(archive_hb - efficientnet_hb)
 
-        # When both models agree on direction, boost confidence
+        # Agreement bonus: both models agree on direction → reduce uncertainty
         agreement_bonus = 0.0
         if (archive_risk > 0.5) == (efficientnet_risk > 0.5):
-            agreement_bonus = disagreement * 0.08  # small reduction in uncertainty
+            agreement_bonus = 0.04 + disagreement * 0.06
 
-        risk = (risk_weight * archive_risk) + ((1.0 - risk_weight) * efficientnet_risk)
-        predicted_hemoglobin = (hb_weight * archive_hb) + ((1.0 - hb_weight) * efficientnet_hb)
+        risk = (archive_w * archive_risk) + (efficientnet_w * efficientnet_risk)
+        hb_archive_w = hb_archive_weight_for_source(source_hint)
+        predicted_hemoglobin = (hb_archive_w * archive_hb) + ((1.0 - hb_archive_w) * efficientnet_hb)
         uncertainty = clamp(
-            (risk_weight * archive_uncertainty)
-            + ((1.0 - risk_weight) * efficientnet_uncertainty)
-            + (disagreement * 0.10)
-            + (min(hemoglobin_gap / 10.0, 1.0) * 0.03)
+            (archive_w * archive_uncertainty)
+            + (efficientnet_w * efficientnet_uncertainty)
+            + (disagreement * 0.08)
+            + (min(hemoglobin_gap / 12.0, 1.0) * 0.025)
             - agreement_bonus,
-            0.05,
+            0.04,
             0.92,
         )
 
     return {
         "anemia_risk": clamp(risk, 0.0, 1.0),
         "predicted_hemoglobin": predicted_hemoglobin,
-        "uncertainty": clamp(uncertainty, 0.05, 0.95),
+        "uncertainty": clamp(uncertainty, 0.04, 0.95),
         "decision_threshold": decision_threshold_for_source(source_hint),
     }

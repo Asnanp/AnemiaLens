@@ -5,15 +5,16 @@ from app.schemas import PredictionResult, QualityAssessment, SignalBreakdown, Sy
 
 
 class TriageService:
-    IMAGE_WEIGHT = 0.50
-    SYMPTOM_WEIGHT = 0.50
+    IMAGE_WEIGHT = 0.55
+    SYMPTOM_WEIGHT = 0.45
+    # Weights calibrated to clinical literature: pallor + dyspnoea are strongest
     _WEIGHTS = {
-        "fatigue": 0.18,
-        "dizziness": 0.16,
-        "pale_skin": 0.22,
-        "shortness_of_breath": 0.24,
-        "heavy_menstrual_bleeding": 0.18,
-        "poor_diet_low_iron": 0.14,
+        "fatigue": 0.16,
+        "dizziness": 0.15,
+        "pale_skin": 0.26,
+        "shortness_of_breath": 0.26,
+        "heavy_menstrual_bleeding": 0.20,
+        "poor_diet_low_iron": 0.12,
     }
 
     def assess(
@@ -44,13 +45,13 @@ class TriageService:
         fused_score = breakdown.fused_score
 
         # Symptom-driven escalation: severe symptoms alone can push to high concern
-        if fused_score >= 0.62 or (
-            prediction.anemia_risk >= 0.55 and symptom_score >= 0.35
-        ) or symptom_score >= 0.72:
+        if fused_score >= 0.58 or (
+            prediction.anemia_risk >= 0.52 and symptom_score >= 0.32
+        ) or symptom_score >= 0.68:
             band = "high_concern"
             label = "High concern"
             summary = "This screening suggests a higher level of concern. Arrange formal medical review soon, especially if symptoms are increasing."
-        elif fused_score >= 0.32 or prediction.anemia_risk >= 0.45 or symptom_score >= 0.30:
+        elif fused_score >= 0.28 or prediction.anemia_risk >= 0.42 or symptom_score >= 0.26:
             band = "moderate_risk"
             label = "Moderate risk"
             summary = "This screening shows some concern. A routine check with a clinician or lab test would be reasonable."

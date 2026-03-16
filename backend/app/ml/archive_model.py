@@ -543,8 +543,10 @@ def _rows_from_samples(
 
 def _build_regressor(*, random_state: int) -> ExtraTreesRegressor:
     return ExtraTreesRegressor(
-        n_estimators=320,
-        min_samples_leaf=2,
+        n_estimators=500,
+        min_samples_leaf=1,
+        max_features=0.7,
+        bootstrap=True,
         random_state=random_state,
         n_jobs=-1,
     )
@@ -552,8 +554,10 @@ def _build_regressor(*, random_state: int) -> ExtraTreesRegressor:
 
 def _build_classifier(*, random_state: int) -> ExtraTreesClassifier:
     return ExtraTreesClassifier(
-        n_estimators=500,
-        min_samples_leaf=2,
+        n_estimators=700,
+        min_samples_leaf=1,
+        max_features=0.7,
+        bootstrap=True,
         random_state=random_state,
         class_weight="balanced_subsample",
         n_jobs=-1,

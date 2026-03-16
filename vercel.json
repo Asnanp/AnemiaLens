@@ -2,5 +2,8 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "echo 'skip root install'",
-  "framework": null
+  "framework": null,
+  "env": {
+    "VITE_API_BASE_URL": "@anemialens_api_url"
+  }
 }
