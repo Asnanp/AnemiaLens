@@ -704,7 +704,10 @@ function ScreeningSection() {
 
   const handleDownload = (shareText: string) => {
     const blob = new Blob([shareText], { type:'text/plain' });
-    const url  = URL.createObjectURL(blob);
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+// Example fetch
+const response = await fetch(`${API_URL}/your-endpoint`);
     const a    = document.createElement('a');
     a.href = url; a.download = 'anemialens-report.txt'; a.click();
     URL.revokeObjectURL(url);
