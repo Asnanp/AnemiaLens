@@ -1,0 +1,163 @@
+{
+  "summary": {
+    "dataset_root": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia",
+    "checkpoint_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\backend\\models\\efficientnet_anemia.pth",
+    "record_count": 86,
+    "subject_count": 44,
+    "threshold": 0.68,
+    "train_record_count": 346,
+    "train_subject_count": 173,
+    "accuracy": 0.8488,
+    "precision": 0.7059,
+    "recall": 0.8889,
+    "f1": 0.7869,
+    "auc": 0.8707,
+    "hb_mae": 1.3317,
+    "label_counts": {
+      "0": 59,
+      "1": 27
+    },
+    "prediction_counts": {
+      "1": 34,
+      "0": 52
+    },
+    "confusion_matrix": [
+      [
+        49,
+        10
+      ],
+      [
+        3,
+        24
+      ]
+    ]
+  },
+  "source_breakdown": {
+    "roi_original": {
+      "count": 44,
+      "errors": 9,
+      "false_positives": 6,
+      "false_negatives": 3,
+      "error_rate": 0.2045,
+      "mean_probability": 0.6318,
+      "hb_mae": 1.5148
+    },
+    "palpebral": {
+      "count": 42,
+      "errors": 4,
+      "false_positives": 4,
+      "false_negatives": 0,
+      "error_rate": 0.0952,
+      "mean_probability": 0.597,
+      "hb_mae": 1.1399
+    }
+  },
+  "false_positives": [
+    {
+      "subject_id": "India-48",
+      "source": "roi_original",
+      "probability": 0.9197,
+      "hb_true": 13.6,
+      "hb_predicted": 9.49,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\48\\20200217_141804.jpg"
+    },
+    {
+      "subject_id": "India-48",
+      "source": "palpebral",
+      "probability": 0.8461,
+      "hb_true": 13.6,
+      "hb_predicted": 10.45,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\48\\20200217_141804_palpebral.png"
+    },
+    {
+      "subject_id": "Italy-113",
+      "source": "roi_original",
+      "probability": 0.7987,
+      "hb_true": 14.0,
+      "hb_predicted": 11.11,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\Italy\\113\\T_82_20190614_080327.jpg"
+    },
+    {
+      "subject_id": "India-1",
+      "source": "roi_original",
+      "probability": 0.7804,
+      "hb_true": 12.2,
+      "hb_predicted": 10.67,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\1\\20200118_164733.jpg"
+    },
+    {
+      "subject_id": "India-91",
+      "source": "roi_original",
+      "probability": 0.7649,
+      "hb_true": 13.4,
+      "hb_predicted": 11.36,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\91\\20200302_231050.jpg"
+    },
+    {
+      "subject_id": "India-1",
+      "source": "palpebral",
+      "probability": 0.742,
+      "hb_true": 12.2,
+      "hb_predicted": 11.72,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\1\\20200118_164733_palpebral.png"
+    },
+    {
+      "subject_id": "India-60",
+      "source": "palpebral",
+      "probability": 0.7326,
+      "hb_true": 12.2,
+      "hb_predicted": 11.32,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\60\\20200223_184734_palpebral.png"
+    },
+    {
+      "subject_id": "Italy-34",
+      "source": "roi_original",
+      "probability": 0.7264,
+      "hb_true": 14.1,
+      "hb_predicted": 11.95,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\Italy\\34\\T_3_20190606_094015.jpg"
+    },
+    {
+      "subject_id": "India-91",
+      "source": "palpebral",
+      "probability": 0.7026,
+      "hb_true": 13.4,
+      "hb_predicted": 11.82,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\91\\20200302_231050_palpebral.png"
+    },
+    {
+      "subject_id": "India-43",
+      "source": "roi_original",
+      "probability": 0.6997,
+      "hb_true": 12.6,
+      "hb_predicted": 11.74,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\43\\20200216_210631.jpg"
+    }
+  ],
+  "false_negatives": [
+    {
+      "subject_id": "India-7",
+      "source": "roi_original",
+      "probability": 0.4831,
+      "hb_true": 9.2,
+      "hb_predicted": 12.86,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\7\\20200124_202058.jpg"
+    },
+    {
+      "subject_id": "India-23",
+      "source": "roi_original",
+      "probability": 0.5395,
+      "hb_true": 9.8,
+      "hb_predicted": 12.57,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\India\\23\\20200211_155237.jpg"
+    },
+    {
+      "subject_id": "Italy-26",
+      "source": "roi_original",
+      "probability": 0.6123,
+      "hb_true": 8.6,
+      "hb_predicted": 12.68,
+      "image_path": "C:\\Users\\USER\\OneDrive\\Desktop\\AnemiaLens\\archive\\dataset anemia\\Italy\\26\\26.jpg"
+    }
+  ]
+}
