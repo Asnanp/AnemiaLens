@@ -370,14 +370,45 @@ function Hero() {
           </div>
         </div>
 
-        {/* Right — Eye */}
+        {/* Right — Eye with orbit rings */}
         <motion.div
           className="hero-eye"
           initial={{ opacity:0, scale:0.85 }} animate={{ opacity:1, scale:1 }}
           transition={{ duration:1.1, delay:0.2, ease:E }}
           style={{ display:'flex', alignItems:'center', justifyContent:'center', paddingTop:'6rem' }}
         >
-          <EyeScanner />
+          <div style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {/* Pulse rings */}
+            {[0,1,2].map(i => (
+              <div key={i} style={{
+                position:'absolute',
+                inset: `${-20 - i*22}px`,
+                borderRadius:'50%',
+                border:`1px solid rgba(200,0,30,${0.15 - i*0.04})`,
+                animation:`pulse-ring ${2 + i*0.8}s ease-out ${i*0.6}s infinite`,
+                pointerEvents:'none',
+              }} />
+            ))}
+            {/* Orbit ring 1 — clockwise */}
+            <div style={{
+              position:'absolute', inset:-50, borderRadius:'50%',
+              border:'1px solid rgba(255,255,255,0.05)',
+              animation:'orbit-spin 25s linear infinite',
+              pointerEvents:'none',
+            }}>
+              <div style={{ position:'absolute', top:-4, left:'50%', transform:'translateX(-50%)', width:8, height:8, borderRadius:'50%', background:'var(--accent-bright)', boxShadow:'0 0 12px var(--accent-bright)' }} />
+            </div>
+            {/* Orbit ring 2 — counter-clockwise */}
+            <div style={{
+              position:'absolute', inset:-75, borderRadius:'50%',
+              border:'1px dashed rgba(200,0,30,0.15)',
+              animation:'orbit-spin 40s linear infinite reverse',
+              pointerEvents:'none',
+            }}>
+              <div style={{ position:'absolute', bottom:-4, left:'50%', transform:'translateX(-50%)', width:5, height:5, borderRadius:'50%', background:'rgba(200,0,30,0.6)' }} />
+            </div>
+            <EyeScanner />
+          </div>
         </motion.div>
       </div>
     </section>
@@ -386,16 +417,40 @@ function Hero() {
 
 // ── CHALLENGE SECTION ─────────────────────────────────────────────────────────
 function Challenge() {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(800px) rotateY(${x*8}deg) rotateX(${-y*8}deg) scale3d(1.02,1.02,1.02)`;
+    };
+    const onLeave = () => { el.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)'; };
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseleave', onLeave);
+    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave); };
+  }, []);
+
   return (
     <section style={{ position:'relative', zIndex:1, padding:'10rem 4rem' }} className="section-pad">
+      {/* Ambient orb */}
+      <div style={{ position:'absolute', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle, rgba(200,0,30,0.08) 0%, transparent 70%)', top:'20%', right:'-10%', filter:'blur(40px)', pointerEvents:'none' }} />
+
       <div className="challenge-grid" style={{ maxWidth:1200, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6rem', alignItems:'center' }}>
 
         <motion.div
+          ref={cardRef}
           className="glass glass-shimmer reveal"
           initial={{ opacity:0, x:-30 }} whileInView={{ opacity:1, x:0 }}
           viewport={{ once:true }} transition={{ duration:0.8, ease:E }}
-          style={{ padding:'3.5rem', borderLeft:'3px solid var(--crimson)',
-            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.12), -4px 0 40px rgba(200,0,30,0.12), 0 48px 100px rgba(0,0,0,0.6)' }}
+          style={{
+            padding:'3.5rem', borderLeft:'3px solid var(--crimson)',
+            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.12), -4px 0 40px rgba(200,0,30,0.12), 0 48px 100px rgba(0,0,0,0.6)',
+            transition:'transform 0.1s ease',
+          }}
         >
           <div className="section-eyebrow" style={{ marginBottom:'1.5rem' }}>The Challenge</div>
           <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(2.2rem,4vw,3.2rem)', fontWeight:700, lineHeight:1.05, letterSpacing:'-0.03em', marginBottom:'1.75rem' }}>
@@ -419,13 +474,13 @@ function Challenge() {
           {IMPACT_CARDS.map((c, i) => (
             <motion.div
               key={c.title}
-              className="glass glass-shimmer"
+              className="glass glass-hover glass-shimmer"
               initial={{ opacity:0, x:30 }} whileInView={{ opacity:1, x:0 }}
               viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
               style={{ padding:'1.75rem 2rem', display:'flex', gap:'1.5rem', alignItems:'center' }}
             >
               <div style={{
-                width:46, height:46, borderRadius:'0.875rem', flexShrink:0,
+                width:48, height:48, borderRadius:'0.875rem', flexShrink:0,
                 background:'linear-gradient(135deg, rgba(200,0,30,0.2) 0%, rgba(200,0,30,0.06) 100%)',
                 border:'1px solid rgba(200,0,30,0.25)',
                 display:'flex', alignItems:'center', justifyContent:'center',
@@ -433,7 +488,7 @@ function Challenge() {
                 boxShadow:'0 0 20px rgba(200,0,30,0.15)',
               }}>{c.icon}</div>
               <div>
-                <h4 style={{ fontWeight:600, fontSize:'0.9rem', marginBottom:'0.3rem' }}>{c.title}</h4>
+                <h4 style={{ fontWeight:700, fontSize:'0.9rem', marginBottom:'0.3rem' }}>{c.title}</h4>
                 <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', lineHeight:1.55 }}>{c.desc}</p>
               </div>
             </motion.div>
@@ -462,26 +517,52 @@ function WorkflowStepper() {
           </h2>
         </motion.div>
 
-        <div className="workflow-pills" style={{ display:'flex', alignItems:'center', gap:'0', marginBottom:'2rem' }}>
+        {/* 5-column grid */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'1.25rem', position:'relative' }}>
+          {/* Connector line */}
+          <div style={{ position:'absolute', top:52, left:'10%', right:'10%', height:1, background:'linear-gradient(90deg, transparent, var(--glass-border) 20%, var(--glass-border) 80%, transparent)', zIndex:0, pointerEvents:'none' }} />
+
           {WORKFLOW.map((step, i) => (
-            <div key={step.title} style={{ display:'contents' }}>
-              <motion.button
-                className={`step-pill ${active===i ? 'active' : ''}`}
-                onClick={() => setActive(active===i ? null : i)}
-                initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }}
-                viewport={{ once:true }} transition={{ delay:i*0.08, duration:0.5 }}
-                style={{ whiteSpace:'nowrap' }}
-              >
-                {step.icon}
-                <span>0{i+1} {step.title}</span>
-              </motion.button>
+            <motion.div
+              key={step.title}
+              className="glass glass-hover"
+              initial={{ opacity:0, y:40 }} whileInView={{ opacity:1, y:0 }}
+              viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
+              onClick={() => setActive(active===i ? null : i)}
+              style={{
+                padding:'2rem 1.25rem', textAlign:'center', display:'flex', flexDirection:'column', gap:'1rem',
+                position:'relative', zIndex:1, cursor:'none',
+                background: active===i ? 'linear-gradient(135deg, rgba(200,0,30,0.12) 0%, rgba(200,0,30,0.04) 100%)' : undefined,
+                borderColor: active===i ? 'rgba(200,0,30,0.3)' : undefined,
+                boxShadow: active===i ? '0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(200,0,30,0.12)' : undefined,
+              }}
+            >
+              <div style={{
+                width:52, height:52, borderRadius:'1rem', margin:'0 auto',
+                background: active===i
+                  ? 'linear-gradient(135deg, rgba(200,0,30,0.3) 0%, rgba(200,0,30,0.1) 100%)'
+                  : 'rgba(255,255,255,0.04)',
+                border:`1px solid ${active===i ? 'rgba(200,0,30,0.35)' : 'var(--glass-border)'}`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color: active===i ? 'var(--accent-bright)' : 'var(--text-muted)',
+                transition:'all 0.3s var(--ease)',
+                boxShadow: active===i ? '0 0 20px rgba(200,0,30,0.25)' : 'none',
+              }}>{step.icon}</div>
+
+              <div style={{ fontSize:'0.5rem', fontFamily:'var(--mono)', color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:'0.15em' }}>Step {i+1}</div>
+              <h4 style={{ fontWeight:700, fontSize:'0.8rem', textTransform:'uppercase', letterSpacing:'0.05em', color: active===i ? 'var(--text)' : 'var(--text-muted)' }}>{step.title}</h4>
+              <p style={{ fontSize:'0.7rem', color:'var(--text-dim)', lineHeight:1.6 }}>{step.desc}</p>
+
               {i < WORKFLOW.length-1 && (
-                <div className={`step-connector ${active !== null && active > i ? 'active' : ''}`} />
+                <div style={{ position:'absolute', top:48, right:-10, zIndex:10, color:'var(--text-dim)' }}>
+                  <ChevronRight size={18} />
+                </div>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
 
+        {/* Expanded detail panel */}
         <div className={`step-panel ${active !== null ? 'open' : ''}`}>
           <AnimatePresence mode="wait">
             {active !== null && (
@@ -491,7 +572,7 @@ function WorkflowStepper() {
                 exit={{ opacity:0, y:-8 }}
                 transition={{ duration:0.35, ease:E }}
               >
-                <GlassCard style={{ padding:'2.5rem 3rem', display:'flex', gap:'2rem', alignItems:'center', marginTop:'0.5rem' }}>
+                <GlassCard style={{ padding:'2.5rem 3rem', display:'flex', gap:'2rem', alignItems:'center', marginTop:'1.5rem' }}>
                   <div style={{
                     width:56, height:56, borderRadius:'1rem', flexShrink:0,
                     background:'linear-gradient(135deg, rgba(200,0,30,0.25) 0%, rgba(200,0,30,0.08) 100%)',
@@ -696,105 +777,30 @@ function ScreeningSection() {
 }
 
 // ── #9 TERMINAL CARD — char-by-char typewriter ────────────────────────────────
-const TERMINAL_LINES = [
-  { k:'Provider',    v:'EfficientNet-B0',  t:'key' },
-  { k:'Risk Score',  v:'68.4% (Moderate)', t:'warn' },
-  { k:'Hb Estimate', v:'9.8 g/dL',         t:'val' },
-  { k:'Confidence',  v:'88%',              t:'val' },
-  { k:'Triage Band', v:'Band 2 — Monitor', t:'warn' },
-] as const;
-
-function TerminalCard() {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [typed, setTyped] = useState<string[]>([]);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } }, { threshold: 0.4 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!inView) return;
-    setTyped([]);
-    let lineIdx = 0;
-    const typeNextLine = () => {
-      if (lineIdx >= TERMINAL_LINES.length) return;
-      const line = TERMINAL_LINES[lineIdx];
-      const full = `${line.k}: ${line.v}`;
-      let charIdx = 0;
-      const typeChar = () => {
-        charIdx++;
-        setTyped(prev => {
-          const next = [...prev];
-          next[lineIdx] = full.slice(0, charIdx);
-          return next;
-        });
-        if (charIdx < full.length) {
-          setTimeout(typeChar, 30);
-        } else {
-          lineIdx++;
-          setTimeout(typeNextLine, 200);
-        }
-      };
-      setTimeout(typeChar, 30);
-    };
-    typeNextLine();
-  }, [inView]);
-
-  const getClass = (lineStr: string) => {
-    const line = TERMINAL_LINES.find(l => lineStr.startsWith(l.k));
-    return line ? `terminal-${line.t}` : 'terminal-val';
-  };
-
-  return (
-    <GlassCard
-      style={{ padding:'3rem', borderLeft:'3px solid var(--crimson)',
-        boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 40px rgba(200,0,30,0.12), 0 48px 100px rgba(0,0,0,0.6)' }}
-    >
-      <div ref={wrapRef}>
-        <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
-          <ShieldCheck size={18} style={{ color:'var(--accent-bright)' }} />
-          <h4 style={{ fontWeight:700, fontSize:'1.05rem' }}>Clinician-Ready Handoff</h4>
-        </div>
-        <p style={{ fontSize:'0.88rem', color:'var(--text-muted)', lineHeight:1.7, marginBottom:'2rem' }}>
-          AnemiaLens generates a structured "Clinical Brief" for formal medical follow-up, ensuring screening data is properly communicated to healthcare professionals.
-        </p>
-
-        <div className="terminal">
-          {typed.map((line, i) => (
-            <div key={i} style={{ display:'flex', gap:'1rem' }}>
-              <span className={getClass(line)}>{line}</span>
-              {i === typed.length - 1 && typed.length < TERMINAL_LINES.length && (
-                <span className="animate-blink" style={{ color:'var(--accent-bright)' }}>▋</span>
-              )}
-            </div>
-          ))}
-          {typed.length >= TERMINAL_LINES.length && (
-            <span className="animate-blink" style={{ color:'var(--accent-bright)', marginLeft:2 }}>▋</span>
-          )}
-        </div>
-
-        <div style={{ display:'flex', gap:'0.875rem', marginTop:'2rem' }}>
-          <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
-            <Share2 size={13} /> Share Summary
-          </button>
-          <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
-            <Download size={13} /> Export Report
-          </button>
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
 // ── #11 TECH SECTION — icon rotate on hover ───────────────────────────────────
 function TechSection() {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(800px) rotateY(${x*6}deg) rotateX(${-y*6}deg) scale3d(1.01,1.01,1.01)`;
+    };
+    const onLeave = () => { el.style.transform = 'perspective(800px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)'; };
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseleave', onLeave);
+    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave); };
+  }, []);
+
   return (
     <section id="technology" style={{ position:'relative', zIndex:1, padding:'10rem 4rem', background:'linear-gradient(180deg, transparent 0%, rgba(2,2,8,0.5) 100%)' }} className="section-pad">
+      {/* Ambient orb */}
+      <div style={{ position:'absolute', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle, rgba(200,0,30,0.08) 0%, transparent 70%)', bottom:'0%', right:'-10%', filter:'blur(40px)', pointerEvents:'none' }} />
+
       <div className="tech-grid" style={{ maxWidth:1200, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'7rem', alignItems:'center' }}>
 
         <div style={{ display:'flex', flexDirection:'column', gap:'3rem' }}>
@@ -814,7 +820,6 @@ function TechSection() {
                 viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
                 style={{ display:'flex', gap:'1.75rem' }}
               >
-                {/* #11 — icon rotates 360deg on hover + crimson glow */}
                 <div
                   className="tech-icon"
                   style={{
@@ -835,11 +840,55 @@ function TechSection() {
           </div>
         </div>
 
+        {/* Clinical brief card — tilt + code block */}
         <motion.div
+          ref={cardRef}
+          className="glass"
           initial={{ opacity:0, x:30 }} whileInView={{ opacity:1, x:0 }}
           viewport={{ once:true }} transition={{ duration:0.8, ease:E }}
+          style={{
+            padding:'3rem', borderLeft:'3px solid var(--crimson)',
+            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 40px rgba(200,0,30,0.12), 0 48px 100px rgba(0,0,0,0.6)',
+            transition:'transform 0.1s ease',
+          }}
         >
-          <TerminalCard />
+          <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
+            <ShieldCheck size={18} style={{ color:'var(--accent-bright)' }} />
+            <h4 style={{ fontWeight:700, fontSize:'1.05rem' }}>Clinician-Ready Handoff</h4>
+          </div>
+          <p style={{ fontSize:'0.88rem', color:'var(--text-muted)', lineHeight:1.7, marginBottom:'2rem' }}>
+            AnemiaLens generates a structured "Clinical Brief" for formal medical follow-up, ensuring screening data is properly communicated to healthcare professionals.
+          </p>
+
+          {/* Static code block — cleaner than typewriter */}
+          <div style={{
+            background:'rgba(0,0,0,0.55)', padding:'1.5rem', borderRadius:'0.875rem',
+            fontFamily:'var(--mono)', fontSize:'0.68rem', color:'var(--text-muted)',
+            border:'1px solid rgba(255,255,255,0.06)', lineHeight:1.9,
+            borderLeft:'3px solid var(--crimson)',
+          }}>
+            {[
+              ['Provider',    'EfficientNet-B0',   'var(--text-dim)'],
+              ['Risk Score',  '68.4% (Moderate)',  '#F59E0B'],
+              ['Hb Estimate', '9.8 g/dL',          'var(--accent-bright)'],
+              ['Confidence',  '88%',               'var(--accent-bright)'],
+              ['Triage Band', 'Band 2 — Monitor',  '#F59E0B'],
+            ].map(([k, v, c]) => (
+              <div key={k} style={{ display:'flex', gap:'1rem' }}>
+                <span style={{ color:'var(--text-dim)', minWidth:90 }}>{k}:</span>
+                <span style={{ color: c }}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', gap:'0.875rem', marginTop:'2rem' }}>
+            <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
+              <Share2 size={13} /> Share Summary
+            </button>
+            <button className="btn btn-glass glass-shimmer" style={{ flex:1, padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem' }}>
+              <Download size={13} /> Export Report
+            </button>
+          </div>
         </motion.div>
       </div>
     </section>
