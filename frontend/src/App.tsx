@@ -50,7 +50,7 @@ function MarqueeTicker() {
     </div>
   );
 }
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // ── #3 MAGNETIC GLASS TILT HOOK ───────────────────────────────────────────────
 function useMagneticTilt(ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
