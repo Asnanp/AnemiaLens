@@ -167,12 +167,30 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         {/* Clinical Guidance */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           transition={{ delay:0.15, duration:0.5, ease:E }}
-          style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1rem' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1rem',
+            ...(analysis.guidance.source === 'qwen' ? { borderTop:'2px solid rgba(0,194,255,0.3)' } : {}) }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'0.75rem' }}>
             <div className="section-eyebrow">Clinical Guidance</div>
+            {analysis.guidance.source === 'qwen' ? (
+              <span style={{ display:'flex', alignItems:'center', gap:'0.4rem', padding:'0.25rem 0.7rem',
+                borderRadius:'99px', fontSize:'0.5rem', fontFamily:'var(--mono)', fontWeight:700,
+                letterSpacing:'0.12em', textTransform:'uppercase', whiteSpace:'nowrap',
+                background:'rgba(0,194,255,0.08)', border:'1px solid rgba(0,194,255,0.25)', color:'rgba(0,194,255,0.9)' }}>
+                <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="rgba(0,194,255,0.9)"/></svg>
+                Qwen 2.5 AI
+              </span>
+            ) : (
+              <span style={{ padding:'0.25rem 0.7rem', borderRadius:'99px', fontSize:'0.5rem',
+                fontFamily:'var(--mono)', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase',
+                background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text-dim)' }}>
+                Rule-based
+              </span>
+            )}
           </div>
           <p style={{ fontSize:'0.8rem', color:'var(--text-muted)', lineHeight:1.65, padding:'0.875rem',
-            borderRadius:'0.75rem', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
+            borderRadius:'0.75rem',
+            background: analysis.guidance.source === 'qwen' ? 'rgba(0,194,255,0.04)' : 'rgba(255,255,255,0.03)',
+            border: analysis.guidance.source === 'qwen' ? '1px solid rgba(0,194,255,0.12)' : '1px solid rgba(255,255,255,0.07)' }}>
             {analysis.guidance.explanation}
           </p>
           <div style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start' }}>
