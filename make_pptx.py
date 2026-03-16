@@ -331,3 +331,165 @@ for i, tag in enumerate(tags):
     rect(s, tx, Inches(6.75), Inches(2.0), Inches(0.42), CARD2, lc=DIM)
     mono(s, tag, tx+Inches(0.1), Inches(6.78), Inches(1.8), Inches(0.32),
          size=Pt(8), color=MUTED, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SLIDE 6 — LIVE DEMO OUTPUT  (data viz: Hb gauge + terminal)
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
+add_bg(s)
+spine(s)
+
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "05  /  Live Demo Output", Inches(0.45), Inches(0.65))
+txt(s, "Real screening result.", Inches(0.45), Inches(0.95),
+    Inches(10), Inches(1.0), size=Pt(42), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(1.95), Inches(3.8), CRIMSON, h=Inches(0.04))
+
+# ── Left panel: triage result card ───────────────────────────────────────────
+rect(s, Inches(0.45), Inches(2.15), Inches(6.0), Inches(4.55), CARD2, lc=AMBER, lw=Pt(1.5))
+rect(s, Inches(0.45), Inches(2.15), Inches(6.0), Inches(0.07), AMBER)
+
+mono(s, "Triage Result  ·  Moderate Risk", Inches(0.65), Inches(2.28),
+     Inches(5.5), Inches(0.28), size=Pt(8), color=AMBER, bold=True)
+
+# Hb value — huge
+txt(s, "9.8", Inches(0.65), Inches(2.6), Inches(3.0), Inches(1.6),
+    size=Pt(96), bold=True, color=AMBER, font="Calibri")
+mono(s, "g/dL  Hemoglobin", Inches(0.65), Inches(4.2),
+     Inches(5.5), Inches(0.3), size=Pt(9), color=MUTED, bold=False)
+
+# Hb scale bar (visual gauge)
+rule(s, Inches(0.65), Inches(4.6), Inches(5.5), DIM2, h=Inches(0.18))
+# Fill: 9.8 out of 18 g/dL = ~54%
+rect(s, Inches(0.65), Inches(4.6), Inches(2.97), Inches(0.18), AMBER)
+mono(s, "0", Inches(0.65), Inches(4.82), Inches(0.4), Inches(0.22), size=Pt(7), color=DIM, bold=False)
+mono(s, "9.8", Inches(3.4), Inches(4.82), Inches(0.6), Inches(0.22), size=Pt(7), color=AMBER, bold=True)
+mono(s, "18 g/dL", Inches(5.9), Inches(4.82), Inches(0.7), Inches(0.22), size=Pt(7), color=DIM, bold=False)
+
+txt(s, "Hemoglobin below normal range.\nClinical follow-up recommended within 1–2 weeks.",
+    Inches(0.65), Inches(5.1), Inches(5.5), Inches(0.8),
+    size=Pt(11), color=MUTED, font="Calibri")
+
+# 3 mini stat chips below
+mini_stats = [("68%", "Anemia Risk", CRIMSON), ("88%", "Confidence", WHITE), ("Band 2", "Triage", AMBER)]
+for i, (val, lbl, vc) in enumerate(mini_stats):
+    stat_chip(s, val, lbl, Inches(0.65) + i * Inches(1.9), Inches(6.0),
+              w=Inches(1.75), h=Inches(0.85), val_color=vc, border=DIM)
+
+# ── Right panel: terminal brief ───────────────────────────────────────────────
+rect(s, Inches(6.7), Inches(2.15), Inches(6.3), Inches(4.55),
+     RGBColor(0x00, 0x00, 0x00), lc=CRIMSON, lw=Pt(1.2))
+# Terminal header bar
+rect(s, Inches(6.7), Inches(2.15), Inches(6.3), Inches(0.38), CARD2)
+mono(s, "CLINICAL HANDOFF BRIEF", Inches(6.9), Inches(2.22),
+     Inches(5.8), Inches(0.28), size=Pt(8), color=CRIMSON, bold=True)
+# Traffic light dots
+for di, dc in enumerate([CRIMSON, AMBER, GREEN]):
+    rect(s, Inches(12.3) - di * Inches(0.28), Inches(2.24), Inches(0.16), Inches(0.16), dc)
+
+terminal_lines = [
+    ("Provider:",    "EfficientNet-B0"),
+    ("Risk Score:",  "68.4%  (Moderate)"),
+    ("Hb Estimate:", "9.8 g/dL"),
+    ("Confidence:",  "88%"),
+    ("Triage Band:", "Band 2  —  Monitor"),
+    ("Symptoms:",    "Fatigue, Dizziness"),
+    ("Next Step:",   "CBC within 1–2 weeks"),
+    ("Disclaimer:",  "Screening only. Not diagnostic."),
+]
+for i, (key, val) in enumerate(terminal_lines):
+    ty = Inches(2.65) + i * Inches(0.44)
+    mono(s, key, Inches(6.9), ty, Inches(1.9), Inches(0.38), size=Pt(10), color=CRIMSON, bold=True)
+    mono(s, val, Inches(8.9), ty, Inches(3.9), Inches(0.38), size=Pt(10), color=WHITE, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SLIDE 7 — IMPACT & SDGs
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
+add_bg(s)
+spine(s)
+ghost_num(s, "1.6B", Inches(7.0), Inches(0.2), size=Pt(160))
+
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "06  /  Impact", Inches(0.45), Inches(0.65))
+txt(s, "Designed for the last mile.", Inches(0.45), Inches(0.95),
+    Inches(10), Inches(1.0), size=Pt(42), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(1.95), Inches(4.2), CRIMSON, h=Inches(0.04))
+
+impacts = [
+    ("Community Health Workers",
+     "Deploy in rural India, sub-Saharan Africa, or any low-resource setting. No training beyond a 5-minute guide.",
+     CRIMSON),
+    ("Pregnant Women & Children",
+     "The highest-risk groups — least likely to access a clinic. AnemiaLens meets them where they are.",
+     BRIGHT),
+    ("School & Field Nurses",
+     "Rapid triage in schools, refugee camps, and disaster zones. Results in under 60 seconds.",
+     AMBER),
+    ("Telemedicine Platforms",
+     "Structured clinical brief integrates directly into existing telehealth workflows via share/export.",
+     GREEN),
+]
+for i, (title, desc, ac) in enumerate(impacts):
+    ix = Inches(0.45) + (i % 2) * Inches(6.3)
+    iy = Inches(2.15) + (i // 2) * Inches(2.05)
+    lcard(s, ix, iy, Inches(6.0), Inches(1.85), title, desc, accent=ac, title_size=Pt(13))
+
+# SDG bar
+rect(s, Inches(0.45), Inches(6.38), Inches(12.4), Inches(0.52), CARD2, lc=DIM)
+mono(s, "UN SDG 3: Good Health & Well-Being   ·   UN SDG 10: Reduced Inequalities   ·   UN SDG 1: No Poverty",
+     Inches(0.55), Inches(6.46), Inches(12.0), Inches(0.35),
+     size=Pt(9), color=CRIMSON, bold=True)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SLIDE 8 — CLOSE / CALL TO ACTION
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
+add_bg(s)
+spine(s)
+
+# Full-width crimson top bar
+rect(s, 0, 0, W, Inches(0.12), CRIMSON)
+
+# Ghost watermark
+ghost_num(s, "AL", Inches(7.5), Inches(0.8), size=Pt(260))
+
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+
+txt(s, "AnemiaLens doesn't replace doctors.", Inches(0.45), Inches(1.1),
+    Inches(12.4), Inches(1.2), size=Pt(38), bold=True, color=WHITE,
+    align=PP_ALIGN.CENTER, font="Calibri")
+
+txt(s, "It gets patients to doctors sooner,\nwith better information, at zero cost.",
+    Inches(0.45), Inches(2.35), Inches(12.4), Inches(1.3),
+    size=Pt(26), color=MUTED, align=PP_ALIGN.CENTER, font="Calibri")
+
+rule(s, Inches(0.45), Inches(3.75), Inches(12.4), CRIMSON, h=Inches(0.05))
+
+# Final 4 stats — large
+final_stats = [
+    ("1.6B+", "People we can reach",       CRIMSON),
+    ("92%",   "Sensitivity",               WHITE),
+    ("$0",    "Marginal cost / screening", GREEN),
+    ("<60s",  "Time to result",            AMBER),
+]
+for i, (val, lbl, vc) in enumerate(final_stats):
+    fx = Inches(0.45) + i * Inches(3.1)
+    txt(s, val, fx, Inches(4.0), Inches(3.0), Inches(1.1),
+        size=Pt(52), bold=True, color=vc, align=PP_ALIGN.CENTER, font="Calibri")
+    mono(s, lbl, fx, Inches(5.1), Inches(3.0), Inches(0.35),
+         size=Pt(8), color=MUTED, bold=False)
+
+rule(s, Inches(0.45), Inches(5.6), Inches(12.4), DIM, h=Inches(0.025))
+
+txt(s, "Thank you.", Inches(0.45), Inches(5.8),
+    Inches(12.4), Inches(0.9), size=Pt(28), bold=True, color=WHITE,
+    align=PP_ALIGN.CENTER, font="Calibri")
+
+mono(s, "AnemiaLens  ·  Hackathon 2026  ·  AI for Health",
+     Inches(0.45), Inches(6.85), Inches(12.4), Inches(0.35),
+     size=Pt(8), color=DIM, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
+prs.save("AnemiaLens_Presentation_v2.pptx")
+print("Done  →  AnemiaLens_Presentation_v2.pptx")

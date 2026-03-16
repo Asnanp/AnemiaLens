@@ -1,5 +1,49 @@
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+.venv/
+.uv-cache/
 
-# Microsoft Office temporary files
-~*.pptx
-~*.docx
-~*.xlsx
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+
+# ── Dataset / Large binary data ───────────────────────────────────────────────
+archive/
+*.jpg
+*.jpeg
+*.png
+*.xlsx
+*.docx
+
+# ── IDE / Tool internals ──────────────────────────────────────────────────────
+.codex/
+.qoder/
+.vscode/
+.kiro/
+.idea/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+frontend/tsconfig.node.tsbuildinfo
+
+# ── Logs & temp ───────────────────────────────────────────────────────────────
+*.log
+vite-live.log
+vite-live.err
+vite.log
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ── Generated / presentation files ───────────────────────────────────────────
+*.pptx
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
