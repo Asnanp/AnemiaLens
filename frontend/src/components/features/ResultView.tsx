@@ -68,7 +68,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const bandGlow   = isHigh ? 'rgba(239,68,68,0.18)' : isModerate ? 'rgba(245,158,11,0.14)' : 'rgba(16,185,129,0.14)';
 
   const hbRaw  = analysis.prediction?.predicted_hemoglobin ?? 0;
-  const risk   = Math.round((analysis.prediction?.anemia_risk ?? 0) * 100);
+  const risk   = Math.round((analysis.triage.score ?? analysis.prediction?.anemia_risk ?? 0) * 100);
   const conf   = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1400, 300);
 
@@ -166,23 +166,35 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.div className="glass"
             initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
             transition={{ delay:0.15, duration:0.5, ease:E }}
-            style={{ padding:'2rem' }}
+            style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1rem' }}
           >
-            <div className="section-eyebrow" style={{ marginBottom:'1.25rem' }}>Clinical Guidance</div>
-            <div style={{ display:'flex', gap:'0.875rem', alignItems:'flex-start', marginBottom:'1.5rem' }}>
-              <div style={{ width:36, height:36, borderRadius:'0.75rem', flexShrink:0, background:'rgba(200,0,30,0.12)', border:'1px solid rgba(200,0,30,0.2)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--accent-bright)' }}>
-                <AlertCircle size={16} />
-              </div>
-              <div>
-                <div style={{ fontWeight:600, fontSize:'0.85rem', marginBottom:'0.25rem' }}>
-                  {analysis.insight_pack.follow_up_timeline[0]?.window ?? 'Next Steps'}
-                </div>
-                <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', lineHeight:1.55 }}>
-                  {analysis.insight_pack.follow_up_timeline[0]?.action ?? analysis.guidance.urgency_guidance}
-                </p>
-              </div>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div className="section-eyebrow">Clinical Guidance</div>
+              {analysis.guidance.source === 'qwen' && (
+                <span style={{ fontSize:'0.55rem', fontFamily:'var(--mono)', padding:'0.2rem 0.6rem', borderRadius:'99px', background:'rgba(0,194,255,0.08)', border:'1px solid rgba(0,194,255,0.25)', color:'rgba(0,194,255,0.9)', letterSpacing:'0.1em', textTransform:'uppercase' }}>
+                  Qwen 2.5
+                </span>
+              )}
             </div>
-            <ul style={{ display:'flex', flexDirection:'column', gap:'0.625rem' }}>
+
+            {/* Explanation from Qwen */}
+            <p style={{ fontSize:'0.8rem', color:'var(--text-muted)', lineHeight:1.65, padding:'0.875rem', borderRadius:'0.75rem', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
+              {analysis.guidance.explanation}
+            </p>
+
+            {/* Urgency */}
+            <div style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start' }}>
+              <div style={{ width:32, height:32, borderRadius:'0.625rem', flexShrink:0, background:'rgba(200,0,30,0.12)', border:'1px solid rgba(200,0,30,0.2)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--accent-bright)' }}>
+                <AlertCircle size={14} />
+              </div>
+              <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', lineHeight:1.55, paddingTop:'0.35rem' }}>
+                {analysis.guidance.urgency_guidance}
+              </p>
+            </div>
+
+            {/* Next steps */}
+            <ul style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
               {analysis.guidance.next_steps.slice(0, 4).map((step, i) => (
                 <li key={i} style={{ display:'flex', gap:'0.625rem', alignItems:'flex-start' }}>
                   <div style={{ width:16, height:16, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.12)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
@@ -192,6 +204,13 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 </li>
               ))}
             </ul>
+
+            {/* Food advice */}
+            {analysis.guidance.food_advice && (
+              <div style={{ fontSize:'0.72rem', color:'var(--text-dim)', lineHeight:1.6, padding:'0.75rem', borderRadius:'0.625rem', background:'rgba(0,229,150,0.04)', border:'1px solid rgba(0,229,150,0.12)' }}>
+                🥗 {analysis.guidance.food_advice}
+              </div>
+            )}
           </motion.div>
 
           {/* Biomarker Analysis */}

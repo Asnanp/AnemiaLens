@@ -5,8 +5,8 @@ from app.schemas import PredictionResult, QualityAssessment, SignalBreakdown, Sy
 
 
 class TriageService:
-    IMAGE_WEIGHT = 0.72
-    SYMPTOM_WEIGHT = 0.28
+    IMAGE_WEIGHT = 0.55
+    SYMPTOM_WEIGHT = 0.45
     _WEIGHTS = {
         "fatigue": 0.16,
         "dizziness": 0.14,
