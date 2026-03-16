@@ -86,41 +86,22 @@ class Settings(BaseSettings):
         ]
     )
 
-    # --- Guidance (Qwen via Hugging Face) -------------------------------
-    qwen_enabled: bool = Field(
+    # --- Guidance (Mistral AI) -------------------------------------------
+    mistral_enabled: bool = Field(
         default=True,
-        validation_alias=AliasChoices(
-            "ANEMIALENS_QWEN_ENABLED",
-            "QWEN_ENABLED",
-            "ANEMIALENS_HF_ENABLED",
-            "HF_ENABLED",
-        ),
+        validation_alias=AliasChoices("ANEMIALENS_MISTRAL_ENABLED", "MISTRAL_ENABLED"),
     )
-    qwen_model: str = Field(
-        default="Qwen/Qwen2.5-7B-Instruct",
-        validation_alias=AliasChoices(
-            "ANEMIALENS_QWEN_MODEL",
-            "QWEN_MODEL",
-            "ANEMIALENS_HF_MODEL",
-            "HF_MODEL",
-        ),
+    mistral_model: str = Field(
+        default="mistral-small-latest",
+        validation_alias=AliasChoices("ANEMIALENS_MISTRAL_MODEL", "MISTRAL_MODEL"),
     )
-    hf_api_key: str = Field(
+    mistral_api_key: str = Field(
         default="",
         repr=False,
-        validation_alias=AliasChoices(
-            "ANEMIALENS_HF_API_KEY",
-            "HF_API_KEY",
-            "HUGGINGFACEHUB_API_TOKEN",
-            "HF_TOKEN",
-        ),
-    )
-    hf_provider: str = Field(
-        default="together",
-        validation_alias=AliasChoices("ANEMIALENS_HF_PROVIDER", "HF_PROVIDER"),
+        validation_alias=AliasChoices("ANEMIALENS_MISTRAL_API_KEY"),
     )
     guidance_timeout: float = Field(
-        default=6.0,
+        default=20.0,
         ge=1.0,
         le=120.0,
         validation_alias=AliasChoices("ANEMIALENS_GUIDANCE_TIMEOUT", "GUIDANCE_TIMEOUT"),
@@ -131,6 +112,11 @@ class Settings(BaseSettings):
         le=2048,
         validation_alias=AliasChoices("ANEMIALENS_GUIDANCE_MAX_TOKENS", "GUIDANCE_MAX_TOKENS"),
     )
+    # Keep old HF fields so existing env files don't break
+    qwen_enabled: bool = Field(default=False, validation_alias=AliasChoices("ANEMIALENS_QWEN_ENABLED", "QWEN_ENABLED"))
+    qwen_model: str = Field(default="", validation_alias=AliasChoices("ANEMIALENS_QWEN_MODEL", "QWEN_MODEL"))
+    hf_api_key: str = Field(default="", repr=False, validation_alias=AliasChoices("ANEMIALENS_HF_API_KEY", "HF_API_KEY"))
+    hf_provider: str = Field(default="", validation_alias=AliasChoices("ANEMIALENS_HF_PROVIDER", "HF_PROVIDER"))
 
     # --- Image quality thresholds ----------------------------------------
     min_blur_score: float = Field(default=60.0, ge=0.0, le=200.0)
@@ -173,11 +159,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _warn_missing_api_key(self) -> "Settings":
-        if self.qwen_enabled and not self.hf_api_key:
+        if self.mistral_enabled and not self.mistral_api_key:
             import warnings
             warnings.warn(
-                "No Hugging Face API key is set but Qwen guidance is enabled. "
-                "Guidance calls will fail and fall back to rule-based responses.",
+                "No Mistral API key is set but Mistral guidance is enabled. "
+                "Guidance calls will fall back to rule-based responses.",
                 RuntimeWarning,
                 stacklevel=2,
             )

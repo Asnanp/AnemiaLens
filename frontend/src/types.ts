@@ -59,7 +59,7 @@ export type TriageResult = {
 };
 
 export type GuidanceResult = {
-  source: 'qwen' | 'fallback';
+  source: 'mistral' | 'fallback';
   model_used?: string | null;
   provider_used?: string | null;
   explanation: string;
@@ -159,8 +159,9 @@ export type RecentScreening = {
 };
 
 export type GuidanceRuntimeStatus = {
-  active_strategy: 'qwen' | 'fallback';
+  active_strategy: 'mistral' | 'fallback';
   qwen_enabled: boolean;
+  mistral_enabled?: boolean;
   client_ready: boolean;
   api_key_configured: boolean;
   qwen_model?: string | null;
