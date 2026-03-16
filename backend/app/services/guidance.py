@@ -28,8 +28,9 @@ _FIELD_LIMITS = {
     "food_advice": 260,
 }
 _UNSAFE_CLAIM_PATTERN = re.compile(
-    r"\b(definitely|confirmed|certain|diagnos(?:e|es|ed|is)|proves?|proof of anemia|"
-    r"you have anemia|you are anemic|you are anaemic|iron deficiency)\b",
+    r"\b(definitely\s+(?:have|has|anemic|anaemic)|confirmed\s+(?:anemia|anaemia)|"
+    r"you\s+(?:have|are)\s+(?:anemia|anaemia|anemic|anaemic)|"
+    r"proves?\s+(?:anemia|anaemia)|proof\s+of\s+anemia)\b",
     flags=re.IGNORECASE,
 )
 _SAFE_DIAGNOSTIC_CONTEXT_PATTERNS = (
@@ -452,6 +453,7 @@ class GuidanceService:
 
         combined_text = " ".join([explanation, urgency_guidance, food_advice, *cleaned_steps])
         if self._contains_unsafe_claim(combined_text):
+            log.warning("Qwen output blocked by safety filter. Text snippet: %s", combined_text[:200])
             raise ValueError("Guidance output made an unsafe medical claim")
 
         return GuidanceResult(
