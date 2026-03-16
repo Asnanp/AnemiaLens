@@ -33,13 +33,18 @@ load_dotenv(BACKEND_ROOT / ".env")
 app = Flask(__name__)
 CORS(
     app,
-    origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "https://anemia-lens.vercel.app"
-    ],
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:5174",
+                "http://127.0.0.1:5174",
+                "https://anemia-lens.vercel.app",
+                r"https://.*\.vercel\.app",
+            ]
+        }
+    },
     supports_credentials=False,
 )
 
