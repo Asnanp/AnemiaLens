@@ -2,382 +2,332 @@ from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Inches, Pt
-import copy
+import math
 
 prs = Presentation()
 prs.slide_width  = Inches(13.33)
 prs.slide_height = Inches(7.5)
 
-# ── Palette ──────────────────────────────────────────────────────────────────
+# ── Palette (matches AnemiaLens app) ─────────────────────────────────────────
 VOID    = RGBColor(0x02, 0x02, 0x08)
+DEEP    = RGBColor(0x06, 0x06, 0x12)
+CARD    = RGBColor(0x0A, 0x0A, 0x18)
+CARD2   = RGBColor(0x10, 0x10, 0x22)
 CRIMSON = RGBColor(0xC8, 0x00, 0x1E)
 BRIGHT  = RGBColor(0xE8, 0x29, 0x4A)
 WHITE   = RGBColor(0xF2, 0xF0, 0xEC)
 MUTED   = RGBColor(0x8A, 0x88, 0x84)
-DIM     = RGBColor(0x44, 0x42, 0x40)
+DIM     = RGBColor(0x2A, 0x28, 0x30)
+DIM2    = RGBColor(0x1E, 0x1C, 0x26)
 GREEN   = RGBColor(0x10, 0xB9, 0x81)
 AMBER   = RGBColor(0xF5, 0x9E, 0x0B)
-CARD    = RGBColor(0x0A, 0x0A, 0x14)
+BLUE    = RGBColor(0x38, 0xBD, 0xF8)
 
 W = prs.slide_width
 H = prs.slide_height
+blank = prs.slide_layouts[6]
 
-blank_layout = prs.slide_layouts[6]  # completely blank
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Core helpers ──────────────────────────────────────────────────────────────
 def add_bg(slide, color=VOID):
-    bg = slide.shapes.add_shape(1, 0, 0, W, H)
-    bg.fill.solid(); bg.fill.fore_color.rgb = color
-    bg.line.fill.background()
-    return bg
+    s = slide.shapes.add_shape(1, 0, 0, W, H)
+    s.fill.solid(); s.fill.fore_color.rgb = color
+    s.line.fill.background()
 
-def add_rect(slide, x, y, w, h, fill, alpha=None, line_color=None, line_w=Pt(0)):
+def rect(slide, x, y, w, h, fill, lc=None, lw=Pt(0.75)):
     s = slide.shapes.add_shape(1, x, y, w, h)
     s.fill.solid(); s.fill.fore_color.rgb = fill
-    if line_color:
-        s.line.color.rgb = line_color
-        s.line.width = line_w
-    else:
-        s.line.fill.background()
+    if lc: s.line.color.rgb = lc; s.line.width = lw
+    else:  s.line.fill.background()
     return s
 
-def add_text(slide, text, x, y, w, h, size=Pt(14), bold=False, color=WHITE,
-             align=PP_ALIGN.LEFT, italic=False, font="Calibri"):
+def txt(slide, text, x, y, w, h, size=Pt(12), bold=False, color=WHITE,
+        align=PP_ALIGN.LEFT, italic=False, font="Calibri"):
     tb = slide.shapes.add_textbox(x, y, w, h)
-    tf = tb.text_frame
-    tf.word_wrap = True
-    p = tf.paragraphs[0]
-    p.alignment = align
-    run = p.add_run()
-    run.text = text
-    run.font.size = size
-    run.font.bold = bold
-    run.font.italic = italic
-    run.font.color.rgb = color
-    run.font.name = font
+    tf = tb.text_frame; tf.word_wrap = True
+    p = tf.paragraphs[0]; p.alignment = align
+    r = p.add_run(); r.text = text
+    r.font.size = size; r.font.bold = bold; r.font.italic = italic
+    r.font.color.rgb = color; r.font.name = font
     return tb
 
-def add_label(slide, text, x, y, w=Inches(4)):
-    add_text(slide, text.upper(), x, y, w, Inches(0.3),
-             size=Pt(8), bold=True, color=CRIMSON, font="Courier New")
+def mono(slide, text, x, y, w, h, size=Pt(9), color=CRIMSON, bold=True, align=PP_ALIGN.LEFT):
+    return txt(slide, text.upper(), x, y, w, h, size=size, bold=bold,
+               color=color, align=align, font="Courier New")
 
-def add_card(slide, x, y, w, h, title, body, title_color=WHITE):
-    add_rect(slide, x, y, w, h, CARD, line_color=DIM, line_w=Pt(0.75))
-    add_text(slide, title, x+Inches(0.2), y+Inches(0.15), w-Inches(0.4), Inches(0.4),
-             size=Pt(13), bold=True, color=title_color)
-    add_text(slide, body, x+Inches(0.2), y+Inches(0.55), w-Inches(0.4), h-Inches(0.7),
-             size=Pt(10), color=MUTED)
+def label(slide, text, x, y, w=Inches(6)):
+    mono(slide, text, x, y, w, Inches(0.28), size=Pt(8), color=CRIMSON)
 
-def crimson_bar(slide, x, y, h=Inches(0.06)):
-    add_rect(slide, x, y, Inches(0.5), h, CRIMSON)
+# Left crimson spine (used on every slide)
+def spine(slide, w=Inches(0.14)):
+    rect(slide, 0, 0, w, H, CRIMSON)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# Thin horizontal rule
+def rule(slide, x, y, w, color=DIM, h=Inches(0.025)):
+    rect(slide, x, y, w, h, color)
+
+# Large ghost number (background watermark)
+def ghost_num(slide, text, x, y, size=Pt(200)):
+    txt(slide, text, x, y, Inches(5), Inches(3.5), size=size, bold=True,
+        color=RGBColor(0x14, 0x12, 0x1E), align=PP_ALIGN.LEFT, font="Calibri")
+
+# Stat chip: big value + small label
+def stat_chip(slide, val, lbl, x, y, w=Inches(2.4), h=Inches(1.1),
+              val_color=CRIMSON, border=DIM):
+    rect(slide, x, y, w, h, CARD2, lc=border)
+    txt(slide, val, x+Inches(0.18), y+Inches(0.08), w-Inches(0.3), Inches(0.55),
+        size=Pt(28), bold=True, color=val_color, font="Calibri")
+    mono(slide, lbl, x+Inches(0.18), y+Inches(0.65), w-Inches(0.3), Inches(0.3),
+         size=Pt(7.5), color=MUTED, bold=False)
+
+# Card with top crimson bar
+def card(slide, x, y, w, h, title, body, accent=CRIMSON, title_size=Pt(13)):
+    rect(slide, x, y, w, h, CARD2, lc=DIM)
+    rect(slide, x, y, w, Inches(0.055), accent)
+    txt(slide, title, x+Inches(0.22), y+Inches(0.14), w-Inches(0.4), Inches(0.42),
+        size=title_size, bold=True, color=WHITE, font="Calibri")
+    txt(slide, body, x+Inches(0.22), y+Inches(0.58), w-Inches(0.4), h-Inches(0.72),
+        size=Pt(10), color=MUTED, font="Calibri")
+
+# Left-accent card
+def lcard(slide, x, y, w, h, title, body, accent=CRIMSON, title_size=Pt(13)):
+    rect(slide, x, y, w, h, CARD2, lc=DIM)
+    rect(slide, x, y, Inches(0.07), h, accent)
+    txt(slide, title, x+Inches(0.22), y+Inches(0.14), w-Inches(0.36), Inches(0.42),
+        size=title_size, bold=True, color=WHITE, font="Calibri")
+    txt(slide, body, x+Inches(0.22), y+Inches(0.58), w-Inches(0.36), h-Inches(0.72),
+        size=Pt(10), color=MUTED, font="Calibri")
+
+# Diagonal accent line (decorative)
+def diag_line(slide, x1, y1, x2, y2, color=DIM, w=Pt(0.5)):
+    from pptx.util import Emu
+    line = slide.shapes.add_connector(1, x1, y1, x2, y2)
+    line.line.color.rgb = color; line.line.width = w
+
+# Step node: circle-ish number badge + title + desc
+def step_node(slide, num, title, desc, x, y, w=Inches(2.3), h=Inches(3.6), accent=CRIMSON):
+    rect(slide, x, y, w, h, CARD2, lc=DIM)
+    rect(slide, x, y, w, Inches(0.055), accent)
+    # Number badge
+    rect(slide, x+Inches(0.18), y+Inches(0.18), Inches(0.55), Inches(0.55), accent)
+    txt(slide, num, x+Inches(0.18), y+Inches(0.16), Inches(0.55), Inches(0.55),
+        size=Pt(16), bold=True, color=WHITE, align=PP_ALIGN.CENTER, font="Calibri")
+    txt(slide, title, x+Inches(0.18), y+Inches(0.85), w-Inches(0.36), Inches(0.45),
+        size=Pt(13), bold=True, color=WHITE, font="Calibri")
+    txt(slide, desc, x+Inches(0.18), y+Inches(1.35), w-Inches(0.36), h-Inches(1.5),
+        size=Pt(10), color=MUTED, font="Calibri")
+
+# Arrow connector between steps
+def arrow(slide, x, y):
+    rect(slide, x, y+Inches(0.22), Inches(0.22), Inches(0.025), DIM)
+    # arrowhead triangle approximation
+    rect(slide, x+Inches(0.18), y+Inches(0.14), Inches(0.08), Inches(0.18), DIM)
+
+# ═════════════════════════════════════════════════════════════════════════════
 # SLIDE 1 — TITLE
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
 add_bg(s)
+spine(s)
 
-# Left crimson accent bar
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
+# Ghost large "A" watermark top-right
+ghost_num(s, "A", Inches(9.2), Inches(-0.8), size=Pt(320))
+
+# Top rule
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
 
 # Eyebrow
-add_text(s, "HACKATHON 2026  ·  AI FOR HEALTH", Inches(0.5), Inches(1.6),
-         Inches(8), Inches(0.4), size=Pt(9), bold=True, color=CRIMSON, font="Courier New")
+mono(s, "Hackathon 2026  ·  AI for Health  ·  Non-Invasive Screening",
+     Inches(0.45), Inches(0.65), Inches(10), Inches(0.3), size=Pt(8), color=CRIMSON)
 
-# Title
-add_text(s, "AnemiaLens", Inches(0.5), Inches(2.1),
-         Inches(9), Inches(1.6), size=Pt(72), bold=True, color=WHITE, font="Calibri")
+# Title — massive
+txt(s, "AnemiaLens", Inches(0.45), Inches(1.3), Inches(10), Inches(2.0),
+    size=Pt(96), bold=True, color=WHITE, font="Calibri")
 
-# Subtitle
-add_text(s, "Smartphone-first anemia screening powered by\ncomputer vision and grounded GenAI.",
-         Inches(0.5), Inches(3.75), Inches(7.5), Inches(1.0),
-         size=Pt(18), color=MUTED, font="Calibri")
+# Crimson underline accent
+rect(s, Inches(0.45), Inches(3.25), Inches(3.8), Inches(0.07), CRIMSON)
 
-# Stat chips row
-chips = [("1.6B+", "People Affected"), ("92%", "Sensitivity"), ("$0", "Marginal Cost")]
-for i, (val, lbl) in enumerate(chips):
-    cx = Inches(0.5) + i * Inches(2.6)
-    add_rect(s, cx, Inches(5.1), Inches(2.3), Inches(0.9), CARD, line_color=DIM, line_w=Pt(0.75))
-    add_text(s, val,  cx+Inches(0.15), Inches(5.15), Inches(2.0), Inches(0.4),
-             size=Pt(22), bold=True, color=CRIMSON, font="Calibri")
-    add_text(s, lbl,  cx+Inches(0.15), Inches(5.55), Inches(2.0), Inches(0.3),
-             size=Pt(9), color=MUTED, font="Courier New")
+# Tagline
+txt(s, "Smartphone-first anemia screening\npowered by computer vision + grounded GenAI.",
+    Inches(0.45), Inches(3.45), Inches(7.8), Inches(1.1),
+    size=Pt(17), color=MUTED, font="Calibri")
 
-# Team / event tag bottom right
-add_text(s, "3-Minute Demo  ·  2026", Inches(9.5), Inches(6.9),
-         Inches(3.5), Inches(0.4), size=Pt(9), color=DIM, align=PP_ALIGN.RIGHT, font="Courier New")
+# Stat chips row — 4 chips
+chips = [
+    ("1.6B+", "People Affected", CRIMSON),
+    ("92%",   "Sensitivity",     WHITE),
+    ("$0",    "Marginal Cost",   GREEN),
+    ("<60s",  "Time to Result",  AMBER),
+]
+for i, (val, lbl, vc) in enumerate(chips):
+    stat_chip(s, val, lbl, Inches(0.45) + i * Inches(2.55), Inches(4.75),
+              w=Inches(2.35), h=Inches(1.05), val_color=vc)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# Bottom rule + team tag
+rule(s, Inches(0.35), Inches(6.85), Inches(12.6), DIM)
+mono(s, "3-Minute Demo  ·  2026", Inches(9.5), Inches(6.95),
+     Inches(3.5), Inches(0.3), size=Pt(8), color=DIM, bold=False)
+mono(s, "Zero blood draw  ·  Works offline  ·  Any smartphone",
+     Inches(0.45), Inches(6.95), Inches(7), Inches(0.3), size=Pt(8), color=DIM, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
 # SLIDE 2 — THE PROBLEM
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
 add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "The Problem", Inches(0.5), Inches(0.4))
-add_text(s, "Bridging the Screening Gap.", Inches(0.5), Inches(0.75),
-         Inches(9), Inches(1.1), size=Pt(44), bold=True, color=WHITE, font="Calibri")
+spine(s)
+ghost_num(s, "25%", Inches(7.5), Inches(0.5), size=Pt(180))
 
-# Big stat left
-add_rect(s, Inches(0.5), Inches(2.0), Inches(3.8), Inches(3.8), CARD, line_color=CRIMSON, line_w=Pt(1.5))
-add_text(s, "25%", Inches(0.6), Inches(2.2), Inches(3.6), Inches(1.4),
-         size=Pt(72), bold=True, color=CRIMSON, font="Calibri")
-add_text(s, "of the world's population\nhas anemia", Inches(0.6), Inches(3.6),
-         Inches(3.6), Inches(0.8), size=Pt(13), color=MUTED, font="Calibri")
-add_text(s, "Yet most cases go undetected\ndue to cost and access barriers.",
-         Inches(0.6), Inches(4.5), Inches(3.6), Inches(1.0), size=Pt(11), color=DIM, font="Calibri")
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "01  /  The Problem", Inches(0.45), Inches(0.65))
+txt(s, "Bridging the Screening Gap.", Inches(0.45), Inches(0.95),
+    Inches(9), Inches(1.1), size=Pt(46), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(2.05), Inches(5.5), CRIMSON, h=Inches(0.04))
 
-# Pain points right
+# Left: big stat block
+rect(s, Inches(0.45), Inches(2.25), Inches(4.2), Inches(4.2), CARD2, lc=CRIMSON, lw=Pt(1.5))
+rect(s, Inches(0.45), Inches(2.25), Inches(4.2), Inches(0.07), CRIMSON)
+txt(s, "25%", Inches(0.6), Inches(2.4), Inches(3.9), Inches(1.5),
+    size=Pt(88), bold=True, color=CRIMSON, font="Calibri")
+txt(s, "of the global population\nhas anemia", Inches(0.6), Inches(3.9),
+    Inches(3.9), Inches(0.65), size=Pt(14), color=WHITE, font="Calibri")
+rule(s, Inches(0.6), Inches(4.65), Inches(3.8), DIM)
+txt(s, "Yet most cases go undetected due to\ncost, distance, and systemic neglect.",
+    Inches(0.6), Inches(4.75), Inches(3.8), Inches(0.9),
+    size=Pt(10.5), color=MUTED, font="Calibri")
+
+# Right: 4 pain point cards
 pain = [
-    ("💸  Cost", "Blood tests cost $5–$30 — unaffordable in low-income settings."),
-    ("🏥  Distance", "Nearest clinic can be hours away for rural communities."),
-    ("⏱  Delay", "Results take days. Anemia worsens silently in the meantime."),
-    ("📉  Awareness", "Symptoms are vague — fatigue, dizziness — easy to dismiss."),
+    ("Cost Barrier",    "Blood tests cost $5–$30 — unaffordable in low-income settings.", CRIMSON),
+    ("Distance",        "Nearest clinic can be hours away for rural communities.",         AMBER),
+    ("Delayed Results", "Results take days. Anemia worsens silently in the meantime.",    AMBER),
+    ("Low Awareness",   "Symptoms — fatigue, dizziness — are vague and easy to dismiss.", MUTED),
 ]
-for i, (title, desc) in enumerate(pain):
-    py = Inches(2.0) + i * Inches(1.1)
-    add_rect(s, Inches(4.7), py, Inches(8.3), Inches(0.95), CARD, line_color=DIM, line_w=Pt(0.75))
-    add_text(s, title, Inches(4.9), py+Inches(0.08), Inches(3.0), Inches(0.35),
-             size=Pt(12), bold=True, color=WHITE, font="Calibri")
-    add_text(s, desc, Inches(4.9), py+Inches(0.42), Inches(8.0), Inches(0.45),
-             size=Pt(10), color=MUTED, font="Calibri")
+for i, (title, desc, ac) in enumerate(pain):
+    py = Inches(2.25) + i * Inches(1.06)
+    lcard(s, Inches(4.9), py, Inches(8.1), Inches(0.95), title, desc, accent=ac, title_size=Pt(12))
 
-# ─────────────────────────────────────────────────────────────────────────────
+rule(s, Inches(0.35), Inches(6.85), Inches(12.6), DIM)
+mono(s, "Source: WHO Global Anaemia Estimates 2023", Inches(0.45), Inches(6.95),
+     Inches(6), Inches(0.3), size=Pt(7.5), color=DIM, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
 # SLIDE 3 — THE SOLUTION
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
 add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "The Solution", Inches(0.5), Inches(0.4))
-add_text(s, "Your phone is the lab.", Inches(0.5), Inches(0.75),
-         Inches(10), Inches(1.1), size=Pt(44), bold=True, color=WHITE, font="Calibri")
+spine(s)
 
-add_text(s, "AnemiaLens analyzes the inner lower eyelid (conjunctiva) — when hemoglobin drops,\nthis tissue loses its pink color. Our model detects that pallor non-invasively.",
-         Inches(0.5), Inches(1.85), Inches(12.3), Inches(0.9),
-         size=Pt(13), color=MUTED, font="Calibri")
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "02  /  The Solution", Inches(0.45), Inches(0.65))
+txt(s, "Your phone is the lab.", Inches(0.45), Inches(0.95),
+    Inches(10), Inches(1.1), size=Pt(46), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(2.05), Inches(4.2), CRIMSON, h=Inches(0.04))
 
-# 3 pillars
+txt(s, "AnemiaLens analyzes the inner lower eyelid (conjunctiva). When hemoglobin drops,\n"
+       "this tissue loses its pink color. Our model detects that pallor — non-invasively.",
+    Inches(0.45), Inches(2.2), Inches(12.4), Inches(0.85),
+    size=Pt(12.5), color=MUTED, font="Calibri")
+
+# 3 pillar cards — equal width, full height
 pillars = [
-    ("📷  Capture", "Photograph the inner lower eyelid with any smartphone camera. No special hardware required."),
-    ("🧠  Analyze", "EfficientNet-B0 estimates hemoglobin level from conjunctival pallor. Validated on 710 clinical specimens."),
-    ("📋  Act", "Structured clinical brief generated instantly. Share with a doctor in one tap."),
+    ("Capture",  "Photograph the inner lower eyelid with any smartphone. No special hardware, no training required.",
+     CRIMSON),
+    ("Analyze",  "EfficientNet-B0 estimates hemoglobin (g/dL) from conjunctival pallor. Validated on 710 clinical specimens. Runs in <2s on CPU.",
+     AMBER),
+    ("Act",      "Structured clinical brief generated instantly. Triage band assigned. Share with a doctor in one tap.",
+     GREEN),
 ]
-for i, (title, desc) in enumerate(pillars):
-    px = Inches(0.5) + i * Inches(4.25)
-    add_rect(s, px, Inches(2.9), Inches(4.0), Inches(3.5), CARD, line_color=CRIMSON, line_w=Pt(1.0))
-    add_rect(s, px, Inches(2.9), Inches(4.0), Inches(0.08), CRIMSON)
-    add_text(s, title, px+Inches(0.2), Inches(3.1), Inches(3.6), Inches(0.5),
-             size=Pt(16), bold=True, color=WHITE, font="Calibri")
-    add_text(s, desc, px+Inches(0.2), Inches(3.7), Inches(3.6), Inches(2.4),
-             size=Pt(11), color=MUTED, font="Calibri")
+for i, (title, desc, ac) in enumerate(pillars):
+    px = Inches(0.45) + i * Inches(4.25)
+    rect(s, px, Inches(3.2), Inches(4.0), Inches(3.5), CARD2, lc=ac, lw=Pt(1.2))
+    rect(s, px, Inches(3.2), Inches(4.0), Inches(0.07), ac)
+    # Large step number ghost
+    txt(s, str(i+1), px+Inches(2.8), Inches(3.1), Inches(1.1), Inches(1.1),
+        size=Pt(72), bold=True, color=RGBColor(0x16, 0x14, 0x24), font="Calibri")
+    txt(s, title, px+Inches(0.22), Inches(3.42), Inches(3.6), Inches(0.5),
+        size=Pt(20), bold=True, color=WHITE, font="Calibri")
+    txt(s, desc, px+Inches(0.22), Inches(4.0), Inches(3.6), Inches(2.4),
+        size=Pt(10.5), color=MUTED, font="Calibri")
 
 # Bottom bar
-add_rect(s, Inches(0.5), Inches(6.6), Inches(12.3), Inches(0.55), CARD, line_color=DIM, line_w=Pt(0.75))
-add_text(s, "Zero blood draw  ·  Zero hardware  ·  Zero marginal cost  ·  Works offline",
-         Inches(0.6), Inches(6.65), Inches(12.0), Inches(0.4),
-         size=Pt(11), bold=True, color=CRIMSON, align=PP_ALIGN.CENTER, font="Courier New")
+rect(s, Inches(0.45), Inches(6.85), Inches(12.4), Inches(0.5), CARD2, lc=DIM)
+mono(s, "Zero blood draw  ·  Zero hardware  ·  Zero marginal cost  ·  Works offline  ·  Any smartphone",
+     Inches(0.55), Inches(6.92), Inches(12.0), Inches(0.35),
+     size=Pt(9), color=CRIMSON, bold=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 4 — HOW IT WORKS (5-step flow)
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
+# ═════════════════════════════════════════════════════════════════════════════
+# SLIDE 4 — HOW IT WORKS
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
 add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "How It Works", Inches(0.5), Inches(0.4))
-add_text(s, "Five steps to screening clarity.", Inches(0.5), Inches(0.75),
-         Inches(10), Inches(1.0), size=Pt(40), bold=True, color=WHITE, font="Calibri")
+spine(s)
+
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "03  /  How It Works", Inches(0.45), Inches(0.65))
+txt(s, "Five steps to screening clarity.", Inches(0.45), Inches(0.95),
+    Inches(10), Inches(1.0), size=Pt(42), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(1.95), Inches(5.0), CRIMSON, h=Inches(0.04))
 
 steps = [
-    ("01", "Capture", "Photograph inner lower eyelid in bright daylight."),
-    ("02", "Quality Gate", "AI rejects blurry or misframed images before analysis."),
-    ("03", "Vision AI", "EfficientNet-B0 estimates hemoglobin from pallor."),
-    ("04", "Symptom Fusion", "Patient symptoms fuse with image biomarkers."),
-    ("05", "Clinical Brief", "Triage band + handoff summary generated instantly."),
+    ("01", "Capture",       "Photograph inner lower eyelid in bright daylight."),
+    ("02", "Quality Gate",  "AI rejects blurry or misframed images before analysis."),
+    ("03", "Vision AI",     "EfficientNet-B0 estimates hemoglobin from pallor."),
+    ("04", "Symptom Fusion","Patient symptoms fuse with image biomarkers."),
+    ("05", "Clinical Brief","Triage band + handoff summary generated instantly."),
 ]
 for i, (num, title, desc) in enumerate(steps):
-    sx = Inches(0.5) + i * Inches(2.52)
-    # connector line
+    sx = Inches(0.45) + i * Inches(2.52)
+    step_node(s, num, title, desc, sx, Inches(2.15), w=Inches(2.3), h=Inches(4.0))
+    # connector arrow between steps
     if i < 4:
-        add_rect(s, sx+Inches(2.1), Inches(2.55), Inches(0.42), Inches(0.06), DIM)
-    # card
-    add_rect(s, sx, Inches(2.0), Inches(2.3), Inches(3.8), CARD, line_color=DIM, line_w=Pt(0.75))
-    add_rect(s, sx, Inches(2.0), Inches(2.3), Inches(0.07), CRIMSON)
-    add_text(s, num, sx+Inches(0.15), Inches(2.1), Inches(0.8), Inches(0.5),
-             size=Pt(28), bold=True, color=CRIMSON, font="Calibri")
-    add_text(s, title, sx+Inches(0.15), Inches(2.65), Inches(2.0), Inches(0.45),
-             size=Pt(13), bold=True, color=WHITE, font="Calibri")
-    add_text(s, desc, sx+Inches(0.15), Inches(3.15), Inches(2.0), Inches(2.4),
-             size=Pt(10), color=MUTED, font="Calibri")
+        cx = sx + Inches(2.3)
+        rect(s, cx, Inches(3.95), Inches(0.22), Inches(0.025), DIM)
 
-# ─────────────────────────────────────────────────────────────────────────────
+rule(s, Inches(0.35), Inches(6.85), Inches(12.6), DIM)
+mono(s, "Total time from capture to result: under 60 seconds",
+     Inches(0.45), Inches(6.95), Inches(8), Inches(0.3), size=Pt(8), color=MUTED, bold=False)
+
+# ═════════════════════════════════════════════════════════════════════════════
 # SLIDE 5 — TECH STACK
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
+# ═════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(blank)
 add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "Technology", Inches(0.5), Inches(0.4))
-add_text(s, "The Intelligence Framework.", Inches(0.5), Inches(0.75),
-         Inches(10), Inches(1.0), size=Pt(40), bold=True, color=WHITE, font="Calibri")
+spine(s)
+
+rule(s, Inches(0.35), Inches(0.55), Inches(12.6), DIM)
+label(s, "04  /  Technology", Inches(0.45), Inches(0.65))
+txt(s, "The Intelligence Framework.", Inches(0.45), Inches(0.95),
+    Inches(10), Inches(1.0), size=Pt(42), bold=True, color=WHITE, font="Calibri")
+rule(s, Inches(0.45), Inches(1.95), Inches(4.8), CRIMSON, h=Inches(0.04))
 
 layers = [
-    ("Vision Layer", "EfficientNet-B0",
+    ("Vision Layer",  "EfficientNet-B0",
      "Trained on 710 conjunctival specimens. Predicts hemoglobin (g/dL) and anemia risk score from a single image. Runs in <2s on CPU.",
      CRIMSON),
-    ("GenAI Layer", "Qwen-2.5 (Grounded)",
+    ("GenAI Layer",   "Qwen-2.5  (Grounded)",
      "Generates safe, personalized clinical guidance. Constrained by deterministic medical rules — cannot hallucinate a diagnosis. Every output is rule-validated.",
      AMBER),
-    ("Safety Layer", "4-Band Triage System",
+    ("Safety Layer",  "4-Band Triage System",
      "Low / Moderate / High Concern / Retake. Designed to prioritize patient safety over false confidence. Non-diagnostic language throughout.",
      GREEN),
 ]
 for i, (layer, model, desc, color) in enumerate(layers):
-    ly = Inches(2.0) + i * Inches(1.6)
-    add_rect(s, Inches(0.5), ly, Inches(12.3), Inches(1.45), CARD, line_color=color, line_w=Pt(1.0))
-    add_rect(s, Inches(0.5), ly, Inches(0.12), Inches(1.45), color)
-    add_text(s, layer.upper(), Inches(0.75), ly+Inches(0.1), Inches(2.5), Inches(0.3),
-             size=Pt(8), bold=True, color=color, font="Courier New")
-    add_text(s, model, Inches(0.75), ly+Inches(0.38), Inches(3.5), Inches(0.5),
-             size=Pt(18), bold=True, color=WHITE, font="Calibri")
-    add_text(s, desc, Inches(4.5), ly+Inches(0.2), Inches(8.1), Inches(1.0),
-             size=Pt(11), color=MUTED, font="Calibri")
+    ly = Inches(2.15) + i * Inches(1.52)
+    rect(s, Inches(0.45), ly, Inches(12.4), Inches(1.38), CARD2, lc=color, lw=Pt(1.2))
+    rect(s, Inches(0.45), ly, Inches(0.1), Inches(1.38), color)
+    mono(s, layer, Inches(0.7), ly+Inches(0.1), Inches(2.8), Inches(0.28),
+         size=Pt(7.5), color=color, bold=True)
+    txt(s, model, Inches(0.7), ly+Inches(0.36), Inches(3.8), Inches(0.55),
+        size=Pt(20), bold=True, color=WHITE, font="Calibri")
+    # Vertical divider
+    rect(s, Inches(4.7), ly+Inches(0.15), Inches(0.025), Inches(1.08), DIM)
+    txt(s, desc, Inches(4.9), ly+Inches(0.18), Inches(7.7), Inches(1.0),
+        size=Pt(11), color=MUTED, font="Calibri")
 
-# Stack tags bottom
+# Stack tags
 tags = ["React + Vite", "FastAPI", "EfficientNet-B0", "Qwen-2.5", "Python 3.11", "No cloud dependency"]
 for i, tag in enumerate(tags):
-    tx = Inches(0.5) + i * Inches(2.1)
-    add_rect(s, tx, Inches(6.75), Inches(1.95), Inches(0.45), CARD, line_color=DIM, line_w=Pt(0.75))
-    add_text(s, tag, tx+Inches(0.1), Inches(6.78), Inches(1.75), Inches(0.35),
-             size=Pt(9), color=MUTED, align=PP_ALIGN.CENTER, font="Courier New")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 6 — DEMO RESULTS (mock output)
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
-add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "Live Demo Output", Inches(0.5), Inches(0.4))
-add_text(s, "Real screening result.", Inches(0.5), Inches(0.75),
-         Inches(10), Inches(1.0), size=Pt(40), bold=True, color=WHITE, font="Calibri")
-
-# Triage card
-add_rect(s, Inches(0.5), Inches(1.9), Inches(5.8), Inches(4.8), CARD,
-         line_color=AMBER, line_w=Pt(1.5))
-add_rect(s, Inches(0.5), Inches(1.9), Inches(0.12), Inches(4.8), AMBER)
-add_text(s, "MODERATE RISK", Inches(0.75), Inches(2.0), Inches(5.0), Inches(0.4),
-         size=Pt(9), bold=True, color=AMBER, font="Courier New")
-add_text(s, "9.8", Inches(0.75), Inches(2.4), Inches(3.0), Inches(1.4),
-         size=Pt(80), bold=True, color=AMBER, font="Calibri")
-add_text(s, "g/dL  Hemoglobin", Inches(0.75), Inches(3.8), Inches(5.0), Inches(0.4),
-         size=Pt(12), color=MUTED, font="Courier New")
-add_text(s, "Hemoglobin below normal range. Clinical follow-up\nrecommended within 1–2 weeks.",
-         Inches(0.75), Inches(4.3), Inches(5.2), Inches(0.8),
-         size=Pt(11), color=MUTED, font="Calibri")
-
-# Stat chips
-stats = [("68%", "Anemia Risk"), ("88%", "Confidence"), ("Band 2", "Triage")]
-for i, (val, lbl) in enumerate(stats):
-    sx = Inches(0.75) + i * Inches(1.8)
-    add_rect(s, sx, Inches(5.3), Inches(1.6), Inches(0.9), VOID, line_color=DIM, line_w=Pt(0.75))
-    add_text(s, val, sx+Inches(0.1), Inches(5.35), Inches(1.4), Inches(0.4),
-             size=Pt(18), bold=True, color=WHITE, font="Calibri")
-    add_text(s, lbl, sx+Inches(0.1), Inches(5.72), Inches(1.4), Inches(0.3),
-             size=Pt(8), color=MUTED, font="Courier New")
-
-# Handoff terminal
-add_rect(s, Inches(6.6), Inches(1.9), Inches(6.4), Inches(4.8), RGBColor(0x00,0x00,0x00),
-         line_color=CRIMSON, line_w=Pt(1.0))
-add_text(s, "CLINICAL HANDOFF BRIEF", Inches(6.8), Inches(2.0), Inches(6.0), Inches(0.35),
-         size=Pt(8), bold=True, color=CRIMSON, font="Courier New")
-terminal_lines = [
-    ("Provider:",       "EfficientNet-B0"),
-    ("Risk Score:",     "68.4% (Moderate)"),
-    ("Hb Estimate:",    "9.8 g/dL"),
-    ("Confidence:",     "88%"),
-    ("Triage Band:",    "Band 2 — Monitor"),
-    ("Symptoms:",       "Fatigue, Dizziness"),
-    ("Next Step:",      "CBC within 1–2 weeks"),
-    ("Disclaimer:",     "Screening only. Not diagnostic."),
-]
-for i, (key, val) in enumerate(terminal_lines):
-    ty = Inches(2.5) + i * Inches(0.42)
-    add_text(s, key, Inches(6.8), ty, Inches(1.8), Inches(0.38),
-             size=Pt(10), color=CRIMSON, font="Courier New")
-    add_text(s, val, Inches(8.7), ty, Inches(4.0), Inches(0.38),
-             size=Pt(10), color=WHITE, font="Courier New")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 7 — IMPACT & SDGs
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
-add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-add_label(s, "Impact", Inches(0.5), Inches(0.4))
-add_text(s, "Designed for the last mile.", Inches(0.5), Inches(0.75),
-         Inches(10), Inches(1.0), size=Pt(40), bold=True, color=WHITE, font="Calibri")
-
-impacts = [
-    ("Community Health Workers",
-     "Deploy in rural India, sub-Saharan Africa, or any low-resource setting. No training beyond a 5-minute guide."),
-    ("Pregnant Women & Children",
-     "The highest-risk groups — who are also least likely to access a clinic. AnemiaLens meets them where they are."),
-    ("School & Field Nurses",
-     "Rapid triage in schools, refugee camps, and disaster zones. Results in under 60 seconds."),
-    ("Telemedicine Platforms",
-     "Structured clinical brief integrates directly into existing telehealth workflows via share/export."),
-]
-for i, (title, desc) in enumerate(impacts):
-    ix = Inches(0.5) + (i % 2) * Inches(6.3)
-    iy = Inches(2.0) + (i // 2) * Inches(2.1)
-    add_rect(s, ix, iy, Inches(6.0), Inches(1.85), CARD, line_color=DIM, line_w=Pt(0.75))
-    add_rect(s, ix, iy, Inches(0.08), Inches(1.85), CRIMSON)
-    add_text(s, title, ix+Inches(0.2), iy+Inches(0.12), Inches(5.6), Inches(0.4),
-             size=Pt(13), bold=True, color=WHITE, font="Calibri")
-    add_text(s, desc, ix+Inches(0.2), iy+Inches(0.55), Inches(5.6), Inches(1.1),
-             size=Pt(10), color=MUTED, font="Calibri")
-
-# SDG badges
-add_rect(s, Inches(0.5), Inches(6.35), Inches(12.3), Inches(0.8), CARD, line_color=DIM, line_w=Pt(0.75))
-add_text(s, "UN SDG 3: Good Health & Well-Being   ·   UN SDG 10: Reduced Inequalities   ·   UN SDG 1: No Poverty",
-         Inches(0.6), Inches(6.45), Inches(12.0), Inches(0.5),
-         size=Pt(11), bold=True, color=CRIMSON, align=PP_ALIGN.CENTER, font="Courier New")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 8 — CLOSE / CALL TO ACTION
-# ─────────────────────────────────────────────────────────────────────────────
-s = prs.slides.add_slide(blank_layout)
-add_bg(s)
-add_rect(s, 0, 0, Inches(0.18), H, CRIMSON)
-
-# Big crimson accent block
-add_rect(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(0.08), CRIMSON)
-
-add_text(s, "AnemiaLens doesn't replace doctors.", Inches(0.5), Inches(1.8),
-         Inches(12.3), Inches(1.1), size=Pt(36), bold=True, color=WHITE,
-         align=PP_ALIGN.CENTER, font="Calibri")
-add_text(s, "It gets patients to doctors sooner,\nwith better information, at zero cost.",
-         Inches(0.5), Inches(2.9), Inches(12.3), Inches(1.2),
-         size=Pt(28), color=MUTED, align=PP_ALIGN.CENTER, font="Calibri")
-
-add_rect(s, Inches(0.5), Inches(4.2), Inches(12.3), Inches(0.08), CRIMSON)
-
-# Final stats row
-final_stats = [
-    ("1.6B+", "People we can reach"),
-    ("92%",   "Sensitivity"),
-    ("$0",    "Marginal cost per screening"),
-    ("<60s",  "Time to result"),
-]
-for i, (val, lbl) in enumerate(final_stats):
-    fx = Inches(0.5) + i * Inches(3.1)
-    add_text(s, val, fx, Inches(4.6), Inches(2.9), Inches(0.9),
-             size=Pt(40), bold=True, color=CRIMSON, align=PP_ALIGN.CENTER, font="Calibri")
-    add_text(s, lbl, fx, Inches(5.5), Inches(2.9), Inches(0.4),
-             size=Pt(10), color=MUTED, align=PP_ALIGN.CENTER, font="Courier New")
-
-add_text(s, "Thank you.", Inches(0.5), Inches(6.2),
-         Inches(12.3), Inches(0.8), size=Pt(22), bold=True, color=WHITE,
-         align=PP_ALIGN.CENTER, font="Calibri")
-
-# ─────────────────────────────────────────────────────────────────────────────
-prs.save("AnemiaLens_Presentation.pptx")
-print("Done → AnemiaLens_Presentation.pptx")
+    tx = Inches(0.45) + i * Inches(2.12)
+    rect(s, tx, Inches(6.75), Inches(2.0), Inches(0.42), CARD2, lc=DIM)
+    mono(s, tag, tx+Inches(0.1), Inches(6.78), Inches(1.8), Inches(0.32),
+         size=Pt(8), color=MUTED, bold=False)
