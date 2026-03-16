@@ -4,6 +4,6 @@
   "installCommand": "echo 'skip root install'",
   "framework": null,
   "env": {
-    "VITE_API_BASE_URL": "@anemialens_api_url"
+    "VITE_API_BASE_URL": "https://anemialens-3.onrender.com"
   }
 }
