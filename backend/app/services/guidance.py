@@ -413,9 +413,10 @@ class GuidanceService:
 
     def runtime_status(self) -> GuidanceRuntimeStatus:
         provider_healthy = self._mistral_ready() and self._last_provider_error is None
-        active_strategy: Literal["qwen", "fallback"] = "qwen" if provider_healthy else "fallback"
+        active_strategy: Literal["mistral", "fallback"] = "mistral" if provider_healthy else "fallback"
         return GuidanceRuntimeStatus(
             active_strategy=active_strategy,
+            mistral_enabled=self.mistral_enabled,
             qwen_enabled=self.mistral_enabled,
             client_ready=self._mistral_ready(),
             api_key_configured=self.api_key_configured,
