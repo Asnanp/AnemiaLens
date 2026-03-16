@@ -6,8 +6,7 @@ import type {
 } from './types';
 
 const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? 'http://127.0.0.1:8001' : '')
+  import.meta.env.VITE_API_BASE_URL ?? ''
 ).replace(/\/$/, '');
 
 function endpoint(path: string): string {
