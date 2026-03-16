@@ -32,16 +32,17 @@ load_dotenv(BACKEND_ROOT / ".env")
 
 app = Flask(__name__)
 CORS(
- app,
- origins=[
- "http://localhost:5173",
- "http://127.0.0.1:5173",
- "http://localhost:5174",
- "http://127.0.0.1:5174",
- "https://anemia-lens.vercel.app",  # ← Your production domain
- r"https://.*\.vercel\.app",  # ← Covers preview deployments
- ],
- supports_credentials=False,
+    app,
+    origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "https://anemia-lens.vercel.app",
+        # Allow all Vercel preview deployments
+        r"https://.*\.vercel\.app",
+    ],
+    supports_credentials=False,
 )
 
 quality_service = ImageQualityService()
@@ -51,7 +52,7 @@ guidance_service = GuidanceService()
 case_insight_service = CaseInsightService()
 clinical_brief_service = ClinicalBriefService()
 handoff_service = HandoffSummaryService()
-NEXT_PUBLIC_API_URL=https://anemialens-production.up.railway.app
+
 
 def _attempt_raw_frame_rescue(image_bytes: bytes, quality):
     if quality.passed or not quality_service.allows_raw_frame_rescue(quality):
@@ -191,13 +192,7 @@ def analyze() -> tuple[object, int]:
         "region": region,
     }
     return jsonify(payload), 200
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// Example
-const response = await fetch(`${API_URL}/api/analyze`, {
-  method: 'POST',
-  body: formData,
-});
 if __name__ == "__main__":
     debug_enabled = os.getenv("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
     port = int(os.environ.get("PORT", 5000))
