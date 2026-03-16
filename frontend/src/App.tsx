@@ -514,6 +514,61 @@ function WorkflowStepper() {
   );
 }
 
+// ── QWEN LOADING OVERLAY ──────────────────────────────────────────────────────
+function QwenLoadingOverlay() {
+  const stages = [
+    { label: 'Running vision model', done: true },
+    { label: 'Analyzing conjunctival pallor', done: true },
+    { label: 'Calculating triage band', done: true },
+    { label: 'Qwen 2.5 generating guidance...', done: false },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 420, gap: '2rem' }}
+    >
+      {/* Pulsing brain icon */}
+      <motion.div
+        animate={{ scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(0,194,255,0.1)', border: '1px solid rgba(0,194,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(0,194,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a4 4 0 0 1 4 4c0 .34-.04.67-.1 1H16a3 3 0 0 1 3 3v1a3 3 0 0 1-1.5 2.6V14a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-.4A3 3 0 0 1 5 11v-1a3 3 0 0 1 3-3h.1A4 4 0 0 1 12 2z"/>
+          <path d="M9 17v2m6-2v2M9 21h6"/>
+        </svg>
+      </motion.div>
+
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+          AI Analysis in Progress
+        </div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+          Qwen 2.5 is generating your personalized guidance
+        </div>
+      </div>
+
+      {/* Stage list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: 340 }}>
+        {stages.map((s, i) => (
+          <motion.div key={i}
+            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.15 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.done ? 'rgba(0,229,150,0.2)' : 'rgba(0,194,255,0.2)'}` }}
+          >
+            {s.done ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E596" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(0,194,255,0.3)', borderTopColor: 'rgba(0,194,255,0.9)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: '0.75rem', color: s.done ? 'var(--text-muted)' : 'rgba(0,194,255,0.9)', fontFamily: 'var(--mono)' }}>{s.label}</span>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 // ── SCREENING SECTION ─────────────────────────────────────────────────────────
 function ScreeningSection() {
   const {
@@ -630,7 +685,8 @@ function ScreeningSection() {
               </div>
             )}
             {step===1 && quality && <QualityView quality={quality} onContinue={() => setStep(2)} onBack={() => setStep(0)} loading={loading} />}
-            {step===2 && <SymptomView symptoms={symptoms} toggleSymptom={toggleSymptom} onContinue={runAnalysis} onBack={() => setStep(1)} loading={loading} symptomLabels={symptomLabels} />}
+            {step===2 && !loading && <SymptomView symptoms={symptoms} toggleSymptom={toggleSymptom} onContinue={runAnalysis} onBack={() => setStep(1)} loading={loading} symptomLabels={symptomLabels} />}
+            {step===2 && loading && <QwenLoadingOverlay />}
             {step===3 && analysis && <ResultView analysis={analysis} onReset={reset} onDownload={() => handleDownload(analysis.handoff_summary.share_text)} />}
           </motion.div>
         </AnimatePresence>
