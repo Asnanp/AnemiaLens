@@ -431,6 +431,20 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 
 @keyframes orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+/* ── PULSE RING — hero orbit ───────────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ── WORKFLOW GRID — responsive ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .workflow-grid-5 { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 600px) {
+  .workflow-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
 /* ── STEPPER ───────────────────────────────────────────────────────────────── */
 .step-pill {
   display: flex; align-items: center; gap: 0.6rem;
