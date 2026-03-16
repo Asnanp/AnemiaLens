@@ -1,0 +1,508 @@
+from __future__ import annotations
+
+import ast
+import json
+import logging
+import re
+from collections import OrderedDict
+from typing import Literal
+
+from app.config import settings
+from app.schemas import (
+    GuidanceResult,
+    GuidanceRuntimeStatus,
+    PredictionResult,
+    SymptomInput,
+    TriageResult,
+)
+
+try:
+    from huggingface_hub import InferenceClient
+except Exception:  # pragma: no cover - handled through runtime fallback
+    InferenceClient = None  # type: ignore[assignment]
+
+
+_FIELD_LIMITS = {
+    "explanation": 320,
+    "urgency_guidance": 240,
+    "food_advice": 260,
+}
+_UNSAFE_CLAIM_PATTERN = re.compile(
+    r"\b(definitely|confirmed|certain|diagnos(?:e|es|ed|is)|proves?|proof of anemia|"
+    r"you have anemia|you are anemic|you are anaemic|iron deficiency)\b",
+    flags=re.IGNORECASE,
+)
+_SAFE_DIAGNOSTIC_CONTEXT_PATTERNS = (
+    re.compile(r"\bnot a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
+    re.compile(r"\bnon-diagnostic\b", flags=re.IGNORECASE),
+    re.compile(r"\bdoes not diagnos(?:e|is)\b", flags=re.IGNORECASE),
+    re.compile(r"\bscreening guidance,\s*not a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
+    re.compile(r"\bscreening only,\s*not a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
+)
+log = logging.getLogger("anemialens.guidance")
+
+
+class GuidanceService:
+    def __init__(self) -> None:
+        self.qwen_enabled = settings.qwen_enabled
+        self.qwen_model = settings.qwen_model.strip()
+        self.hf_provider = settings.hf_provider.strip() or "hf-inference"
+        self.guidance_timeout = settings.guidance_timeout
+        self.guidance_max_tokens = settings.guidance_max_tokens
+        self.api_key_configured = bool(settings.hf_api_key.strip())
+        self.provider_name = self.hf_provider
+        self._fallback_reason: str | None = None
+        self._last_provider_error: str | None = None
+        self._response_cache: OrderedDict[str, GuidanceResult] = OrderedDict()
+        self._response_cache_size = 64
+        self._client = self._build_client()
+
+        if not self.qwen_enabled:
+            self._fallback_reason = "Qwen guidance is disabled in backend configuration."
+        elif InferenceClient is None:
+            self._fallback_reason = "huggingface_hub is unavailable, so rule-based guidance is active."
+        elif not self.api_key_configured:
+            self._fallback_reason = "Hugging Face API key is missing, so rule-based guidance is active."
+
+    def generate(
+        self,
+        triage: TriageResult,
+        symptoms: SymptomInput,
+        prediction: PredictionResult | None,
+        language: str | None = None,
+        region: str | None = None,
+    ) -> GuidanceResult:
+        if not self._should_use_llm(triage, prediction):
+            return self.generate_smart_fallback(
+                triage.band,
+                prediction.predicted_hemoglobin if prediction else None,
+                prediction.confidence if prediction else None,
+                symptoms,
+                region,
+            )
+
+        payload = self._build_payload(triage, symptoms, prediction, language, region)
+        cache_key = self._cache_key(payload)
+        cached = self._response_cache.get(cache_key)
+        if cached is not None:
+            self._response_cache.move_to_end(cache_key)
+            return GuidanceResult.model_validate(cached.model_dump())
+
+        if self._qwen_ready():
+            qwen_result = self._generate_qwen(
+                payload,
+                triage_band=triage.band,
+                predicted_hemoglobin=prediction.predicted_hemoglobin if prediction else None,
+                confidence=prediction.confidence if prediction else None,
+                symptoms=symptoms,
+                region=region,
+            )
+            if qwen_result is not None:
+                if qwen_result.source == "qwen":
+                    self._last_provider_error = None
+                    self._store_cached_result(cache_key, qwen_result)
+                return qwen_result
+
+        return self.generate_smart_fallback(
+            triage.band,
+            prediction.predicted_hemoglobin if prediction else None,
+            prediction.confidence if prediction else None,
+            symptoms,
+            region,
+        )
+
+    def _build_client(self):
+        if InferenceClient is None or not self.qwen_enabled or not self.api_key_configured or not self.qwen_model:
+            return None
+        return InferenceClient(
+            model=self.qwen_model,
+            provider=self.hf_provider,
+            token=settings.hf_api_key,
+            timeout=self.guidance_timeout,
+        )
+
+    def _build_payload(
+        self,
+        triage: TriageResult,
+        symptoms: SymptomInput,
+        prediction: PredictionResult | None,
+        language: str | None,
+        region: str | None,
+    ) -> dict[str, object]:
+        active_symptoms = [
+            label
+            for label, active in {
+                "fatigue": symptoms.fatigue,
+                "dizziness": symptoms.dizziness,
+                "pale skin": symptoms.pale_skin,
+                "shortness of breath": symptoms.shortness_of_breath,
+                "heavy menstrual bleeding": bool(symptoms.heavy_menstrual_bleeding),
+                "low iron intake": symptoms.poor_diet_low_iron,
+            }.items()
+            if active
+        ]
+        return {
+            "triage_label": triage.label,
+            "triage_band": triage.band,
+            "triage_score": triage.score,
+            "screening_text": prediction.screening_text if prediction else None,
+            "screening_label": prediction.screening_label if prediction else None,
+            "prediction_risk": prediction.anemia_risk if prediction else None,
+            "prediction_risk_percent": round(prediction.anemia_risk * 100, 1) if prediction else None,
+            "predicted_hemoglobin": prediction.predicted_hemoglobin if prediction else None,
+            "confidence": prediction.confidence if prediction else None,
+            "confidence_percent": round(prediction.confidence * 100, 1) if prediction else None,
+            "uncertainty": prediction.uncertainty if prediction else None,
+            "uncertainty_percent": round(prediction.uncertainty * 100, 1) if prediction else None,
+            "reliability_flag": prediction.reliability_flag if prediction else None,
+            "symptom_count": symptoms.active_count,
+            "active_symptoms": active_symptoms,
+            "symptoms": symptoms.model_dump(),
+            "language": language,
+            "region": region,
+        }
+
+    def _system_prompt(self) -> str:
+        return (
+            "You are AnemiaLens Guide, a careful community screening assistant. "
+            "Use only the supplied screening facts. "
+            "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers. "
+            "Keep every statement compatible with a screening tool rather than a diagnosis. "
+            "If confidence or uncertainty is provided, explain it simply. "
+            "If language or region is provided, adapt wording and food examples only to that context. "
+            "Return only valid JSON with keys: explanation, urgency_guidance, food_advice, next_steps. "
+            "explanation must be 1-2 short sentences. "
+            "urgency_guidance must be 1 short sentence. "
+            "food_advice must be 1 short sentence with food ideas only. "
+            "next_steps must be 2-4 short action strings."
+        )
+
+    def _user_prompt(self, payload: dict[str, object]) -> str:
+        return (
+            "Generate grounded user guidance from this screening payload.\n"
+            f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
+            "Use simple language and mention that this is screening guidance, not a diagnosis."
+        )
+
+    def _generate_qwen(
+        self,
+        payload: dict[str, object],
+        *,
+        triage_band: str,
+        predicted_hemoglobin: float | None,
+        confidence: float | None,
+        symptoms: SymptomInput,
+        region: str | None,
+    ) -> GuidanceResult | None:
+        try:
+            text = self._call_qwen_api(payload)
+            return self._parse_guidance_response(
+                text,
+                source="qwen",
+                model_used=self.qwen_model,
+                provider_used=self.provider_name,
+            )
+        except Exception as exc:
+            self._last_provider_error = self._summarize_provider_error(exc)
+            log.warning("Qwen guidance request failed: %s", exc)
+            return self.generate_smart_fallback(
+                triage_band,
+                predicted_hemoglobin,
+                confidence,
+                symptoms,
+                region,
+            )
+
+    def _call_qwen_api(self, payload: dict[str, object]) -> str:
+        if self._client is None:
+            raise RuntimeError("Qwen client is not configured.")
+
+        response = self._client.chat_completion(
+            messages=[
+                {"role": "system", "content": self._system_prompt()},
+                {"role": "user", "content": self._user_prompt(payload)},
+            ],
+            max_tokens=self.guidance_max_tokens,
+            temperature=0.15,
+        )
+
+        try:
+            message = response.choices[0].message
+            content = message.content
+        except Exception as exc:  # pragma: no cover - defensive against SDK shape changes
+            raise ValueError(f"Qwen response did not include message content: {exc}") from exc
+
+        if isinstance(content, str):
+            text = content.strip()
+        elif isinstance(content, list):
+            text = "".join(
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and isinstance(item.get("text"), str)
+            ).strip()
+        else:
+            text = str(content).strip()
+
+        if not text:
+            raise ValueError("Qwen response did not include text output.")
+        return text
+
+    def _qwen_ready(self) -> bool:
+        return self.qwen_enabled and self.api_key_configured and self._client is not None
+
+    def _should_use_llm(
+        self,
+        triage: TriageResult,
+        prediction: PredictionResult | None,
+    ) -> bool:
+        return not (
+            prediction is None
+            or triage.band == "uncertain_retake_needed"
+            or prediction.reliability_flag == "low"
+        )
+
+    def _cache_key(self, payload: dict[str, object]) -> str:
+        return json.dumps(payload, sort_keys=True, ensure_ascii=False)
+
+    def _store_cached_result(self, cache_key: str, result: GuidanceResult) -> None:
+        self._response_cache[cache_key] = result
+        self._response_cache.move_to_end(cache_key)
+        while len(self._response_cache) > self._response_cache_size:
+            self._response_cache.popitem(last=False)
+
+    def _summarize_provider_error(self, exc: Exception) -> str:
+        message = " ".join(str(exc).split())
+        lowered = message.lower()
+        if "403" in message or "sufficient permissions" in lowered:
+            return (
+                "Hugging Face token lacks permission to call Inference Providers. "
+                "Enable 'Make calls to Inference Providers' on the HF token."
+            )
+        if "401" in message or "unauthorized" in lowered or "authentication" in lowered:
+            return "Hugging Face API key was rejected. Check the configured HF token."
+        if "429" in message or "rate limit" in lowered:
+            return "Hugging Face rate limit reached. Retry shortly or reduce demo traffic."
+        if len(message) <= 220:
+            return message
+        return message[:217] + "..."
+
+    def generate_smart_fallback(
+        self,
+        triage_band: str,
+        predicted_hemoglobin: float | None,
+        confidence: float | None,
+        symptoms: SymptomInput,
+        region: str | None = None,
+    ) -> GuidanceResult:
+        band = (triage_band or "").lower()
+        hb = predicted_hemoglobin
+
+        if band == "uncertain_retake_needed" or hb is None:
+            explanation = (
+                "Image signal was not strong enough for a confident prediction. "
+                "This is not a clear result."
+            )
+            urgency = (
+                "Retake the scan in better lighting. If symptoms persist, see a doctor regardless of this result."
+            )
+            next_steps = [
+                "Retake eye image in bright natural light",
+                "Pull lower eyelid gently and hold camera steady",
+                "If you feel dizzy or very tired, visit a clinic anyway",
+            ]
+        elif band == "high_concern" or hb < 8.0:
+            explanation = (
+                "Severely low hemoglobin may mean the blood cannot carry enough oxygen well. "
+                "Fatigue, dizziness, and breathlessness are expected at this level."
+            )
+            urgency = "Seek medical attention within 24 to 48 hours. Do not delay."
+            next_steps = [
+                "Visit nearest clinic or hospital today",
+                "Request a full blood count (CBC) test",
+                "Ask a doctor about iron or B12 treatment options",
+                "Avoid strenuous physical activity until reviewed",
+            ]
+        elif band == "moderate_risk" or (hb is not None and 8.0 <= hb <= 10.9):
+            explanation = (
+                "Mild to moderate anemia-like signal detected. "
+                "Hemoglobin appears below the healthy threshold, which may cause tiredness and reduced concentration."
+            )
+            urgency = "See a doctor within 1 to 2 weeks. Dietary changes can help."
+            next_steps = [
+                "Book a clinic visit this week",
+                "Start an iron-rich diet immediately",
+                "Take an iron supplement if recommended by a pharmacist or clinician",
+                "Rescreen in 4 weeks after dietary changes",
+            ]
+        else:
+            explanation = (
+                "Conjunctival pallor signal is within the normal range for this screening. "
+                "The hemoglobin estimate suggests adequate red blood cell levels."
+            )
+            urgency = "No immediate action is needed from this screening alone. Maintain a balanced diet."
+            next_steps = [
+                "Continue an iron-rich diet as prevention",
+                "Rescreen in 3 months or if symptoms develop",
+                "Stay hydrated and maintain regular sleep",
+            ]
+
+        if confidence is not None and confidence < 0.55:
+            urgency = f"{urgency} Confidence is low, so formal testing matters more."
+
+        food_advice = self._food_advice_for_region(region)
+        next_steps = self._augment_next_steps(next_steps, symptoms)
+
+        return GuidanceResult(
+            source="fallback",
+            model_used=None,
+            provider_used=None,
+            explanation=self._sanitize_text(explanation, limit=_FIELD_LIMITS["explanation"]),
+            urgency_guidance=self._sanitize_text(urgency, limit=_FIELD_LIMITS["urgency_guidance"]),
+            food_advice=self._sanitize_text(food_advice, limit=_FIELD_LIMITS["food_advice"]),
+            next_steps=[self._sanitize_text(step, limit=120) for step in next_steps],
+        )
+
+    def _augment_next_steps(self, base_steps: list[str], symptoms: SymptomInput) -> list[str]:
+        steps = list(base_steps)
+        if symptoms.fatigue and symptoms.shortness_of_breath:
+            steps.append("Avoid strenuous activity until reviewed by a doctor.")
+        if symptoms.heavy_menstrual_bleeding:
+            steps.append("Discuss menstrual blood loss with your doctor as a likely contributing factor.")
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for step in steps:
+            if step not in seen:
+                deduped.append(step)
+                seen.add(step)
+        return deduped
+
+    def _food_advice_for_region(self, region: str | None) -> str:
+        region_value = (region or "").strip().lower()
+        if "india" in region_value:
+            base = "Choose local iron-rich foods such as spinach (palak), lentils (dal), jaggery, moringa leaves, amla, and bajra roti."
+        elif any(token in region_value for token in ("ghana", "nigeria", "kenya", "africa")):
+            base = "Choose iron-rich foods such as ugwu leaves, beans, liver, garden eggs, and citrus fruits with meals."
+        elif any(
+            token in region_value
+            for token in (
+                "southeast asia",
+                "indonesia",
+                "philippines",
+                "vietnam",
+                "thailand",
+                "malaysia",
+                "cambodia",
+                "laos",
+                "myanmar",
+                "singapore",
+            )
+        ):
+            base = "Choose iron-rich foods such as kangkong, tempeh, tofu, moringa, fortified rice, and guava."
+        else:
+            base = "Choose iron-rich foods such as dark leafy greens, lentils, lean red meat, fortified cereals, and pumpkin seeds."
+        return f"{base} Pair them with vitamin C-rich foods, and avoid tea or coffee within 1 hour of iron-rich meals as tannins reduce absorption."
+
+    def _parse_guidance_response(
+        self,
+        raw_text: str,
+        source: Literal["qwen"],
+        model_used: str,
+        provider_used: str,
+    ) -> GuidanceResult:
+        text = raw_text.strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            text = re.sub(r"^json\s*", "", text, count=1, flags=re.IGNORECASE).strip()
+
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+            if not match:
+                raise
+            candidate = match.group(0)
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                parsed = ast.literal_eval(candidate)
+
+        if not isinstance(parsed, dict):
+            raise ValueError("Guidance response must be a JSON object")
+
+        next_steps = parsed.get("next_steps") or []
+        if isinstance(next_steps, str):
+            next_steps = [next_steps]
+        if not isinstance(next_steps, list):
+            raise ValueError("Guidance next_steps must be a list or string")
+
+        explanation = self._sanitize_text(str(parsed["explanation"]), limit=_FIELD_LIMITS["explanation"])
+        urgency_guidance = self._sanitize_text(
+            str(parsed["urgency_guidance"]),
+            limit=_FIELD_LIMITS["urgency_guidance"],
+        )
+        food_advice = self._sanitize_text(str(parsed["food_advice"]), limit=_FIELD_LIMITS["food_advice"])
+        cleaned_steps = [
+            self._sanitize_text(str(item), limit=120)
+            for item in next_steps
+            if str(item).strip()
+        ][:4]
+
+        if not cleaned_steps:
+            raise ValueError("Guidance next_steps cannot be empty")
+
+        combined_text = " ".join([explanation, urgency_guidance, food_advice, *cleaned_steps])
+        if self._contains_unsafe_claim(combined_text):
+            raise ValueError("Guidance output made an unsafe medical claim")
+
+        return GuidanceResult(
+            source=source,
+            model_used=model_used,
+            provider_used=provider_used,
+            explanation=explanation,
+            urgency_guidance=urgency_guidance,
+            food_advice=food_advice,
+            next_steps=cleaned_steps,
+        )
+
+    def _fallback_guidance(
+        self,
+        triage: TriageResult,
+        symptoms: SymptomInput,
+        prediction: PredictionResult | None,
+        region: str | None = None,
+    ) -> GuidanceResult:
+        return self.generate_smart_fallback(
+            triage.band,
+            prediction.predicted_hemoglobin if prediction else None,
+            prediction.confidence if prediction else None,
+            symptoms,
+            region,
+        )
+
+    def _sanitize_text(self, text: str, *, limit: int) -> str:
+        normalized = " ".join(text.split())
+        if len(normalized) <= limit:
+            return normalized
+        return normalized[: limit - 3].rstrip(" ,.;:") + "..."
+
+    def _contains_unsafe_claim(self, text: str) -> bool:
+        scrubbed = text
+        for pattern in _SAFE_DIAGNOSTIC_CONTEXT_PATTERNS:
+            scrubbed = pattern.sub(" ", scrubbed)
+        return bool(_UNSAFE_CLAIM_PATTERN.search(scrubbed))
+
+    def runtime_status(self) -> GuidanceRuntimeStatus:
+        provider_healthy = self._qwen_ready() and self._last_provider_error is None
+        active_strategy: Literal["qwen", "fallback"] = "qwen" if provider_healthy else "fallback"
+
+        return GuidanceRuntimeStatus(
+            active_strategy=active_strategy,
+            qwen_enabled=self.qwen_enabled,
+            client_ready=self._qwen_ready(),
+            api_key_configured=self.api_key_configured,
+            qwen_model=self.qwen_model if self.qwen_enabled else None,
+            provider=self.provider_name if self.qwen_enabled else None,
+            fallback_reason=self._fallback_reason if self._fallback_reason else (self._last_provider_error if active_strategy == "fallback" else None),
+            last_provider_error=self._last_provider_error,
+        )
