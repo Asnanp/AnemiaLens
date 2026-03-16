@@ -21,7 +21,7 @@ const TICKER_ITEMS = [
   '710 validated conjunctival images',
   '$0 marginal cost per screening',
   'EfficientNet-B0 vision backbone',
-  'Qwen-2.5 grounded GenAI guidance',
+  'Mistral AI grounded GenAI guidance',
   'Four-band safety triage system',
   'Smartphone-first — no hardware required',
 ];
@@ -118,7 +118,7 @@ const WORKFLOW = [
   { icon: <ShieldCheck size={20} />,  title: 'Quality Gate',     desc: 'Vision algorithms reject blurry or misframed images.' },
   { icon: <Brain size={20} />,        title: 'AI Prediction',    desc: 'EfficientNet-B0 estimates hemoglobin from pallor.' },
   { icon: <HeartPulse size={20} />,   title: 'Symptom Fusion',   desc: 'Fatigue, dizziness fused with image biomarkers.' },
-  { icon: <MessageSquare size={20} />,title: 'GenAI Guidance',   desc: 'Qwen-2.5 translates AI data into safe next steps.' },
+  { icon: <MessageSquare size={20} />,title: 'GenAI Guidance',   desc: 'Mistral AI translates AI data into safe next steps.' },
 ];
 
 const IMPACT_CARDS = [
@@ -129,7 +129,7 @@ const IMPACT_CARDS = [
 
 const TECH_LAYERS = [
   { icon: <Brain size={20} />,  title: 'Vision Screening Layer', desc: 'EfficientNet-B0 trained to analyze micro-vessel density and conjunctival pallor with sub-millimeter precision.' },
-  { icon: <Zap size={20} />,   title: 'Grounded GenAI Layer',   desc: 'Qwen-2.5 constrained by deterministic medical rules — safe, personalized guidance without hallucination.' },
+  { icon: <Zap size={20} />,   title: 'Grounded GenAI Layer',   desc: 'Mistral AI constrained by deterministic medical rules — safe, personalized guidance without hallucination.' },
   { icon: <Lock size={20} />,  title: 'Safety Triage System',   desc: 'Four-band triage (Low, Moderate, High, Retake) designed to prioritize user safety over false confidence.' },
 ];
 
@@ -639,13 +639,13 @@ function WorkflowStepper() {
   );
 }
 
-// ── QWEN LOADING OVERLAY ──────────────────────────────────────────────────────
+// ── MISTRAL LOADING OVERLAY ───────────────────────────────────────────────────
 function QwenLoadingOverlay() {
   const stages = [
     { label: 'Running vision model', done: true },
     { label: 'Analyzing conjunctival pallor', done: true },
     { label: 'Calculating triage band', done: true },
-    { label: 'Qwen 2.5 generating guidance...', done: false },
+    { label: 'Mistral AI generating guidance...', done: false },
   ];
   return (
     <motion.div
@@ -669,7 +669,7 @@ function QwenLoadingOverlay() {
           AI Analysis in Progress
         </div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          Qwen 2.5 is generating your personalized guidance
+          Mistral AI is generating your personalized guidance
         </div>
       </div>
 

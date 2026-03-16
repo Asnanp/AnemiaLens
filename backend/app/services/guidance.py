@@ -7,6 +7,8 @@ import re
 from collections import OrderedDict
 from typing import Literal
 
+import requests as _requests
+
 from app.config import settings
 from app.schemas import (
     GuidanceResult,
@@ -15,12 +17,6 @@ from app.schemas import (
     SymptomInput,
     TriageResult,
 )
-
-try:
-    from huggingface_hub import InferenceClient
-except Exception:  # pragma: no cover - handled through runtime fallback
-    InferenceClient = None  # type: ignore[assignment]
-
 
 _FIELD_LIMITS = {
     "explanation": 320,
@@ -37,33 +33,28 @@ _SAFE_DIAGNOSTIC_CONTEXT_PATTERNS = (
     re.compile(r"\bnot a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
     re.compile(r"\bnon-diagnostic\b", flags=re.IGNORECASE),
     re.compile(r"\bdoes not diagnos(?:e|is)\b", flags=re.IGNORECASE),
-    re.compile(r"\bscreening guidance,\s*not a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
-    re.compile(r"\bscreening only,\s*not a diagnos(?:is|tic)\b", flags=re.IGNORECASE),
 )
 log = logging.getLogger("anemialens.guidance")
+
+_MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 
 
 class GuidanceService:
     def __init__(self) -> None:
-        self.qwen_enabled = settings.qwen_enabled
-        self.qwen_model = settings.qwen_model.strip()
-        self.hf_provider = settings.hf_provider.strip() or "hf-inference"
+        self.mistral_enabled = settings.mistral_enabled
+        self.mistral_model = settings.mistral_model.strip()
         self.guidance_timeout = settings.guidance_timeout
         self.guidance_max_tokens = settings.guidance_max_tokens
-        self.api_key_configured = bool(settings.hf_api_key.strip())
-        self.provider_name = self.hf_provider
+        self.api_key_configured = bool(settings.mistral_api_key.strip())
         self._fallback_reason: str | None = None
         self._last_provider_error: str | None = None
         self._response_cache: OrderedDict[str, GuidanceResult] = OrderedDict()
         self._response_cache_size = 64
-        self._client = self._build_client()
 
-        if not self.qwen_enabled:
-            self._fallback_reason = "Qwen guidance is disabled in backend configuration."
-        elif InferenceClient is None:
-            self._fallback_reason = "huggingface_hub is unavailable, so rule-based guidance is active."
+        if not self.mistral_enabled:
+            self._fallback_reason = "Mistral guidance is disabled in configuration."
         elif not self.api_key_configured:
-            self._fallback_reason = "Hugging Face API key is missing, so rule-based guidance is active."
+            self._fallback_reason = "Mistral API key is missing."
 
     def generate(
         self,
@@ -89,8 +80,8 @@ class GuidanceService:
             self._response_cache.move_to_end(cache_key)
             return GuidanceResult.model_validate(cached.model_dump())
 
-        if self._qwen_ready():
-            qwen_result = self._generate_qwen(
+        if self._mistral_ready():
+            result = self._generate_mistral(
                 payload,
                 triage_band=triage.band,
                 predicted_hemoglobin=prediction.predicted_hemoglobin if prediction else None,
@@ -98,11 +89,11 @@ class GuidanceService:
                 symptoms=symptoms,
                 region=region,
             )
-            if qwen_result is not None:
-                if qwen_result.source == "qwen":
+            if result is not None:
+                if result.source == "mistral":
                     self._last_provider_error = None
-                    self._store_cached_result(cache_key, qwen_result)
-                return qwen_result
+                    self._store_cached_result(cache_key, result)
+                return result
 
         return self.generate_smart_fallback(
             triage.band,
@@ -110,16 +101,6 @@ class GuidanceService:
             prediction.confidence if prediction else None,
             symptoms,
             region,
-        )
-
-    def _build_client(self):
-        if InferenceClient is None or not self.qwen_enabled or not self.api_key_configured or not self.qwen_model:
-            return None
-        return InferenceClient(
-            model=self.qwen_model,
-            provider=self.hf_provider,
-            token=settings.hf_api_key,
-            timeout=self.guidance_timeout,
         )
 
     def _build_payload(
@@ -169,23 +150,23 @@ class GuidanceService:
             "Use only the supplied screening facts. "
             "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers. "
             "Keep every statement compatible with a screening tool rather than a diagnosis. "
-            "If confidence or uncertainty is provided, explain it simply. "
-            "If language or region is provided, adapt wording and food examples only to that context. "
-            "Return only valid JSON with keys: explanation, urgency_guidance, food_advice, next_steps. "
-            "explanation must be 1-2 short sentences. "
-            "urgency_guidance must be 1 short sentence. "
-            "food_advice must be 1 short sentence with food ideas only. "
-            "next_steps must be 2-4 short action strings."
+            "If language or region is provided, adapt wording and food examples to that context. "
+            "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps. "
+            "explanation: 1-2 short sentences. "
+            "urgency_guidance: 1 short sentence. "
+            "food_advice: 1 short sentence with food ideas only. "
+            "next_steps: array of 2-4 short action strings. "
+            "No markdown, no extra keys, no preamble."
         )
 
     def _user_prompt(self, payload: dict[str, object]) -> str:
         return (
             "Generate grounded user guidance from this screening payload.\n"
             f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
-            "Use simple language and mention that this is screening guidance, not a diagnosis."
+            "Use simple language. Mention this is screening guidance, not a diagnosis."
         )
 
-    def _generate_qwen(
+    def _generate_mistral(
         self,
         payload: dict[str, object],
         *,
@@ -196,16 +177,16 @@ class GuidanceService:
         region: str | None,
     ) -> GuidanceResult | None:
         try:
-            text = self._call_qwen_api(payload)
+            text = self._call_mistral_api(payload)
             return self._parse_guidance_response(
                 text,
-                source="qwen",
-                model_used=self.qwen_model,
-                provider_used=self.provider_name,
+                source="mistral",
+                model_used=self.mistral_model,
+                provider_used="mistral",
             )
         except Exception as exc:
-            self._last_provider_error = self._summarize_provider_error(exc)
-            log.warning("Qwen guidance request failed: %s", exc)
+            self._last_provider_error = self._summarize_error(exc)
+            log.warning("Mistral guidance request failed: %s", exc)
             return self.generate_smart_fallback(
                 triage_band,
                 predicted_hemoglobin,
@@ -214,52 +195,37 @@ class GuidanceService:
                 region,
             )
 
-    def _call_qwen_api(self, payload: dict[str, object]) -> str:
-        if self._client is None:
-            raise RuntimeError("Qwen client is not configured.")
-
-        response = self._client.chat_completion(
-            messages=[
+    def _call_mistral_api(self, payload: dict[str, object]) -> str:
+        headers = {
+            "Authorization": f"Bearer {settings.mistral_api_key}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": self.mistral_model,
+            "messages": [
                 {"role": "system", "content": self._system_prompt()},
                 {"role": "user", "content": self._user_prompt(payload)},
             ],
-            max_tokens=self.guidance_max_tokens,
-            temperature=0.15,
-        )
-
+            "max_tokens": self.guidance_max_tokens,
+            "temperature": 0.15,
+            "response_format": {"type": "json_object"},
+        }
+        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
+        resp.raise_for_status()
+        data = resp.json()
         try:
-            message = response.choices[0].message
-            content = message.content
-        except Exception as exc:  # pragma: no cover - defensive against SDK shape changes
-            raise ValueError(f"Qwen response did not include message content: {exc}") from exc
-
-        if isinstance(content, str):
-            text = content.strip()
-        elif isinstance(content, list):
-            text = "".join(
-                item.get("text", "")
-                for item in content
-                if isinstance(item, dict) and isinstance(item.get("text"), str)
-            ).strip()
-        else:
-            text = str(content).strip()
-
+            text = data["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Unexpected Mistral response shape: {exc}") from exc
         if not text:
-            raise ValueError("Qwen response did not include text output.")
+            raise ValueError("Mistral response was empty.")
         return text
 
-    def _qwen_ready(self) -> bool:
-        return self.qwen_enabled and self.api_key_configured and self._client is not None
+    def _mistral_ready(self) -> bool:
+        return self.mistral_enabled and self.api_key_configured
 
-    def _should_use_llm(
-        self,
-        triage: TriageResult,
-        prediction: PredictionResult | None,
-    ) -> bool:
-        return not (
-            prediction is None
-            or triage.band == "uncertain_retake_needed"
-        )
+    def _should_use_llm(self, triage: TriageResult, prediction: PredictionResult | None) -> bool:
+        return not (prediction is None or triage.band == "uncertain_retake_needed")
 
     def _cache_key(self, payload: dict[str, object]) -> str:
         return json.dumps(payload, sort_keys=True, ensure_ascii=False)
@@ -270,21 +236,13 @@ class GuidanceService:
         while len(self._response_cache) > self._response_cache_size:
             self._response_cache.popitem(last=False)
 
-    def _summarize_provider_error(self, exc: Exception) -> str:
+    def _summarize_error(self, exc: Exception) -> str:
         message = " ".join(str(exc).split())
-        lowered = message.lower()
-        if "403" in message or "sufficient permissions" in lowered:
-            return (
-                "Hugging Face token lacks permission to call Inference Providers. "
-                "Enable 'Make calls to Inference Providers' on the HF token."
-            )
-        if "401" in message or "unauthorized" in lowered or "authentication" in lowered:
-            return "Hugging Face API key was rejected. Check the configured HF token."
-        if "429" in message or "rate limit" in lowered:
-            return "Hugging Face rate limit reached. Retry shortly or reduce demo traffic."
-        if len(message) <= 220:
-            return message
-        return message[:217] + "..."
+        if "401" in message or "unauthorized" in message.lower():
+            return "Mistral API key was rejected."
+        if "429" in message or "rate limit" in message.lower():
+            return "Mistral rate limit reached."
+        return message[:220]
 
     def generate_smart_fallback(
         self,
@@ -302,9 +260,7 @@ class GuidanceService:
                 "Image signal was not strong enough for a confident prediction. "
                 "This is not a clear result."
             )
-            urgency = (
-                "Retake the scan in better lighting. If symptoms persist, see a doctor regardless of this result."
-            )
+            urgency = "Retake the scan in better lighting. If symptoms persist, see a doctor regardless of this result."
             next_steps = [
                 "Retake eye image in bright natural light",
                 "Pull lower eyelid gently and hold camera steady",
@@ -368,7 +324,6 @@ class GuidanceService:
             steps.append("Avoid strenuous activity until reviewed by a doctor.")
         if symptoms.heavy_menstrual_bleeding:
             steps.append("Discuss menstrual blood loss with your doctor as a likely contributing factor.")
-
         deduped: list[str] = []
         seen: set[str] = set()
         for step in steps:
@@ -383,37 +338,23 @@ class GuidanceService:
             base = "Choose local iron-rich foods such as spinach (palak), lentils (dal), jaggery, moringa leaves, amla, and bajra roti."
         elif any(token in region_value for token in ("ghana", "nigeria", "kenya", "africa")):
             base = "Choose iron-rich foods such as ugwu leaves, beans, liver, garden eggs, and citrus fruits with meals."
-        elif any(
-            token in region_value
-            for token in (
-                "southeast asia",
-                "indonesia",
-                "philippines",
-                "vietnam",
-                "thailand",
-                "malaysia",
-                "cambodia",
-                "laos",
-                "myanmar",
-                "singapore",
-            )
-        ):
+        elif any(token in region_value for token in ("indonesia", "philippines", "vietnam", "thailand", "malaysia")):
             base = "Choose iron-rich foods such as kangkong, tempeh, tofu, moringa, fortified rice, and guava."
         else:
             base = "Choose iron-rich foods such as dark leafy greens, lentils, lean red meat, fortified cereals, and pumpkin seeds."
-        return f"{base} Pair them with vitamin C-rich foods, and avoid tea or coffee within 1 hour of iron-rich meals as tannins reduce absorption."
+        return f"{base} Pair with vitamin C-rich foods, and avoid tea or coffee within 1 hour of iron-rich meals."
 
     def _parse_guidance_response(
         self,
         raw_text: str,
-        source: Literal["qwen"],
+        source: Literal["mistral"],
         model_used: str,
         provider_used: str,
     ) -> GuidanceResult:
         text = raw_text.strip()
         if text.startswith("```"):
-            text = text.strip("`")
-            text = re.sub(r"^json\s*", "", text, count=1, flags=re.IGNORECASE).strip()
+            text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s*```$", "", text).strip()
 
         try:
             parsed = json.loads(text)
@@ -421,11 +362,10 @@ class GuidanceService:
             match = re.search(r"\{.*\}", text, flags=re.DOTALL)
             if not match:
                 raise
-            candidate = match.group(0)
             try:
-                parsed = json.loads(candidate)
+                parsed = json.loads(match.group(0))
             except json.JSONDecodeError:
-                parsed = ast.literal_eval(candidate)
+                parsed = ast.literal_eval(match.group(0))
 
         if not isinstance(parsed, dict):
             raise ValueError("Guidance response must be a JSON object")
@@ -433,27 +373,20 @@ class GuidanceService:
         next_steps = parsed.get("next_steps") or []
         if isinstance(next_steps, str):
             next_steps = [next_steps]
-        if not isinstance(next_steps, list):
-            raise ValueError("Guidance next_steps must be a list or string")
 
-        explanation = self._sanitize_text(str(parsed["explanation"]), limit=_FIELD_LIMITS["explanation"])
-        urgency_guidance = self._sanitize_text(
-            str(parsed["urgency_guidance"]),
-            limit=_FIELD_LIMITS["urgency_guidance"],
-        )
-        food_advice = self._sanitize_text(str(parsed["food_advice"]), limit=_FIELD_LIMITS["food_advice"])
+        explanation = self._sanitize_text(str(parsed.get("explanation", "")), limit=_FIELD_LIMITS["explanation"])
+        urgency_guidance = self._sanitize_text(str(parsed.get("urgency_guidance", "")), limit=_FIELD_LIMITS["urgency_guidance"])
+        food_advice = self._sanitize_text(str(parsed.get("food_advice", "")), limit=_FIELD_LIMITS["food_advice"])
         cleaned_steps = [
-            self._sanitize_text(str(item), limit=120)
-            for item in next_steps
-            if str(item).strip()
+            self._sanitize_text(str(s), limit=120) for s in next_steps if str(s).strip()
         ][:4]
 
         if not cleaned_steps:
             raise ValueError("Guidance next_steps cannot be empty")
 
-        combined_text = " ".join([explanation, urgency_guidance, food_advice, *cleaned_steps])
-        if self._contains_unsafe_claim(combined_text):
-            log.warning("Qwen output blocked by safety filter. Text snippet: %s", combined_text[:200])
+        combined = " ".join([explanation, urgency_guidance, food_advice, *cleaned_steps])
+        if self._contains_unsafe_claim(combined):
+            log.warning("Mistral output blocked by safety filter: %s", combined[:200])
             raise ValueError("Guidance output made an unsafe medical claim")
 
         return GuidanceResult(
@@ -464,21 +397,6 @@ class GuidanceService:
             urgency_guidance=urgency_guidance,
             food_advice=food_advice,
             next_steps=cleaned_steps,
-        )
-
-    def _fallback_guidance(
-        self,
-        triage: TriageResult,
-        symptoms: SymptomInput,
-        prediction: PredictionResult | None,
-        region: str | None = None,
-    ) -> GuidanceResult:
-        return self.generate_smart_fallback(
-            triage.band,
-            prediction.predicted_hemoglobin if prediction else None,
-            prediction.confidence if prediction else None,
-            symptoms,
-            region,
         )
 
     def _sanitize_text(self, text: str, *, limit: int) -> str:
@@ -494,16 +412,15 @@ class GuidanceService:
         return bool(_UNSAFE_CLAIM_PATTERN.search(scrubbed))
 
     def runtime_status(self) -> GuidanceRuntimeStatus:
-        provider_healthy = self._qwen_ready() and self._last_provider_error is None
+        provider_healthy = self._mistral_ready() and self._last_provider_error is None
         active_strategy: Literal["qwen", "fallback"] = "qwen" if provider_healthy else "fallback"
-
         return GuidanceRuntimeStatus(
             active_strategy=active_strategy,
-            qwen_enabled=self.qwen_enabled,
-            client_ready=self._qwen_ready(),
+            qwen_enabled=self.mistral_enabled,
+            client_ready=self._mistral_ready(),
             api_key_configured=self.api_key_configured,
-            qwen_model=self.qwen_model if self.qwen_enabled else None,
-            provider=self.provider_name if self.qwen_enabled else None,
-            fallback_reason=self._fallback_reason if self._fallback_reason else (self._last_provider_error if active_strategy == "fallback" else None),
+            qwen_model=self.mistral_model if self.mistral_enabled else None,
+            provider="mistral" if self.mistral_enabled else None,
+            fallback_reason=self._fallback_reason or (self._last_provider_error if not provider_healthy else None),
             last_provider_error=self._last_provider_error,
         )
