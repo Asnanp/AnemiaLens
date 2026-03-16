@@ -161,6 +161,98 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         </div>
       </motion.div>
 
+      {/* ── MISTRAL AI GUIDANCE — full-width ── */}
+      {analysis.guidance.source === 'mistral' && (
+        <motion.div
+          initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+          transition={{ delay:0.1, duration:0.5, ease:E }}
+          style={{ borderRadius:'1.25rem', padding:'2rem 2.5rem',
+            background:'linear-gradient(135deg, rgba(0,194,255,0.06) 0%, rgba(0,100,200,0.04) 100%)',
+            border:'1px solid rgba(0,194,255,0.2)',
+            boxShadow:'0 0 60px rgba(0,194,255,0.06)' }}>
+          {/* Header */}
+          <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
+            <div style={{ width:32, height:32, borderRadius:'0.625rem', flexShrink:0,
+              background:'rgba(0,194,255,0.12)', border:'1px solid rgba(0,194,255,0.25)',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(0,194,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="18" cy="6" r="3" fill="rgba(0,194,255,0.9)" stroke="none"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontFamily:'var(--mono)', fontSize:'0.55rem', letterSpacing:'0.18em',
+                textTransform:'uppercase', color:'rgba(0,194,255,0.7)', marginBottom:'0.15rem' }}>
+                AI-Generated Guidance
+              </div>
+              <div style={{ fontFamily:'var(--mono)', fontSize:'0.6rem', color:'rgba(0,194,255,0.5)' }}>
+                {analysis.guidance.model_used ?? 'Mistral AI'} · personalized to your screening
+              </div>
+            </div>
+            <span style={{ marginLeft:'auto', padding:'0.3rem 0.8rem', borderRadius:'99px',
+              fontSize:'0.5rem', fontFamily:'var(--mono)', fontWeight:700, letterSpacing:'0.15em',
+              textTransform:'uppercase', background:'rgba(0,194,255,0.1)',
+              border:'1px solid rgba(0,194,255,0.3)', color:'rgba(0,194,255,0.9)' }}>
+              Mistral AI
+            </span>
+          </div>
+
+          {/* Explanation */}
+          <p style={{ fontSize:'0.9rem', color:'var(--text)', lineHeight:1.75,
+            marginBottom:'1.5rem', maxWidth:800 }}>
+            {analysis.guidance.explanation}
+          </p>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' }}>
+            {/* Urgency */}
+            <div style={{ padding:'1rem 1.25rem', borderRadius:'0.875rem',
+              background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.15)' }}>
+              <div style={{ fontFamily:'var(--mono)', fontSize:'0.5rem', letterSpacing:'0.15em',
+                textTransform:'uppercase', color:'rgba(239,68,68,0.7)', marginBottom:'0.5rem' }}>
+                Urgency
+              </div>
+              <p style={{ fontSize:'0.8rem', color:'var(--text-muted)', lineHeight:1.6 }}>
+                {analysis.guidance.urgency_guidance}
+              </p>
+            </div>
+
+            {/* Food advice */}
+            {analysis.guidance.food_advice && (
+              <div style={{ padding:'1rem 1.25rem', borderRadius:'0.875rem',
+                background:'rgba(0,229,150,0.05)', border:'1px solid rgba(0,229,150,0.15)' }}>
+                <div style={{ fontFamily:'var(--mono)', fontSize:'0.5rem', letterSpacing:'0.15em',
+                  textTransform:'uppercase', color:'rgba(0,229,150,0.7)', marginBottom:'0.5rem' }}>
+                  Dietary Advice
+                </div>
+                <p style={{ fontSize:'0.8rem', color:'var(--text-muted)', lineHeight:1.6 }}>
+                  {analysis.guidance.food_advice}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Next steps */}
+          {analysis.guidance.next_steps.length > 0 && (
+            <div style={{ marginTop:'1.5rem' }}>
+              <div style={{ fontFamily:'var(--mono)', fontSize:'0.5rem', letterSpacing:'0.15em',
+                textTransform:'uppercase', color:'rgba(0,194,255,0.6)', marginBottom:'0.75rem' }}>
+                Recommended Next Steps
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+                {analysis.guidance.next_steps.map((step, i) => (
+                  <div key={i} style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start',
+                    padding:'0.6rem 0.875rem', borderRadius:'0.625rem',
+                    background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ fontFamily:'var(--mono)', fontSize:'0.55rem', color:'rgba(0,194,255,0.6)',
+                      fontWeight:700, flexShrink:0, marginTop:2 }}>{String(i+1).padStart(2,'0')}</span>
+                    <span style={{ fontSize:'0.78rem', color:'var(--text-muted)', lineHeight:1.55 }}>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* ── BOTTOM ROW: 3 cards ── */}
       <div className="result-bottom-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1.5rem' }}>
 

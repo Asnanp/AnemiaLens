@@ -595,7 +595,8 @@ class AnalysisMeta(BaseModel):
 
 class GuidanceRuntimeStatus(BaseModel):
     active_strategy: GuidanceSource
-    qwen_enabled: bool
+    mistral_enabled: bool = False
+    qwen_enabled: bool = False  # kept for backwards compat
     client_ready: bool = False
     api_key_configured: bool = False
     qwen_model: str | None = None
