@@ -190,6 +190,8 @@ def analyze() -> tuple[object, int]:
     return jsonify(payload), 200
 
 
+
+
 if __name__ == "__main__":
     debug_enabled = os.getenv("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
     app.run(host="127.0.0.1", port=5000, debug=debug_enabled, use_reloader=debug_enabled)
