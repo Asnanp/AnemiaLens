@@ -703,15 +703,18 @@ function ScreeningSection() {
   } = useScreening();
 
   const handleDownload = (shareText: string) => {
-    const blob = new Blob([shareText], { type:'text/plain' });
-    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  const blob = new Blob([shareText], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
 
-// Example fetch
-const response = await fetch(`${API_URL}/your-endpoint`);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'anemialens-report.txt'; a.click();
-    URL.revokeObjectURL(url);
-  };
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'anemialens-report.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(url);
+};
 
   const canStep = (i: number) =>
     i===0 || (i===1 && !!file) || (i===2 && !!quality) || (i===3 && !!analysis);
