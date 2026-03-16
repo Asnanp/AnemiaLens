@@ -48,7 +48,7 @@ class ScreeningPredictor:
                         efficientnet_secondary = predict_with_efficientnet_model(
                             self.efficientnet_bundle,
                             image,
-                            mc_passes=1,
+                            mc_passes=8,
                         )
                     except Exception:
                         efficientnet_secondary = None
@@ -266,9 +266,9 @@ class ScreeningPredictor:
         margin = abs(risk - threshold)
         mild_positive_conflict = (
             predicted_hemoglobin is not None
-            and threshold <= risk < (threshold + 0.15)
-            and predicted_hemoglobin > 12.2
-            and uncertainty >= 0.52
+            and threshold <= risk < (threshold + 0.12)
+            and predicted_hemoglobin > 13.0
+            and uncertainty >= 0.65
         )
         if mild_positive_conflict:
             return (
@@ -300,7 +300,7 @@ class ScreeningPredictor:
                 "anemia_likely",
                 "The screening model sees a persistent low-hemoglobin signal, so this result should be treated as likely anemia despite moderate uncertainty.",
             )
-        if uncertainty >= 0.62 or (margin < 0.08 and uncertainty >= 0.34):
+        if uncertainty >= 0.75 or (margin < 0.08 and uncertainty >= 0.45):
             return (
                 "uncertain",
                 "The estimated hemoglobin trend is borderline or noisy, so the safest interpretation is uncertain.",
@@ -318,7 +318,7 @@ class ScreeningPredictor:
     def _display_hemoglobin(self, predicted_hemoglobin: float | None, uncertainty: float) -> float | None:
         if predicted_hemoglobin is None:
             return None
-        if uncertainty >= 0.52:
+        if uncertainty >= 0.70:
             return None
         return round(clamp(predicted_hemoglobin, 6.0, 18.0), 2)
 

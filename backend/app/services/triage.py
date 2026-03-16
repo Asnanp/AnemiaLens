@@ -5,14 +5,14 @@ from app.schemas import PredictionResult, QualityAssessment, SignalBreakdown, Sy
 
 
 class TriageService:
-    IMAGE_WEIGHT = 0.55
-    SYMPTOM_WEIGHT = 0.45
+    IMAGE_WEIGHT = 0.50
+    SYMPTOM_WEIGHT = 0.50
     _WEIGHTS = {
-        "fatigue": 0.16,
-        "dizziness": 0.14,
-        "pale_skin": 0.18,
-        "shortness_of_breath": 0.22,
-        "heavy_menstrual_bleeding": 0.16,
+        "fatigue": 0.18,
+        "dizziness": 0.16,
+        "pale_skin": 0.22,
+        "shortness_of_breath": 0.24,
+        "heavy_menstrual_bleeding": 0.18,
         "poor_diet_low_iron": 0.14,
     }
 
@@ -43,13 +43,14 @@ class TriageService:
 
         fused_score = breakdown.fused_score
 
-        if fused_score >= 0.65 or (
-            prediction.anemia_risk >= 0.60 and symptom_score >= 0.38
-        ):
+        # Symptom-driven escalation: severe symptoms alone can push to high concern
+        if fused_score >= 0.62 or (
+            prediction.anemia_risk >= 0.55 and symptom_score >= 0.35
+        ) or symptom_score >= 0.72:
             band = "high_concern"
             label = "High concern"
             summary = "This screening suggests a higher level of concern. Arrange formal medical review soon, especially if symptoms are increasing."
-        elif fused_score >= 0.38 or prediction.anemia_risk >= 0.52 or symptom_score >= 0.45:
+        elif fused_score >= 0.32 or prediction.anemia_risk >= 0.45 or symptom_score >= 0.30:
             band = "moderate_risk"
             label = "Moderate risk"
             summary = "This screening shows some concern. A routine check with a clinician or lab test would be reasonable."
@@ -58,7 +59,7 @@ class TriageService:
             label = "Low risk"
             summary = "This screening does not show an urgent signal, but symptoms that continue or worsen still deserve follow-up."
 
-        if prediction.uncertainty >= 0.65:
+        if prediction.uncertainty >= 0.80:
             band = "uncertain_retake_needed"
             label = "Uncertain, retake needed"
             summary = "The model uncertainty is high, so the safest next step is to retake the image and repeat the screening."

@@ -9,19 +9,19 @@ RUNTIME_STACK_VERSION = "archive-evidence-fusion-v4"
 SourceHint = Literal["roi_original", "palpebral", "forniceal_palpebral"]
 
 DEFAULT_SOURCE_THRESHOLDS: dict[SourceHint, float] = {
-    "roi_original": 0.435,
-    "palpebral": 0.66,
-    "forniceal_palpebral": 0.66,
+    "roi_original": 0.40,
+    "palpebral": 0.60,
+    "forniceal_palpebral": 0.60,
 }
 
 DEFAULT_RISK_ARCHIVE_WEIGHTS: dict[SourceHint, float] = {
-    "roi_original": 0.84,
+    "roi_original": 0.55,
     "palpebral": 1.0,
     "forniceal_palpebral": 1.0,
 }
 
 DEFAULT_HB_ARCHIVE_WEIGHTS: dict[SourceHint, float] = {
-    "roi_original": 0.96,
+    "roi_original": 0.70,
     "palpebral": 1.0,
     "forniceal_palpebral": 1.0,
 }
@@ -62,13 +62,21 @@ def build_runtime_stack_prediction(
         disagreement = abs(archive_risk - efficientnet_risk)
         hemoglobin_gap = abs(archive_hb - efficientnet_hb)
 
+        # When both models agree on direction, boost confidence
+        agreement_bonus = 0.0
+        if (archive_risk > 0.5) == (efficientnet_risk > 0.5):
+            agreement_bonus = disagreement * 0.08  # small reduction in uncertainty
+
         risk = (risk_weight * archive_risk) + ((1.0 - risk_weight) * efficientnet_risk)
         predicted_hemoglobin = (hb_weight * archive_hb) + ((1.0 - hb_weight) * efficientnet_hb)
-        uncertainty = (
+        uncertainty = clamp(
             (risk_weight * archive_uncertainty)
             + ((1.0 - risk_weight) * efficientnet_uncertainty)
-            + (disagreement * 0.22)
-            + (min(hemoglobin_gap / 8.0, 1.0) * 0.04)
+            + (disagreement * 0.10)
+            + (min(hemoglobin_gap / 10.0, 1.0) * 0.03)
+            - agreement_bonus,
+            0.05,
+            0.92,
         )
 
     return {
