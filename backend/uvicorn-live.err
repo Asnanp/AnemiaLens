@@ -1,9 +1,0 @@
-INFO:     Started server process [23628]
-INFO:     Waiting for application startup.
-2026-03-15 19:42:54,409 [INFO] anemialens AnemiaLens starting up …
-2026-03-15 19:42:55,065 [INFO] anemialens All services initialised.
-INFO:     Application startup complete.
-ERROR:    [Errno 10048] error while attempting to bind on address ('127.0.0.1', 5000): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
-INFO:     Waiting for application shutdown.
-2026-03-15 19:42:55,066 [INFO] anemialens AnemiaLens shutting down.
-INFO:     Application shutdown complete.
