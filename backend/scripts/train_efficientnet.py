@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from collections import Counter
 from copy import deepcopy
@@ -15,7 +16,6 @@ from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, preci
 from sklearn.model_selection import GroupShuffleSplit
 from torch import nn
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from app.config import (
@@ -38,9 +38,12 @@ DATA_ROOT = BACKEND_ROOT / "data"
 ARCHIVE_ROOT = BACKEND_ROOT.parent / "archive" / "dataset anemia"
 SEED = 42
 BATCH_SIZE = 16
-EPOCHS = 40
-PATIENCE = 8
+EPOCHS = 60
+PATIENCE = 12
 MAX_GRAD_NORM = 1.0
+WARMUP_EPOCHS = 5
+LABEL_SMOOTHING = 0.05
+MIXUP_ALPHA = 0.3
 
 
 @dataclass(frozen=True)
@@ -94,14 +97,25 @@ def main() -> None:
     model = build_efficientnet_model(pretrained=True).to(device)
     optimizer = AdamW(
         [
-            {"params": list(model.classifier.parameters()), "lr": 1e-4},
-            {"params": [param for param in model.features.parameters() if param.requires_grad], "lr": 1e-5},
+            {"params": list(model.classifier.parameters()), "lr": 2e-4},
+            {"params": [param for param in model.features.parameters() if param.requires_grad], "lr": 8e-6},
         ],
-        weight_decay=1e-4,
+        weight_decay=2e-4,
     )
-    scheduler = CosineAnnealingLR(optimizer, T_max=EPOCHS)
-    cls_loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([_positive_class_weight(train_records)], device=device))
-    hb_loss_fn = nn.SmoothL1Loss(beta=0.75)
+
+    # Warmup then cosine annealing
+    def warmup_cosine_lr(epoch: int) -> float:
+        if epoch < WARMUP_EPOCHS:
+            return float(epoch + 1) / WARMUP_EPOCHS
+        progress = (epoch - WARMUP_EPOCHS) / max(EPOCHS - WARMUP_EPOCHS, 1)
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warmup_cosine_lr)
+
+    # Label smoothing on BCE
+    pos_weight = torch.tensor([_positive_class_weight(train_records)], device=device)
+    cls_loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    hb_loss_fn = nn.SmoothL1Loss(beta=0.5)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
@@ -123,11 +137,29 @@ def main() -> None:
             hbs = hbs.to(device)
             normalized_hbs = (hbs - hb_mean) / hb_std
 
-            optimizer.zero_grad(set_to_none=True)
-            output = model(images)
-            cls_loss = cls_loss_fn(output[:, 0:1], labels)
-            hb_loss = hb_loss_fn(output[:, 1:2], normalized_hbs)
-            total_loss = (0.7 * cls_loss) + (0.3 * hb_loss)
+            # MixUp augmentation
+            if MIXUP_ALPHA > 0 and np.random.random() < 0.5:
+                lam = float(np.random.beta(MIXUP_ALPHA, MIXUP_ALPHA))
+                idx = torch.randperm(images.size(0), device=device)
+                images = lam * images + (1.0 - lam) * images[idx]
+                labels_a, labels_b = labels, labels[idx]
+                hbs_a, hbs_b = normalized_hbs, normalized_hbs[idx]
+
+                optimizer.zero_grad(set_to_none=True)
+                output = model(images)
+                # Label smoothing applied to both MixUp targets
+                smooth_a = labels_a * (1.0 - LABEL_SMOOTHING) + 0.5 * LABEL_SMOOTHING
+                smooth_b = labels_b * (1.0 - LABEL_SMOOTHING) + 0.5 * LABEL_SMOOTHING
+                cls_loss = lam * cls_loss_fn(output[:, 0:1], smooth_a) + (1.0 - lam) * cls_loss_fn(output[:, 0:1], smooth_b)
+                hb_loss = lam * hb_loss_fn(output[:, 1:2], hbs_a) + (1.0 - lam) * hb_loss_fn(output[:, 1:2], hbs_b)
+            else:
+                optimizer.zero_grad(set_to_none=True)
+                output = model(images)
+                smooth_labels = labels * (1.0 - LABEL_SMOOTHING) + 0.5 * LABEL_SMOOTHING
+                cls_loss = cls_loss_fn(output[:, 0:1], smooth_labels)
+                hb_loss = hb_loss_fn(output[:, 1:2], normalized_hbs)
+
+            total_loss = (0.65 * cls_loss) + (0.35 * hb_loss)
             total_loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
             optimizer.step()

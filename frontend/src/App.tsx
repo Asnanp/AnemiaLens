@@ -14,6 +14,43 @@ import {
 
 const E = [0.22, 1, 0.36, 1] as const;
 
+// ── MARQUEE TICKER ────────────────────────────────────────────────────────────
+const TICKER_ITEMS = [
+  '1.6B+ people affected by anemia globally',
+  '92% model sensitivity on clinical specimens',
+  '710 validated conjunctival images',
+  '$0 marginal cost per screening',
+  'EfficientNet-B0 vision backbone',
+  'Qwen-2.5 grounded GenAI guidance',
+  'Four-band safety triage system',
+  'Smartphone-first — no hardware required',
+];
+
+function MarqueeTicker() {
+  const items = [...TICKER_ITEMS, ...TICKER_ITEMS];
+  return (
+    <div className="marquee-strip" style={{
+      position:'relative', zIndex:2, overflow:'hidden',
+      borderTop:'1px solid rgba(200,0,30,0.15)',
+      borderBottom:'1px solid rgba(200,0,30,0.15)',
+      background:'linear-gradient(90deg, rgba(200,0,30,0.04) 0%, rgba(200,0,30,0.02) 50%, rgba(200,0,30,0.04) 100%)',
+      padding:'0.875rem 0',
+    }}>
+      {/* fade edges */}
+      <div style={{ position:'absolute', left:0, top:0, bottom:0, width:120, background:'linear-gradient(90deg, var(--void), transparent)', zIndex:2, pointerEvents:'none' }} />
+      <div style={{ position:'absolute', right:0, top:0, bottom:0, width:120, background:'linear-gradient(270deg, var(--void), transparent)', zIndex:2, pointerEvents:'none' }} />
+      <div className="marquee-track">
+        {items.map((item, i) => (
+          <span key={i} className="marquee-item">
+            <span style={{ color:'var(--accent-bright)', marginRight:'0.5rem' }}>◆</span>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── #3 MAGNETIC GLASS TILT HOOK ───────────────────────────────────────────────
 function useMagneticTilt(ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -525,7 +562,7 @@ function WorkflowStepper() {
         </motion.div>
 
         {/* 5-column grid */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'1.25rem', position:'relative' }}>
+        <div className="workflow-5col" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'1.25rem', position:'relative' }}>
           {/* Connector line */}
           <div style={{ position:'absolute', top:52, left:'10%', right:'10%', height:1, background:'linear-gradient(90deg, transparent, var(--glass-border) 20%, var(--glass-border) 80%, transparent)', zIndex:0, pointerEvents:'none' }} />
 
@@ -538,7 +575,7 @@ function WorkflowStepper() {
               onClick={() => setActive(active===i ? null : i)}
               style={{
                 padding:'2rem 1.25rem', textAlign:'center', display:'flex', flexDirection:'column', gap:'1rem',
-                position:'relative', zIndex:1, cursor:'none',
+                position:'relative', zIndex:1, cursor:'pointer',
                 background: active===i ? 'linear-gradient(135deg, rgba(200,0,30,0.12) 0%, rgba(200,0,30,0.04) 100%)' : undefined,
                 borderColor: active===i ? 'rgba(200,0,30,0.3)' : undefined,
                 boxShadow: active===i ? '0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(200,0,30,0.12)' : undefined,
@@ -691,21 +728,26 @@ function ScreeningSection() {
           </h2>
         </motion.div>
 
-        <div className="screening-stepper" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0', marginBottom:'4rem' }}>
+        {/* ── Premium progress stepper ── */}
+        <div className="screening-progress" style={{ marginBottom:'4rem' }}>
           {STEPS_META.map((s, i) => (
             <>
-              <button
+              <div
                 key={s.label}
-                className={`step-pill ${step===i ? 'active' : step>i ? 'done' : ''}`}
+                className={`screening-step-node ${step===i?'active':''} ${step>i?'done':''}`}
                 onClick={() => canStep(i) && setStep(i)}
-                disabled={!canStep(i)}
-                style={{ opacity: canStep(i) ? 1 : 0.4 }}
+                style={{ opacity: canStep(i) ? 1 : 0.45, cursor: canStep(i) ? 'pointer' : 'default' }}
               >
-                {step > i ? '✓' : s.icon}
-                <span>{s.label}</span>
-              </button>
+                <div className={`screening-step-circle ${step===i?'active':''} ${step>i?'done':''}`}>
+                  {step > i
+                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    : <span style={{ fontFamily:'var(--mono)', fontSize:'0.65rem' }}>{String(i+1).padStart(2,'0')}</span>
+                  }
+                </div>
+                <span className="screening-step-label">{s.label}</span>
+              </div>
               {i < STEPS_META.length-1 && (
-                <div className={`step-connector ${step > i ? 'active' : ''}`} style={{ minWidth:40 }} />
+                <div className={`screening-step-line ${step>i?'done':''}`} />
               )}
             </>
           ))}
@@ -745,7 +787,9 @@ function ScreeningSection() {
                     <div className="label-tag" style={{ marginBottom:'0.5rem' }}>Protocol Check</div>
                     {['Bright, indirect natural daylight','No flash or harsh shadows','Lower eyelid fully exposed','One eye centered in frame'].map(tip => (
                       <div key={tip} style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
-                        <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(200,0,30,0.15)', border:'1px solid rgba(200,0,30,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.55rem', color:'var(--accent-bright)', flexShrink:0 }}>✓</div>
+                        <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(200,0,30,0.15)', border:'1px solid rgba(200,0,30,0.3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
                         <span style={{ fontSize:'0.82rem', color:'var(--text-muted)' }}>{tip}</span>
                       </div>
                     ))}
@@ -889,7 +933,7 @@ function Footer() {
                 <div className="label-tag" style={{ color:'var(--text)', marginBottom:'1.5rem' }}>{col.title}</div>
                 <ul style={{ listStyle:'none', display:'flex', flexDirection:'column', gap:'0.875rem' }}>
                   {col.links.map(l => (
-                    <li key={l} style={{ fontSize:'0.82rem', color:'var(--text-dim)', cursor:'none', transition:'color 0.2s' }}
+                    <li key={l} style={{ fontSize:'0.82rem', color:'var(--text-dim)', cursor:'pointer', transition:'color 0.2s' }}
                       onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
                       onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                     >{l}</li>
@@ -943,9 +987,14 @@ export default function App() {
       <Navbar backendUp={backendUp} />
       <main style={{ position:'relative', zIndex:1 }}>
         <Hero />
+        <MarqueeTicker />
+        <div className="section-divider" />
         <Challenge />
+        <div className="section-divider" />
         <WorkflowStepper />
+        <div className="section-divider" />
         <ScreeningSection />
+        <div className="section-divider" />
         <TechSection />
       </main>
       <Footer />

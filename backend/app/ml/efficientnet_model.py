@@ -11,7 +11,7 @@ from torchvision import transforms
 from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
 
-EFFICIENTNET_VERSION = "efficientnet-b0-ft"
+EFFICIENTNET_VERSION = "efficientnet-b0-ft-v2"
 IMAGE_SIZE = 224
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -24,18 +24,23 @@ def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
 def build_efficientnet_model(*, pretrained: bool = True) -> nn.Module:
     weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
     model = efficientnet_b0(weights=weights)
+    # Deeper head: 1280 → 512 → 128 → 2, GELU activations, stronger regularisation
     model.classifier = nn.Sequential(
-        nn.Dropout(0.4),
-        nn.Linear(1280, 256),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(256, 2),
+        nn.Dropout(0.35),
+        nn.Linear(1280, 512),
+        nn.GELU(),
+        nn.Dropout(0.25),
+        nn.Linear(512, 128),
+        nn.GELU(),
+        nn.Dropout(0.15),
+        nn.Linear(128, 2),
     )
 
+    # Freeze early layers 0-3, fine-tune 4-8 for richer feature adaptation
     for param in model.features.parameters():
         param.requires_grad = False
     for name, param in model.features.named_parameters():
-        if name.startswith(("6", "7", "8")):
+        if name.startswith(("4", "5", "6", "7", "8")):
             param.requires_grad = True
     for param in model.classifier.parameters():
         param.requires_grad = True
@@ -46,12 +51,15 @@ def build_train_transform() -> transforms.Compose:
     return transforms.Compose(
         [
             transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
-            transforms.RandomRotation(15),
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+            transforms.RandomVerticalFlip(p=0.15),
+            transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.05),
+            transforms.RandomRotation(20),
+            transforms.RandomAffine(degrees=0, translate=(0.12, 0.12), scale=(0.88, 1.12)),
+            transforms.RandomPerspective(distortion_scale=0.15, p=0.3),
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ToTensor(),
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.RandomErasing(p=0.25, scale=(0.02, 0.12), ratio=(0.3, 3.3)),
         ]
     )
 
@@ -100,32 +108,46 @@ def predict_with_efficientnet_model(
     model: nn.Module = bundle["model"]
     device: torch.device = bundle["device"]
     transform = bundle["transform"]
-    tensor = transform(image.convert("RGB")).unsqueeze(0).to(device)
     hb_mean = float(bundle.get("hb_mean", 0.0))
     hb_std_scale = max(float(bundle.get("hb_std", 1.0)), 1e-6)
+
+    rgb = image.convert("RGB")
+
+    # Build TTA variants: original + horizontal flip + slight brightness shifts
+    from PIL import ImageEnhance
+    tta_images = [
+        rgb,
+        rgb.transpose(Image.FLIP_LEFT_RIGHT),
+        ImageEnhance.Brightness(rgb).enhance(1.10),
+        ImageEnhance.Brightness(rgb).enhance(0.90),
+    ]
 
     probabilities: list[float] = []
     hemoglobin_values: list[float] = []
 
     with torch.no_grad():
-        for _ in range(max(mc_passes, 1)):
-            model.eval()
-            if mc_passes > 1:
-                _enable_dropout(model)
-            output = model(tensor)
-            probabilities.append(float(torch.sigmoid(output[:, 0]).item()))
-            hemoglobin_values.append(float((output[:, 1].item() * hb_std_scale) + hb_mean))
+        for tta_img in tta_images:
+            tensor = transform(tta_img).unsqueeze(0).to(device)
+            for pass_idx in range(max(mc_passes, 1)):
+                model.eval()
+                if mc_passes > 1:
+                    _enable_dropout(model)
+                output = model(tensor)
+                probabilities.append(float(torch.sigmoid(output[:, 0]).item()))
+                hemoglobin_values.append(float((output[:, 1].item() * hb_std_scale) + hb_mean))
 
     mean_probability = float(np.mean(probabilities))
     mean_hemoglobin = float(np.mean(hemoglobin_values))
     probability_std = float(np.std(probabilities))
     hemoglobin_std = float(np.std(hemoglobin_values))
-    margin_uncertainty = 1.0 - min(1.0, abs(mean_probability - 0.5) * 2.0)
+
+    # Calibrated uncertainty: margin + MC spread + Hb spread
+    margin_uncertainty = 1.0 - min(1.0, abs(mean_probability - 0.5) * 2.5)
     uncertainty = clamp(
-        (probability_std * 2.4)
-        + (min(hemoglobin_std / 2.5, 1.0) * 0.35)
-        + (margin_uncertainty * 0.2),
-        0.05,
+        (probability_std * 2.2)
+        + (min(hemoglobin_std / 2.0, 1.0) * 0.30)
+        + (margin_uncertainty * 0.18),
+        0.04,
         0.95,
     )
 
