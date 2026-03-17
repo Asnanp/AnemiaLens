@@ -16,7 +16,7 @@ const E = [0.22, 1, 0.36, 1] as const;
 
 // ── MARQUEE TICKER ────────────────────────────────────────────────────────────
 const TICKER_ITEMS = [
-  '1.6B+ people affected by anemia globally',
+  '1.92B+ people affected by anemia globally',
   '92% model sensitivity on clinical specimens',
   '710 validated conjunctival images',
   '$0 marginal cost per screening',
@@ -402,7 +402,7 @@ function Hero() {
             transition={{ delay:0.7, duration:0.8 }}
             style={{ display:'flex', gap:'3.5rem', paddingTop:'2.5rem', borderTop:'1px solid var(--glass-border)', marginTop:'0.5rem' }}
           >
-            {[['1.6B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
+            {[['1.92B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
               <div key={label}>
                 <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
                   {val.replace(/[^0-9.]/g,'')}
