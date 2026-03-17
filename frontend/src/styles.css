@@ -8,15 +8,15 @@
   --crimson:         #C8001E;
   --crimson-glow:    rgba(200,0,30,0.45);
   --crimson-subtle:  rgba(200,0,30,0.12);
-  --gold:            #CA8A04;
-  --gold-light:      #F0B429;
-  --gold-glow:       rgba(202,138,4,0.35);
-  --gold-subtle:     rgba(202,138,4,0.10);
+  --violet:          #7C3AED;
+  --violet-light:    #A78BFA;
+  --violet-glow:     rgba(124,58,237,0.35);
+  --violet-subtle:   rgba(124,58,237,0.10);
   --accent:          #C8001E;
   --accent-bright:   #E8294A;
   --accent-glow:     rgba(200,0,30,0.45);
   --accent-glow-sm:  rgba(200,0,30,0.18);
-  /* Iridescent border — shifts from crimson to gold */
+  /* Iridescent border — shifts from crimson to violet */
   --iris-border:     rgba(255,255,255,0.13);
   --glass-white:     rgba(255,255,255,0.042);
   --glass-border:    rgba(255,255,255,0.10);
@@ -107,7 +107,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
     0 32px 80px rgba(0,0,0,0.55),
     0 0 0 0.5px rgba(255,255,255,0.04);
 }
-/* Iridescent top-edge shimmer — shifts crimson→gold */
+/* Iridescent top-edge shimmer — shifts crimson→violet */
 .glass::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
@@ -115,7 +115,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
     transparent 0%,
     rgba(200,0,30,0.5) 20%,
     rgba(255,255,255,0.22) 50%,
-    rgba(202,138,4,0.5) 80%,
+    rgba(124,58,237,0.5) 80%,
     transparent 100%
   );
   pointer-events: none; z-index: 2;
@@ -144,20 +144,20 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
     0 0 0 0.5px rgba(255,255,255,0.10);
 }
 
-/* Gold-accent glass variant */
+/* Violet-accent glass variant */
 .glass-gold {
-  border-color: rgba(202,138,4,0.25);
+  border-color: rgba(124,58,237,0.25);
   box-shadow:
-    inset 0 1px 0 rgba(240,180,41,0.18),
-    0 0 40px rgba(202,138,4,0.12),
+    inset 0 1px 0 rgba(167,139,250,0.18),
+    0 0 40px rgba(124,58,237,0.12),
     0 32px 64px rgba(0,0,0,0.4);
 }
 .glass-gold::before {
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(202,138,4,0.6) 30%,
-    rgba(255,220,100,0.3) 50%,
-    rgba(202,138,4,0.6) 70%,
+    rgba(124,58,237,0.6) 30%,
+    rgba(167,139,250,0.3) 50%,
+    rgba(124,58,237,0.6) 70%,
     transparent 100%
   );
 }
@@ -224,22 +224,22 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
 }
 
-/* Gold CTA variant */
+/* Violet CTA variant */
 .btn-gold {
-  background: linear-gradient(135deg, #92600A 0%, var(--gold) 50%, var(--gold-light) 100%);
+  background: linear-gradient(135deg, #4C1D95 0%, var(--violet) 50%, var(--violet-light) 100%);
   color: #fff;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.28),
-    0 0 0 1px rgba(202,138,4,0.4),
-    0 12px 36px var(--gold-glow),
-    0 0 60px rgba(202,138,4,0.10);
+    0 0 0 1px rgba(124,58,237,0.4),
+    0 12px 36px var(--violet-glow),
+    0 0 60px rgba(124,58,237,0.10);
 }
 .btn-gold:hover {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.38),
-    0 0 0 1px rgba(240,180,41,0.6),
-    0 24px 56px var(--gold-glow),
-    0 0 40px rgba(202,138,4,0.5);
+    0 0 0 1px rgba(167,139,250,0.6),
+    0 24px 56px var(--violet-glow),
+    0 0 40px rgba(124,58,237,0.5);
   transform: translateY(-3px);
 }
 
@@ -281,14 +281,14 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   letter-spacing: 0.18em;
   color: var(--text-muted);
 }
-/* Section eyebrow — gold shimmer flicker */
+/* Section eyebrow — crimson→violet shimmer */
 .section-eyebrow {
   font-family: var(--mono);
   font-size: 0.62rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  background: linear-gradient(90deg, var(--accent-bright) 0%, var(--gold-light) 60%, var(--accent-bright) 100%);
+  background: linear-gradient(90deg, var(--accent-bright) 0%, var(--violet-light) 60%, var(--accent-bright) 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -325,20 +325,20 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 }
 .stat-chip:hover {
   background: var(--glass-md);
-  border-color: rgba(202,138,4,0.35);
+  border-color: rgba(124,58,237,0.35);
   transform: translateY(-3px);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.18),
     0 10px 28px rgba(0,0,0,0.42),
-    0 0 20px var(--gold-subtle);
+    0 0 20px var(--violet-subtle);
 }
 .stat-chip-val { color: var(--text); font-weight: 600; font-size: 0.85rem; }
 
 /* ── NAVBAR — #10 living glass ─────────────────────────────────────────────── */
-/* Logo AL pulse — gold */
+/* Logo AL pulse — crimson */
 @keyframes al-pulse {
-  0%,100% { box-shadow: 0 4px 16px rgba(202,138,4,0.5); }
-  50%      { box-shadow: 0 4px 24px rgba(202,138,4,0.9), 0 0 40px rgba(202,138,4,0.4); }
+  0%,100% { box-shadow: 0 4px 16px rgba(200,0,30,0.5); }
+  50%      { box-shadow: 0 4px 24px rgba(200,0,30,0.9), 0 0 40px rgba(200,0,30,0.4); }
 }
 .nav-logo-badge { animation: al-pulse 3s ease-in-out infinite; }
 
@@ -1137,15 +1137,15 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
    LUXURY UPGRADE — Heaven Level
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── GOLD SECTION DIVIDER ───────────────────────────────────────────────────── */
+/* ── CRIMSON→VIOLET SECTION DIVIDER ────────────────────────────────────────── */
 .section-divider {
   position: relative; height: 1px; margin: 0;
   background: linear-gradient(90deg,
     transparent 0%,
     rgba(200,0,30,0.15) 20%,
-    rgba(202,138,4,0.45) 40%,
-    rgba(255,220,100,0.6) 50%,
-    rgba(202,138,4,0.45) 60%,
+    rgba(124,58,237,0.45) 40%,
+    rgba(167,139,250,0.6) 50%,
+    rgba(124,58,237,0.45) 60%,
     rgba(200,0,30,0.15) 80%,
     transparent 100%
   );
@@ -1154,8 +1154,8 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   content: '';
   position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
   width: 7px; height: 7px; border-radius: 50%;
-  background: var(--gold-light);
-  box-shadow: 0 0 14px var(--gold-light), 0 0 28px var(--gold-glow), 0 0 56px rgba(202,138,4,0.2);
+  background: var(--violet-light);
+  box-shadow: 0 0 14px var(--violet-light), 0 0 28px var(--violet-glow), 0 0 56px rgba(124,58,237,0.2);
 }
 
 /* ── LUXURY GRAIN TEXTURE — finer ──────────────────────────────────────────── */
@@ -1185,25 +1185,25 @@ body::before {
   font-size: clamp(3.4rem, 7.5vw, 7.5rem);
 }
 
-/* ── GOLD GRADIENT TEXT UTILITY ─────────────────────────────────────────────── */
+/* ── GRADIENT TEXT UTILITIES ────────────────────────────────────────────────── */
 .text-gold {
-  background: linear-gradient(135deg, #92600A 0%, var(--gold) 40%, var(--gold-light) 70%, #FDE68A 100%);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--violet-light) 60%, #C4B5FD 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .text-crimson-gold {
-  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--gold-light) 100%);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--violet-light) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ── LUXURY CARD HOVER — gold top border reveal ─────────────────────────────── */
+/* ── LUXURY CARD HOVER — violet top border reveal ───────────────────────────── */
 .glass-hover::after {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), var(--gold-light), var(--gold), transparent);
+  background: linear-gradient(90deg, transparent, var(--crimson), var(--violet-light), var(--crimson), transparent);
   opacity: 0;
   transition: opacity 0.4s var(--ease);
   border-radius: 99px 99px 0 0;
@@ -1211,24 +1211,24 @@ body::before {
 }
 .glass-hover:hover::after { opacity: 1; }
 
-/* ── MARQUEE — gold diamond separator ──────────────────────────────────────── */
-.marquee-item { border-right-color: rgba(202,138,4,0.18); }
-.marquee-item:hover { color: var(--gold-light); }
+/* ── MARQUEE — violet separator ─────────────────────────────────────────────── */
+.marquee-item { border-right-color: rgba(124,58,237,0.18); }
+.marquee-item:hover { color: var(--violet-light); }
 
-/* ── STEP BADGE — gold gradient ─────────────────────────────────────────────── */
+/* ── STEP BADGE — crimson gradient ──────────────────────────────────────────── */
 .step-badge {
-  background: linear-gradient(135deg, #92600A, var(--gold), var(--gold-light));
-  box-shadow: 0 0 14px rgba(202,138,4,0.5), 0 0 28px rgba(202,138,4,0.2);
+  background: linear-gradient(135deg, var(--crimson), var(--accent-bright));
+  box-shadow: 0 0 14px rgba(200,0,30,0.5), 0 0 28px rgba(200,0,30,0.2);
 }
 
-/* ── WORKFLOW CONNECTOR — crimson→gold gradient ─────────────────────────────── */
+/* ── WORKFLOW CONNECTOR — crimson→violet gradient ───────────────────────────── */
 .workflow-connector {
   background: linear-gradient(90deg,
     transparent 0%,
     rgba(200,0,30,0.2) 15%,
-    rgba(202,138,4,0.4) 40%,
-    rgba(255,220,100,0.5) 50%,
-    rgba(202,138,4,0.4) 60%,
+    rgba(124,58,237,0.4) 40%,
+    rgba(167,139,250,0.5) 50%,
+    rgba(124,58,237,0.4) 60%,
     rgba(200,0,30,0.2) 85%,
     transparent 100%
   );
@@ -1236,68 +1236,68 @@ body::before {
 .workflow-connector::after {
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(202,138,4,0.12) 30%,
-    rgba(255,220,100,0.2) 50%,
-    rgba(202,138,4,0.12) 70%,
+    rgba(124,58,237,0.12) 30%,
+    rgba(167,139,250,0.2) 50%,
+    rgba(124,58,237,0.12) 70%,
     transparent 100%
   );
   filter: blur(6px);
 }
 
-/* ── SCREENING STEP ACTIVE — gold ring ──────────────────────────────────────── */
+/* ── SCREENING STEP ACTIVE — violet ring ────────────────────────────────────── */
 .screening-step-circle.active {
-  border-color: var(--gold-light);
-  background: linear-gradient(135deg, rgba(202,138,4,0.22), rgba(202,138,4,0.06));
-  color: var(--gold-light);
-  box-shadow: 0 0 0 4px rgba(202,138,4,0.12), 0 0 24px rgba(202,138,4,0.35);
+  border-color: var(--violet-light);
+  background: linear-gradient(135deg, rgba(124,58,237,0.22), rgba(124,58,237,0.06));
+  color: var(--violet-light);
+  box-shadow: 0 0 0 4px rgba(124,58,237,0.12), 0 0 24px rgba(124,58,237,0.35);
 }
-.screening-step-node.active .screening-step-label { color: var(--gold-light); }
+.screening-step-node.active .screening-step-label { color: var(--violet-light); }
 
-/* ── FOOTER GLOW — crimson→gold ─────────────────────────────────────────────── */
+/* ── FOOTER GLOW — crimson→violet ───────────────────────────────────────────── */
 .footer-glow::before {
   background: linear-gradient(90deg,
     transparent,
     rgba(200,0,30,0.3) 20%,
-    rgba(202,138,4,0.6) 40%,
-    rgba(255,220,100,0.8) 50%,
-    rgba(202,138,4,0.6) 60%,
+    rgba(124,58,237,0.6) 40%,
+    rgba(167,139,250,0.8) 50%,
+    rgba(124,58,237,0.6) 60%,
     rgba(200,0,30,0.3) 80%,
     transparent
   );
-  box-shadow: 0 0 24px rgba(202,138,4,0.25), 0 0 48px rgba(200,0,30,0.12);
+  box-shadow: 0 0 24px rgba(124,58,237,0.25), 0 0 48px rgba(200,0,30,0.12);
 }
 
-/* ── ICON BOX — gold glow on hover ──────────────────────────────────────────── */
+/* ── ICON BOX — violet glow on hover ────────────────────────────────────────── */
 .glass-hover:hover .icon-box {
-  box-shadow: 0 0 32px rgba(202,138,4,0.3), 0 0 16px rgba(200,0,30,0.2) !important;
-  background: linear-gradient(135deg, rgba(202,138,4,0.22) 0%, rgba(200,0,30,0.10) 100%) !important;
+  box-shadow: 0 0 32px rgba(124,58,237,0.3), 0 0 16px rgba(200,0,30,0.2) !important;
+  background: linear-gradient(135deg, rgba(124,58,237,0.22) 0%, rgba(200,0,30,0.10) 100%) !important;
 }
 
-/* ── HERO STAT — gold underline sweep ───────────────────────────────────────── */
+/* ── HERO STAT — crimson→violet underline sweep ─────────────────────────────── */
 .hero-stat::before {
-  background: linear-gradient(90deg, var(--crimson), var(--gold), transparent);
+  background: linear-gradient(90deg, var(--crimson), var(--violet-light), transparent);
 }
 
-/* ── NAV LINK — gold underline ──────────────────────────────────────────────── */
+/* ── NAV LINK — crimson→violet underline ────────────────────────────────────── */
 .nav-link::after {
-  background: linear-gradient(90deg, var(--crimson), var(--gold));
+  background: linear-gradient(90deg, var(--crimson), var(--violet-light));
 }
 
-/* ── SCROLLBAR — gold tint ───────────────────────────────────────────────────── */
+/* ── SCROLLBAR — violet tint ─────────────────────────────────────────────────── */
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(200,0,30,0.4), rgba(202,138,4,0.4));
+  background: linear-gradient(180deg, rgba(200,0,30,0.4), rgba(124,58,237,0.4));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(200,0,30,0.7), rgba(202,138,4,0.7));
+  background: linear-gradient(180deg, rgba(200,0,30,0.7), rgba(124,58,237,0.7));
 }
 
-/* ── CURSOR — gold ring on hover ─────────────────────────────────────────────── */
+/* ── CURSOR — violet ring on hover ──────────────────────────────────────────── */
 body:has(button:hover) #cursor-ring,
 body:has(a:hover) #cursor-ring {
   width: 52px; height: 52px;
-  border-color: var(--gold);
+  border-color: var(--violet-light);
   border-width: 2px;
-  box-shadow: 0 0 12px var(--gold-glow);
+  box-shadow: 0 0 12px var(--violet-glow);
 }
 
 /* ── SECTION HEADING — luxury size ──────────────────────────────────────────── */
@@ -1309,14 +1309,14 @@ body:has(a:hover) #cursor-ring {
   letter-spacing: -0.035em;
 }
 
-/* ── LUXURY AMBIENT ORB — dual color ────────────────────────────────────────── */
+/* ── AMBIENT ORB — dual crimson/violet ──────────────────────────────────────── */
 .ambient-orb-dual {
   position: absolute;
   border-radius: 50%;
   filter: blur(100px);
   pointer-events: none;
   animation: orb-drift 16s ease-in-out infinite;
-  background: radial-gradient(circle at 40% 40%, rgba(200,0,30,0.12) 0%, rgba(202,138,4,0.08) 50%, transparent 70%);
+  background: radial-gradient(circle at 40% 40%, rgba(200,0,30,0.12) 0%, rgba(124,58,237,0.08) 50%, transparent 70%);
 }
 
 /* ── GLASS CARD — luxury inner glow ─────────────────────────────────────────── */
@@ -1324,24 +1324,24 @@ body:has(a:hover) #cursor-ring {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.22),
     inset 0 -1px 0 rgba(0,0,0,0.4),
-    inset 1px 0 0 rgba(202,138,4,0.06),
+    inset 1px 0 0 rgba(124,58,237,0.06),
     inset -1px 0 0 rgba(200,0,30,0.06),
     0 40px 100px rgba(0,0,0,0.6),
     0 0 0 0.5px rgba(255,255,255,0.06);
 }
 
-/* ── PROGRESS TRACK — gold fill ─────────────────────────────────────────────── */
+/* ── PROGRESS TRACK — crimson→violet fill ───────────────────────────────────── */
 .progress-fill {
-  background: linear-gradient(90deg, var(--crimson), var(--accent-bright), var(--gold));
-  box-shadow: 0 0 10px var(--crimson-glow), 0 0 20px rgba(202,138,4,0.2);
+  background: linear-gradient(90deg, var(--crimson), var(--accent-bright), var(--violet-light));
+  box-shadow: 0 0 10px var(--crimson-glow), 0 0 20px rgba(124,58,237,0.2);
 }
 
-/* ── TERMINAL — gold left border ────────────────────────────────────────────── */
+/* ── TERMINAL — violet left border ──────────────────────────────────────────── */
 .terminal {
-  border-left-color: var(--gold);
+  border-left-color: var(--violet-light);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
-    -4px 0 30px rgba(202,138,4,0.12),
+    -4px 0 30px rgba(124,58,237,0.12),
     0 24px 48px rgba(0,0,0,0.5);
 }
 
@@ -1349,15 +1349,15 @@ body:has(a:hover) #cursor-ring {
 .eyebrow-dot {
   display: inline-block;
   width: 5px; height: 5px; border-radius: 50%;
-  background: var(--gold-light);
-  box-shadow: 0 0 8px var(--gold-glow);
+  background: var(--violet-light);
+  box-shadow: 0 0 8px var(--violet-glow);
   margin-right: 0.5rem;
   vertical-align: middle;
   animation: eyebrow-dot-pulse 2s ease-in-out infinite;
 }
 @keyframes eyebrow-dot-pulse {
-  0%,100% { box-shadow: 0 0 6px var(--gold-glow); transform: scale(1); }
-  50%      { box-shadow: 0 0 14px var(--gold-glow), 0 0 28px rgba(202,138,4,0.3); transform: scale(1.3); }
+  0%,100% { box-shadow: 0 0 6px var(--violet-glow); transform: scale(1); }
+  50%      { box-shadow: 0 0 14px var(--violet-glow), 0 0 28px rgba(124,58,237,0.3); transform: scale(1.3); }
 }
 
 /* ── LUXURY CARD BORDER ANIMATION ───────────────────────────────────────────── */
@@ -1372,7 +1372,7 @@ body:has(a:hover) #cursor-ring {
 .glass-border-animate::before {
   content: '';
   position: absolute; inset: -1px; border-radius: inherit;
-  background: linear-gradient(90deg, rgba(200,0,30,0.4), rgba(202,138,4,0.6), rgba(255,220,100,0.4), rgba(202,138,4,0.6), rgba(200,0,30,0.4));
+  background: linear-gradient(90deg, rgba(200,0,30,0.4), rgba(124,58,237,0.6), rgba(167,139,250,0.4), rgba(124,58,237,0.6), rgba(200,0,30,0.4));
   background-size: 300% 100%;
   animation: border-shimmer 4s linear infinite;
   z-index: -1;
@@ -1381,7 +1381,7 @@ body:has(a:hover) #cursor-ring {
 }
 .glass-border-animate:hover::before { opacity: 1; }
 
-/* ── HERO STAT NUMBER — gold gradient ───────────────────────────────────────── */
+/* ── HERO STAT NUMBER — text gradient ───────────────────────────────────────── */
 .hero-stat .stat-number {
   background: linear-gradient(135deg, var(--text) 0%, rgba(245,243,239,0.7) 100%);
   -webkit-background-clip: text;
@@ -1406,23 +1406,23 @@ body:has(a:hover) #cursor-ring {
   pointer-events: none; z-index: 2;
 }
 
-/* ── RESULT HERO CARD — gold accent on high concern ─────────────────────────── */
+/* ── RESULT HERO CARD — hover lift ──────────────────────────────────────────── */
 .result-hero-card:hover {
   transform: translateY(-6px);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.18),
     0 60px 120px rgba(0,0,0,0.65),
-    0 0 80px rgba(202,138,4,0.08);
+    0 0 80px rgba(124,58,237,0.08);
 }
 
 /* ── LUXURY FOCUS RING ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--gold-light);
+  outline: 2px solid var(--violet-light);
   outline-offset: 3px;
   border-radius: 4px;
 }
 button:focus-visible, a:focus-visible {
-  outline: 2px solid var(--gold-light);
+  outline: 2px solid var(--violet-light);
   outline-offset: 3px;
 }
 

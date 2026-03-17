@@ -40,7 +40,7 @@ function LuxuryParticles() {
     left: Math.random() * 100,
     duration: Math.random() * 20 + 15,
     delay: Math.random() * 20,
-    color: i % 3 === 0 ? 'rgba(202,138,4,0.5)' : i % 3 === 1 ? 'rgba(200,0,30,0.4)' : 'rgba(255,255,255,0.2)',
+    color: i % 3 === 0 ? 'rgba(124,58,237,0.5)' : i % 3 === 1 ? 'rgba(200,0,30,0.4)' : 'rgba(255,255,255,0.15)',
   }));
   return (
     <>
@@ -270,7 +270,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
         <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
           <div className="nav-logo-badge" style={{
             width:32, height:32, borderRadius:'10px',
-            background:'linear-gradient(135deg, #92600A 0%, #CA8A04 50%, #F0B429 100%)',
+            background:'linear-gradient(135deg, #C8001E 0%, #E8294A 60%, #7C3AED 100%)',
             display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:'0.6rem', fontWeight:800, color:'#fff', letterSpacing:'0.05em',
             fontFamily:'var(--mono)', flexShrink:0,
@@ -470,7 +470,7 @@ function Hero() {
           <motion.div
             initial={{ opacity:0 }} animate={{ opacity:1 }}
             transition={{ delay:0.7, duration:0.8 }}
-            style={{ display:'flex', gap:'2rem', paddingTop:'2.5rem', borderTop:'1px solid rgba(202,138,4,0.2)', marginTop:'0.5rem', flexWrap:'wrap' }}
+            style={{ display:'flex', gap:'2rem', paddingTop:'2.5rem', borderTop:'1px solid rgba(124,58,237,0.2)', marginTop:'0.5rem', flexWrap:'wrap' }}
           >
             {[
               { raw:'1.92', suffix:'B+', label:'Anemia Cases Globally', target:192, div:100 },
@@ -992,7 +992,7 @@ function Footer() {
           <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr', gap:'5rem', marginBottom:'4rem' }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
-                <div style={{ width:38, height:38, borderRadius:'10px', background:'linear-gradient(135deg, #92600A, #CA8A04, #F0B429)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:900, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 6px 20px rgba(202,138,4,0.4)' }}>AL</div>
+                <div style={{ width:38, height:38, borderRadius:'10px', background:'linear-gradient(135deg, #C8001E, #E8294A, #7C3AED)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:900, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 6px 20px rgba(124,58,237,0.35)' }}>AL</div>
                 <span style={{ fontWeight:800, fontSize:'1.1rem', letterSpacing:'-0.02em' }}>Anemia<span style={{ color:'var(--accent-bright)' }}>Lens</span></span>
               </div>
               <p style={{ fontSize:'0.82rem', color:'var(--text-dim)', lineHeight:1.8, maxWidth:340, marginBottom:'2rem' }}>
