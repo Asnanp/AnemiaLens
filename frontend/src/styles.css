@@ -1,32 +1,38 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
-/* ── DESIGN TOKENS — #12 color refinement ──────────────────────────────────── */
+/* ── DESIGN TOKENS — luxury upgrade ────────────────────────────────────────── */
 :root {
-  --void:            #020208;
-  --bg:              #04040A;
+  --void:            #010108;
+  --bg:              #03030C;
   --crimson:         #C8001E;
-  --crimson-glow:    rgba(200,0,30,0.4);
+  --crimson-glow:    rgba(200,0,30,0.45);
   --crimson-subtle:  rgba(200,0,30,0.12);
+  --gold:            #CA8A04;
+  --gold-light:      #F0B429;
+  --gold-glow:       rgba(202,138,4,0.35);
+  --gold-subtle:     rgba(202,138,4,0.10);
   --accent:          #C8001E;
   --accent-bright:   #E8294A;
-  --accent-glow:     rgba(200,0,30,0.4);
+  --accent-glow:     rgba(200,0,30,0.45);
   --accent-glow-sm:  rgba(200,0,30,0.18);
-  --glass-white:     rgba(255,255,255,0.055);
-  --glass-border:    rgba(255,255,255,0.11);
-  --glass-highlight: rgba(255,255,255,0.22);
-  --glass:           rgba(255,255,255,0.055);
-  --glass-md:        rgba(255,255,255,0.09);
-  --glass-hi:        rgba(255,255,255,0.13);
-  --glass-border-hi: rgba(255,255,255,0.20);
-  --glass-shine:     rgba(255,255,255,0.15);
-  --text-primary:    #F2F0EC;
-  --text:            #F2F0EC;
-  --text-secondary:  rgba(242,240,236,0.5);
-  --text-muted:      rgba(242,240,236,0.50);
-  --text-dim:        rgba(242,240,236,0.28);
+  /* Iridescent border — shifts from crimson to gold */
+  --iris-border:     rgba(255,255,255,0.13);
+  --glass-white:     rgba(255,255,255,0.042);
+  --glass-border:    rgba(255,255,255,0.10);
+  --glass-highlight: rgba(255,255,255,0.20);
+  --glass:           rgba(255,255,255,0.042);
+  --glass-md:        rgba(255,255,255,0.08);
+  --glass-hi:        rgba(255,255,255,0.12);
+  --glass-border-hi: rgba(255,255,255,0.18);
+  --glass-shine:     rgba(255,255,255,0.14);
+  --text-primary:    #F5F3EF;
+  --text:            #F5F3EF;
+  --text-secondary:  rgba(245,243,239,0.52);
+  --text-muted:      rgba(245,243,239,0.52);
+  --text-dim:        rgba(245,243,239,0.26);
   --serif:           'Cormorant Garamond', Georgia, serif;
-  --sans:            'Barlow', system-ui, sans-serif;
+  --sans:            'Figtree', system-ui, sans-serif;
   --mono:            'IBM Plex Mono', monospace;
   --ease:            cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring:     cubic-bezier(0.16, 1, 0.3, 1);
@@ -87,9 +93,9 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 
 /* ── GLASS CARD DEPTH UPGRADE ──────────────────────────────────────────────── */
 .glass {
-  background: rgba(255,255,255,0.03);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  background: rgba(255,255,255,0.028);
+  backdrop-filter: blur(36px) saturate(200%) brightness(1.04);
+  -webkit-backdrop-filter: blur(36px) saturate(200%) brightness(1.04);
   border: 1px solid var(--glass-border);
   border-radius: 1.5rem;
   position: relative;
@@ -97,47 +103,71 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   will-change: transform;
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 0 rgba(0,0,0,0.3),
-    0 24px 60px rgba(0,0,0,0.5),
-    0 0 0 0.5px rgba(255,255,255,0.05);
+    inset 0 -1px 0 rgba(0,0,0,0.35),
+    0 32px 80px rgba(0,0,0,0.55),
+    0 0 0 0.5px rgba(255,255,255,0.04);
 }
-/* Layer 2: top-edge light refraction */
+/* Iridescent top-edge shimmer — shifts crimson→gold */
 .glass::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--glass-highlight) 40%, rgba(255,255,255,0.10) 60%, transparent 100%);
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(200,0,30,0.5) 20%,
+    rgba(255,255,255,0.22) 50%,
+    rgba(202,138,4,0.5) 80%,
+    transparent 100%
+  );
   pointer-events: none; z-index: 2;
 }
 /* Inner diagonal shimmer */
 .glass::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(0,0,0,0.08) 100%);
+  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 45%, rgba(0,0,0,0.10) 100%);
   pointer-events: none; z-index: 1; border-radius: inherit;
 }
 
 .glass-hover {
-  transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), background 0.45s var(--ease), border-color 0.45s var(--ease);
+  transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease), background 0.5s var(--ease), border-color 0.5s var(--ease);
   cursor: pointer;
 }
 .glass-hover:hover {
-  background: rgba(255,255,255,0.065);
-  border-color: rgba(255,255,255,0.20);
-  transform: translateY(-10px) scale(1.005);
+  background: rgba(255,255,255,0.055);
+  border-color: rgba(255,255,255,0.18);
+  transform: translateY(-12px) scale(1.006);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.30),
     inset 0 -1px 0 rgba(0,0,0,0.2),
-    0 48px 96px rgba(0,0,0,0.6),
-    0 0 60px var(--crimson-subtle),
+    0 60px 120px rgba(0,0,0,0.65),
+    0 0 80px var(--crimson-subtle),
     0 0 0 0.5px rgba(255,255,255,0.10);
 }
 
-.glass-accent {
-  background: linear-gradient(135deg, rgba(200,0,30,0.18) 0%, rgba(200,0,30,0.06) 100%);
-  border-color: rgba(200,0,30,0.35);
+/* Gold-accent glass variant */
+.glass-gold {
+  border-color: rgba(202,138,4,0.25);
   box-shadow:
-    inset 0 1px 0 rgba(255,100,100,0.2),
-    0 0 40px rgba(200,0,30,0.2),
+    inset 0 1px 0 rgba(240,180,41,0.18),
+    0 0 40px rgba(202,138,4,0.12),
+    0 32px 64px rgba(0,0,0,0.4);
+}
+.glass-gold::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(202,138,4,0.6) 30%,
+    rgba(255,220,100,0.3) 50%,
+    rgba(202,138,4,0.6) 70%,
+    transparent 100%
+  );
+}
+
+.glass-accent {
+  background: linear-gradient(135deg, rgba(200,0,30,0.16) 0%, rgba(200,0,30,0.05) 100%);
+  border-color: rgba(200,0,30,0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255,100,100,0.18),
+    0 0 40px rgba(200,0,30,0.18),
     0 32px 64px rgba(0,0,0,0.4);
 }
 
@@ -148,55 +178,87 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   font-family: var(--sans); font-weight: 600; font-size: 0.78rem;
   letter-spacing: 0.06em; text-transform: uppercase;
   border: none; cursor: none; position: relative; overflow: hidden;
-  transition: all 0.35s var(--ease);
+  transition: all 0.4s var(--ease);
+}
+/* Sweep shimmer on hover */
+.btn::before {
+  content: '';
+  position: absolute; top: 0; left: -120%; width: 80%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transform: skewX(-20deg);
+  transition: left 0s;
+  pointer-events: none;
+}
+.btn:hover::before {
+  left: 160%;
+  transition: left 0.55s var(--ease);
 }
 .btn::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
   opacity: 0; transition: opacity 0.3s; border-radius: inherit;
 }
 .btn:hover::after { opacity: 1; }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--crimson) 0%, var(--accent-bright) 100%);
+  background: linear-gradient(135deg, var(--crimson) 0%, #E8294A 60%, #FF5070 100%);
   color: #fff;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.32),
     0 0 0 1px rgba(200,0,30,0.4),
-    0 12px 32px var(--crimson-glow),
-    0 0 60px rgba(200,0,30,0.15);
+    0 12px 36px var(--crimson-glow),
+    0 0 60px rgba(200,0,30,0.12);
 }
 .btn-primary:hover {
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.42),
     0 0 0 1px rgba(232,41,74,0.6),
-    0 20px 48px var(--crimson-glow),
-    0 0 30px rgba(200,0,30,0.6),
-    0 0 60px rgba(200,0,30,0.2);
-  transform: translateY(-2px);
+    0 24px 56px var(--crimson-glow),
+    0 0 40px rgba(200,0,30,0.55),
+    0 0 80px rgba(200,0,30,0.18);
+  transform: translateY(-3px);
 }
 .btn-primary:active {
   transform: scale(0.96) translateY(0);
   transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
 }
 
+/* Gold CTA variant */
+.btn-gold {
+  background: linear-gradient(135deg, #92600A 0%, var(--gold) 50%, var(--gold-light) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.28),
+    0 0 0 1px rgba(202,138,4,0.4),
+    0 12px 36px var(--gold-glow),
+    0 0 60px rgba(202,138,4,0.10);
+}
+.btn-gold:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.38),
+    0 0 0 1px rgba(240,180,41,0.6),
+    0 24px 56px var(--gold-glow),
+    0 0 40px rgba(202,138,4,0.5);
+  transform: translateY(-3px);
+}
+
 .btn-glass {
   background: var(--glass-white);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   color: var(--text);
   box-shadow:
     inset 0 1px 0 var(--glass-shine),
     inset 0 0 0 1px var(--glass-border),
-    0 8px 24px rgba(0,0,0,0.3);
+    0 8px 28px rgba(0,0,0,0.32);
 }
 .btn-glass:hover {
-  background: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.09);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.25),
-    inset 0 0 0 1px rgba(255,255,255,0.25),
-    0 16px 40px rgba(0,0,0,0.4);
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 0 0 1px rgba(255,255,255,0.22),
+    0 20px 48px rgba(0,0,0,0.42);
   transform: translateY(-2px);
 }
 .btn-glass:active {
@@ -207,7 +269,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 /* ── TYPOGRAPHY ────────────────────────────────────────────────────────────── */
 .display-hero {
   font-family: var(--serif);
-  font-size: clamp(3.2rem, 7vw, 6.8rem);
+  font-size: clamp(3.2rem, 7vw, 7rem);
   line-height: 0.88;
   letter-spacing: -0.04em;
 }
@@ -219,22 +281,30 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   letter-spacing: 0.18em;
   color: var(--text-muted);
 }
-/* #11 — section eyebrow glitch flicker */
+/* Section eyebrow — gold shimmer flicker */
 .section-eyebrow {
   font-family: var(--mono);
   font-size: 0.62rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: var(--accent-bright);
-  animation: eyebrow-glitch 12s infinite;
+  letter-spacing: 0.22em;
+  background: linear-gradient(90deg, var(--accent-bright) 0%, var(--gold-light) 60%, var(--accent-bright) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: eyebrow-shimmer 6s linear infinite, eyebrow-glitch 14s infinite;
   will-change: opacity;
 }
+@keyframes eyebrow-shimmer {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
 @keyframes eyebrow-glitch {
-  0%,94%,100% { opacity: 1; transform: none; text-shadow: none; }
-  95%  { opacity: 0.7; transform: translateX(2px); text-shadow: -2px 0 var(--crimson); }
-  96%  { opacity: 1; transform: translateX(-1px); text-shadow: 1px 0 rgba(0,200,255,0.5); }
-  97%  { opacity: 0.9; transform: none; text-shadow: none; }
+  0%,94%,100% { opacity: 1; transform: none; filter: none; }
+  95%  { opacity: 0.7; transform: translateX(2px); filter: hue-rotate(20deg); }
+  96%  { opacity: 1; transform: translateX(-1px); filter: none; }
+  97%  { opacity: 0.9; transform: none; }
 }
 
 /* ── STAT CHIPS ────────────────────────────────────────────────────────────── */
@@ -242,32 +312,33 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   display: inline-flex; align-items: center; gap: 0.5rem;
   padding: 0.5rem 1.1rem; border-radius: 99px;
   background: var(--glass-white);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 var(--glass-shine), 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow:
+    inset 0 1px 0 var(--glass-shine),
+    0 4px 20px rgba(0,0,0,0.32);
   font-family: var(--mono); font-size: 0.7rem; font-weight: 500;
   color: var(--text);
-  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), background 0.3s var(--ease), border-color 0.3s var(--ease);
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), background 0.35s var(--ease), border-color 0.35s var(--ease);
   cursor: none;
 }
-/* #11 — stat chips lift + crimson glow on hover */
 .stat-chip:hover {
   background: var(--glass-md);
-  border-color: rgba(200,0,30,0.4);
+  border-color: rgba(202,138,4,0.35);
   transform: translateY(-3px);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.2),
-    0 8px 24px rgba(0,0,0,0.4),
-    0 0 16px var(--crimson-subtle);
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 10px 28px rgba(0,0,0,0.42),
+    0 0 20px var(--gold-subtle);
 }
 .stat-chip-val { color: var(--text); font-weight: 600; font-size: 0.85rem; }
 
 /* ── NAVBAR — #10 living glass ─────────────────────────────────────────────── */
-/* Logo AL pulse */
+/* Logo AL pulse — gold */
 @keyframes al-pulse {
-  0%,100% { box-shadow: 0 4px 16px rgba(200,0,30,0.5); }
-  50%      { box-shadow: 0 4px 24px rgba(200,0,30,0.9), 0 0 40px rgba(200,0,30,0.4); }
+  0%,100% { box-shadow: 0 4px 16px rgba(202,138,4,0.5); }
+  50%      { box-shadow: 0 4px 24px rgba(202,138,4,0.9), 0 0 40px rgba(202,138,4,0.4); }
 }
 .nav-logo-badge { animation: al-pulse 3s ease-in-out infinite; }
 
@@ -771,18 +842,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   100% { transform: translateX(-50%); }
 }
 
-/* ── SECTION DIVIDER ────────────────────────────────────────────────────────── */
-.section-divider {
-  position: relative; height: 1px; margin: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(200,0,30,0.2) 30%, rgba(200,0,30,0.35) 50%, rgba(200,0,30,0.2) 70%, transparent 100%);
-}
-.section-divider::after {
-  content: '';
-  position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent-bright);
-  box-shadow: 0 0 12px var(--accent-bright), 0 0 24px rgba(200,0,30,0.4);
-}
+/* ── SECTION DIVIDER — see luxury section below ─────────────────────────────── */
 
 /* ── SECTION HEADING ACCENT LINE ────────────────────────────────────────────── */
 .heading-accent {
@@ -1044,16 +1104,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   .screening-step-circle { width: 36px; height: 36px; font-size: 0.6rem; }
 }
 
-/* ── FOCUS VISIBLE — keyboard navigation ───────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid var(--accent-bright);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-button:focus-visible, a:focus-visible {
-  outline: 2px solid var(--accent-bright);
-  outline-offset: 3px;
-}
+/* ── FOCUS VISIBLE — see luxury section below ───────────────────────────────── */
 
 /* ── RESULT HERO CARD — hover lift ─────────────────────────────────────────── */
 .result-hero-card {
@@ -1081,3 +1132,302 @@ button:focus-visible, a:focus-visible {
 
 /* ── SCREENING STEP NODE — cursor ───────────────────────────────────────────── */
 .screening-step-node { cursor: pointer; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LUXURY UPGRADE — Heaven Level
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── GOLD SECTION DIVIDER ───────────────────────────────────────────────────── */
+.section-divider {
+  position: relative; height: 1px; margin: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(200,0,30,0.15) 20%,
+    rgba(202,138,4,0.45) 40%,
+    rgba(255,220,100,0.6) 50%,
+    rgba(202,138,4,0.45) 60%,
+    rgba(200,0,30,0.15) 80%,
+    transparent 100%
+  );
+}
+.section-divider::after {
+  content: '';
+  position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold-light);
+  box-shadow: 0 0 14px var(--gold-light), 0 0 28px var(--gold-glow), 0 0 56px rgba(202,138,4,0.2);
+}
+
+/* ── LUXURY GRAIN TEXTURE — finer ──────────────────────────────────────────── */
+body::before {
+  opacity: 0.025;
+  background-size: 160px 160px;
+}
+
+/* ── FLOATING PARTICLE DOTS ─────────────────────────────────────────────────── */
+.luxury-particle {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  animation: particle-float linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes particle-float {
+  0%   { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+  5%   { opacity: 1; transform: translateY(90vh) translateX(5px) scale(1); }
+  95%  { opacity: 0.6; }
+  100% { transform: translateY(-10vh) translateX(-10px) scale(0.5); opacity: 0; }
+}
+
+/* ── HERO HEADLINE — luxury weight ─────────────────────────────────────────── */
+.display-hero {
+  font-size: clamp(3.4rem, 7.5vw, 7.5rem);
+}
+
+/* ── GOLD GRADIENT TEXT UTILITY ─────────────────────────────────────────────── */
+.text-gold {
+  background: linear-gradient(135deg, #92600A 0%, var(--gold) 40%, var(--gold-light) 70%, #FDE68A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-crimson-gold {
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--gold-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── LUXURY CARD HOVER — gold top border reveal ─────────────────────────────── */
+.glass-hover::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--gold-light), var(--gold), transparent);
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+  border-radius: 99px 99px 0 0;
+  z-index: 5;
+}
+.glass-hover:hover::after { opacity: 1; }
+
+/* ── MARQUEE — gold diamond separator ──────────────────────────────────────── */
+.marquee-item { border-right-color: rgba(202,138,4,0.18); }
+.marquee-item:hover { color: var(--gold-light); }
+
+/* ── STEP BADGE — gold gradient ─────────────────────────────────────────────── */
+.step-badge {
+  background: linear-gradient(135deg, #92600A, var(--gold), var(--gold-light));
+  box-shadow: 0 0 14px rgba(202,138,4,0.5), 0 0 28px rgba(202,138,4,0.2);
+}
+
+/* ── WORKFLOW CONNECTOR — crimson→gold gradient ─────────────────────────────── */
+.workflow-connector {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(200,0,30,0.2) 15%,
+    rgba(202,138,4,0.4) 40%,
+    rgba(255,220,100,0.5) 50%,
+    rgba(202,138,4,0.4) 60%,
+    rgba(200,0,30,0.2) 85%,
+    transparent 100%
+  );
+}
+.workflow-connector::after {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(202,138,4,0.12) 30%,
+    rgba(255,220,100,0.2) 50%,
+    rgba(202,138,4,0.12) 70%,
+    transparent 100%
+  );
+  filter: blur(6px);
+}
+
+/* ── SCREENING STEP ACTIVE — gold ring ──────────────────────────────────────── */
+.screening-step-circle.active {
+  border-color: var(--gold-light);
+  background: linear-gradient(135deg, rgba(202,138,4,0.22), rgba(202,138,4,0.06));
+  color: var(--gold-light);
+  box-shadow: 0 0 0 4px rgba(202,138,4,0.12), 0 0 24px rgba(202,138,4,0.35);
+}
+.screening-step-node.active .screening-step-label { color: var(--gold-light); }
+
+/* ── FOOTER GLOW — crimson→gold ─────────────────────────────────────────────── */
+.footer-glow::before {
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(200,0,30,0.3) 20%,
+    rgba(202,138,4,0.6) 40%,
+    rgba(255,220,100,0.8) 50%,
+    rgba(202,138,4,0.6) 60%,
+    rgba(200,0,30,0.3) 80%,
+    transparent
+  );
+  box-shadow: 0 0 24px rgba(202,138,4,0.25), 0 0 48px rgba(200,0,30,0.12);
+}
+
+/* ── ICON BOX — gold glow on hover ──────────────────────────────────────────── */
+.glass-hover:hover .icon-box {
+  box-shadow: 0 0 32px rgba(202,138,4,0.3), 0 0 16px rgba(200,0,30,0.2) !important;
+  background: linear-gradient(135deg, rgba(202,138,4,0.22) 0%, rgba(200,0,30,0.10) 100%) !important;
+}
+
+/* ── HERO STAT — gold underline sweep ───────────────────────────────────────── */
+.hero-stat::before {
+  background: linear-gradient(90deg, var(--crimson), var(--gold), transparent);
+}
+
+/* ── NAV LINK — gold underline ──────────────────────────────────────────────── */
+.nav-link::after {
+  background: linear-gradient(90deg, var(--crimson), var(--gold));
+}
+
+/* ── SCROLLBAR — gold tint ───────────────────────────────────────────────────── */
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(200,0,30,0.4), rgba(202,138,4,0.4));
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(200,0,30,0.7), rgba(202,138,4,0.7));
+}
+
+/* ── CURSOR — gold ring on hover ─────────────────────────────────────────────── */
+body:has(button:hover) #cursor-ring,
+body:has(a:hover) #cursor-ring {
+  width: 52px; height: 52px;
+  border-color: var(--gold);
+  border-width: 2px;
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+/* ── SECTION HEADING — luxury size ──────────────────────────────────────────── */
+.section-heading-xl {
+  font-family: var(--serif);
+  font-size: clamp(2.8rem, 5.5vw, 5rem);
+  font-weight: 700;
+  line-height: 1.0;
+  letter-spacing: -0.035em;
+}
+
+/* ── LUXURY AMBIENT ORB — dual color ────────────────────────────────────────── */
+.ambient-orb-dual {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  animation: orb-drift 16s ease-in-out infinite;
+  background: radial-gradient(circle at 40% 40%, rgba(200,0,30,0.12) 0%, rgba(202,138,4,0.08) 50%, transparent 70%);
+}
+
+/* ── GLASS CARD — luxury inner glow ─────────────────────────────────────────── */
+.glass-luxury {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 -1px 0 rgba(0,0,0,0.4),
+    inset 1px 0 0 rgba(202,138,4,0.06),
+    inset -1px 0 0 rgba(200,0,30,0.06),
+    0 40px 100px rgba(0,0,0,0.6),
+    0 0 0 0.5px rgba(255,255,255,0.06);
+}
+
+/* ── PROGRESS TRACK — gold fill ─────────────────────────────────────────────── */
+.progress-fill {
+  background: linear-gradient(90deg, var(--crimson), var(--accent-bright), var(--gold));
+  box-shadow: 0 0 10px var(--crimson-glow), 0 0 20px rgba(202,138,4,0.2);
+}
+
+/* ── TERMINAL — gold left border ────────────────────────────────────────────── */
+.terminal {
+  border-left-color: var(--gold);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    -4px 0 30px rgba(202,138,4,0.12),
+    0 24px 48px rgba(0,0,0,0.5);
+}
+
+/* ── SECTION EYEBROW DOT ─────────────────────────────────────────────────────── */
+.eyebrow-dot {
+  display: inline-block;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold-light);
+  box-shadow: 0 0 8px var(--gold-glow);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  animation: eyebrow-dot-pulse 2s ease-in-out infinite;
+}
+@keyframes eyebrow-dot-pulse {
+  0%,100% { box-shadow: 0 0 6px var(--gold-glow); transform: scale(1); }
+  50%      { box-shadow: 0 0 14px var(--gold-glow), 0 0 28px rgba(202,138,4,0.3); transform: scale(1.3); }
+}
+
+/* ── LUXURY CARD BORDER ANIMATION ───────────────────────────────────────────── */
+@keyframes border-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.glass-border-animate {
+  position: relative;
+}
+.glass-border-animate::before {
+  content: '';
+  position: absolute; inset: -1px; border-radius: inherit;
+  background: linear-gradient(90deg, rgba(200,0,30,0.4), rgba(202,138,4,0.6), rgba(255,220,100,0.4), rgba(202,138,4,0.6), rgba(200,0,30,0.4));
+  background-size: 300% 100%;
+  animation: border-shimmer 4s linear infinite;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.glass-border-animate:hover::before { opacity: 1; }
+
+/* ── HERO STAT NUMBER — gold gradient ───────────────────────────────────────── */
+.hero-stat .stat-number {
+  background: linear-gradient(135deg, var(--text) 0%, rgba(245,243,239,0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── LUXURY SECTION TRANSITION ──────────────────────────────────────────────── */
+.section-fade-edge {
+  position: relative;
+}
+.section-fade-edge::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 120px;
+  background: linear-gradient(180deg, var(--void) 0%, transparent 100%);
+  pointer-events: none; z-index: 2;
+}
+.section-fade-edge::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 120px;
+  background: linear-gradient(0deg, var(--void) 0%, transparent 100%);
+  pointer-events: none; z-index: 2;
+}
+
+/* ── RESULT HERO CARD — gold accent on high concern ─────────────────────────── */
+.result-hero-card:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 60px 120px rgba(0,0,0,0.65),
+    0 0 80px rgba(202,138,4,0.08);
+}
+
+/* ── LUXURY FOCUS RING ───────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 3px;
+}
+
+/* ── MOBILE — luxury adjustments ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .display-hero { font-size: clamp(3rem, 13vw, 5rem) !important; }
+  .section-heading-xl { font-size: clamp(2.2rem, 8vw, 3.2rem) !important; }
+}
