@@ -117,7 +117,11 @@ def analyze() -> tuple[object, int]:
         if isinstance(exc, UnidentifiedImageError) or "cannot identify image" in str(exc).lower():
             return jsonify({"error": "The uploaded file is not a valid image. Please upload a JPEG or PNG photo."}), 400
         raise
-    prediction = predictor.predict(rgb, quality) if quality.passed else None
+    try:
+        prediction = predictor.predict(rgb, quality) if quality.passed else None
+    except Exception as exc:
+        import gc; gc.collect()
+        return jsonify({"error": f"Model inference failed: {type(exc).__name__}. Please try again."}), 500
     used_raw_frame_rescue = False
     if prediction is None:
         quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(image_bytes, quality)
@@ -189,6 +193,13 @@ def analyze() -> tuple[object, int]:
         "region": region,
     }
     return jsonify(payload), 200
+
+import gc
+
+@app.after_request
+def _free_memory(response):
+    gc.collect()
+    return response
 
 if __name__ == "__main__":
     debug_enabled = os.getenv("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
