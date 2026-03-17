@@ -85,21 +85,19 @@ body:has(a:hover) #cursor-dot { width: 0; height: 0; opacity: 0; }
 body:has(button:hover) #cursor-ring,
 body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--crimson); border-width: 2px; }
 
-/* ── LIQUID GLASS SYSTEM — #1 three-layer depth ────────────────────────────── */
+/* ── GLASS CARD DEPTH UPGRADE ──────────────────────────────────────────────── */
 .glass {
   background: rgba(255,255,255,0.03);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid var(--glass-border);
   border-radius: 1.5rem;
   position: relative;
   overflow: hidden;
   will-change: transform;
-  /* Layer 1: inner highlight rim */
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     inset 0 -1px 0 rgba(0,0,0,0.3),
-    /* Layer 3: outer depth */
     0 24px 60px rgba(0,0,0,0.5),
     0 0 0 0.5px rgba(255,255,255,0.05);
 }
@@ -123,15 +121,15 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   cursor: pointer;
 }
 .glass-hover:hover {
-  background: rgba(255,255,255,0.055);
-  border-color: rgba(255,255,255,0.18);
-  transform: translateY(-8px);
+  background: rgba(255,255,255,0.065);
+  border-color: rgba(255,255,255,0.20);
+  transform: translateY(-10px) scale(1.005);
   box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
+    inset 0 1px 0 rgba(255,255,255,0.28),
     inset 0 -1px 0 rgba(0,0,0,0.2),
-    0 40px 80px rgba(0,0,0,0.55),
-    0 0 40px var(--crimson-subtle),
-    0 0 0 0.5px rgba(255,255,255,0.08);
+    0 48px 96px rgba(0,0,0,0.6),
+    0 0 60px var(--crimson-subtle),
+    0 0 0 0.5px rgba(255,255,255,0.10);
 }
 
 .glass-accent {
@@ -784,6 +782,132 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent-bright);
   box-shadow: 0 0 12px var(--accent-bright), 0 0 24px rgba(200,0,30,0.4);
+}
+
+/* ── SECTION HEADING ACCENT LINE ────────────────────────────────────────────── */
+.heading-accent {
+  position: relative;
+  display: inline-block;
+}
+.heading-accent::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--crimson), var(--accent-bright), transparent);
+  border-radius: 99px;
+  opacity: 0.6;
+}
+
+/* ── STAT COUNT-UP ──────────────────────────────────────────────────────────── */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  transition: all 0.1s;
+}
+
+/* ── AMBIENT ORB ────────────────────────────────────────────────────────────── */
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: orb-drift 12s ease-in-out infinite;
+}
+@keyframes orb-drift {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -20px) scale(1.05); }
+  66%      { transform: translate(-20px, 15px) scale(0.97); }
+}
+
+/* ── FOOTER GLOW TOP BORDER ─────────────────────────────────────────────────── */
+.footer-glow {
+  position: relative;
+}
+.footer-glow::before {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,0,30,0.5) 30%, rgba(232,41,74,0.8) 50%, rgba(200,0,30,0.5) 70%, transparent);
+  box-shadow: 0 0 20px rgba(200,0,30,0.3), 0 0 40px rgba(200,0,30,0.1);
+}
+
+/* ── WORKFLOW CONNECTOR UPGRADE ─────────────────────────────────────────────── */
+.workflow-connector {
+  position: absolute; top: 52px; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(200,0,30,0.15) 10%,
+    rgba(200,0,30,0.3) 30%,
+    rgba(200,0,30,0.3) 70%,
+    rgba(200,0,30,0.15) 90%,
+    transparent 100%
+  );
+  z-index: 0; pointer-events: none;
+}
+.workflow-connector::after {
+  content: '';
+  position: absolute; inset: -1px 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(200,0,30,0.08) 20%,
+    rgba(200,0,30,0.15) 50%,
+    rgba(200,0,30,0.08) 80%,
+    transparent 100%
+  );
+  filter: blur(4px);
+}
+
+/* ── STEP NUMBER BADGE ──────────────────────────────────────────────────────── */
+.step-badge {
+  position: absolute;
+  top: -10px; right: -10px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--crimson), var(--accent-bright));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.5rem; font-weight: 700;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(200,0,30,0.5);
+  z-index: 5;
+}
+
+/* ── HERO STAT CARD ─────────────────────────────────────────────────────────── */
+.hero-stat {
+  position: relative;
+  padding: 0.5rem 0;
+  transition: transform 0.3s var(--ease);
+}
+.hero-stat:hover {
+  transform: translateY(-4px);
+}
+.hero-stat::before {
+  content: '';
+  position: absolute; bottom: 0; left: 0; width: 0; height: 1px;
+  background: linear-gradient(90deg, var(--crimson), transparent);
+  transition: width 0.4s var(--ease);
+}
+.hero-stat:hover::before {
+  width: 100%;
+}
+
+/* ── SCREENING SECTION AMBIENT ──────────────────────────────────────────────── */
+.screening-ambient {
+  position: absolute;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,0,30,0.06) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  filter: blur(60px);
+  pointer-events: none;
+  animation: orb-drift 15s ease-in-out infinite;
+}
+
+/* ── CARD ICON GLOW UPGRADE ─────────────────────────────────────────────────── */
+.icon-box {
+  transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease), background 0.3s var(--ease);
+}
+.glass-hover:hover .icon-box {
+  box-shadow: 0 0 30px rgba(200,0,30,0.35) !important;
+  transform: scale(1.08);
+  background: linear-gradient(135deg, rgba(200,0,30,0.28) 0%, rgba(200,0,30,0.10) 100%) !important;
 }
 
 /* ── SCREENING PROGRESS BAR ─────────────────────────────────────────────────── */
