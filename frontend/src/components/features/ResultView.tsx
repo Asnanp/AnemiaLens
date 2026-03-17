@@ -348,7 +348,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ marginTop:'auto', width:'100%', padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem', cursor:'pointer' }}
             onClick={onDownload}>
-            <Download size={13} /> <span className="liquid-text" data-text="Export Report">Export Report</span>
+            <Download size={13} /> Export Report
           </motion.button>
         </motion.div>
 
@@ -367,7 +367,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.button className="btn btn-primary" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ width:'100%', padding:'0.75rem', fontSize:'0.68rem', cursor:'pointer' }}
             onClick={() => navigator.share?.({ text: analysis.handoff_summary.share_text })}>
-            <Share2 size={13} /> <span className="liquid-text" data-text="Share with Provider">Share with Provider</span>
+            <Share2 size={13} /> Share with Provider
           </motion.button>
           <div style={{ padding:'1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)',
             border:'1px solid rgba(255,255,255,0.05)' }}>
@@ -377,7 +377,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
               style={{ width:'100%', padding:'0.65rem', fontSize:'0.62rem', borderRadius:'0.75rem', cursor:'pointer' }}
               onClick={onReset}>
-              <RefreshCw size={12} /> <span className="liquid-text" data-text="New Screening">New Screening</span>
+              <RefreshCw size={12} /> New Screening
             </motion.button>
           </div>
         </motion.div>
