@@ -5,7 +5,15 @@ import type {
   SymptomInput
 } from './types';
 
-const API_BASE = (
+// Silent wake ping — fires immediately on import, warms Render cold start
+// before the user even clicks anything
+(function silentWake() {
+  const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+  const url = base ? `${base}/health` : '/health';
+  fetch(url, { method: 'GET' }).catch(() => {/* silent — just warming */});
+})();
+
+
   import.meta.env.VITE_API_BASE_URL ?? ''
 ).replace(/\/$/, '');
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Download, Info, Share2, AlertCircle, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse } from '../../types';
 
 const E = [0.22, 1, 0.36, 1] as const;
@@ -43,11 +43,10 @@ function RiskArc({ value, color }: { value: number; color: string }) {
       <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
         <span style={{ fontFamily:'var(--mono)', fontWeight:700, fontSize:'1.4rem', color, lineHeight:1 }}>{value}%</span>
         <span style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:'0.12em', textTransform:'uppercase', marginTop:4 }}>Risk Score</span>
-      </div>
+      </motion.div>
     </div>
   );
 }
-
 interface ResultViewProps {
   analysis: AnalyzeResponse;
   onReset: () => void;
@@ -67,8 +66,69 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const conf   = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
 
+  // ── Dramatic reveal state ──
+  const [flashDone, setFlashDone] = useState(false);
+  const [revealed,  setRevealed]  = useState(false);
+
+  useEffect(() => {
+    // Flash lasts 600ms, then content reveals
+    const t1 = setTimeout(() => setFlashDone(true), 600);
+    const t2 = setTimeout(() => setRevealed(true),  700);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+    <div style={{ position:'relative' }}>
+
+      {/* ── DRAMATIC FLASH OVERLAY ── */}
+      <AnimatePresence>
+        {!flashDone && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.55, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, times: [0, 0.3, 1], ease: 'easeOut' }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9000,
+              background: bandColor,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── RESULT LABEL CINEMATIC ENTRANCE ── */}
+      <AnimatePresence>
+        {!flashDone && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: [0, 1, 1, 0], scale: [0.7, 1.05, 1, 0.9] }}
+            transition={{ duration: 0.6, times: [0, 0.25, 0.6, 1] }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 9001,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{
+              fontFamily: 'var(--serif)', fontSize: 'clamp(3rem, 10vw, 7rem)',
+              fontWeight: 700, color: '#fff',
+              textShadow: `0 0 60px ${bandColor}, 0 0 120px ${bandColor}80`,
+              letterSpacing: '-0.04em',
+            }}>
+              {analysis.triage.label}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── MAIN CONTENT — staggered reveal ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: revealed ? 1 : 0 }}
+        transition={{ duration: 0.4 }}
+        style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}
+      >
 
       {/* ── HERO CARD — full-width Hb display ── */}
       <motion.div className="glass result-hero-card"
