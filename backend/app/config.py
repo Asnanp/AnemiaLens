@@ -107,7 +107,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ANEMIALENS_GUIDANCE_TIMEOUT", "GUIDANCE_TIMEOUT"),
     )
     guidance_max_tokens: int = Field(
-        default=512,
+        default=768,
         ge=64,
         le=2048,
         validation_alias=AliasChoices("ANEMIALENS_GUIDANCE_MAX_TOKENS", "GUIDANCE_MAX_TOKENS"),

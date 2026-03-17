@@ -147,15 +147,16 @@ class GuidanceService:
     def _system_prompt(self) -> str:
         return (
             "You are AnemiaLens Guide, a careful community screening assistant. "
-            "Use only the supplied screening facts. "
-            "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers. "
+            "Use the supplied screening data to write specific, personalized guidance — "
+            "reference the actual hemoglobin estimate, risk percentage, triage band, and active symptoms provided. "
+            "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers beyond what is supplied. "
             "Keep every statement compatible with a screening tool rather than a diagnosis. "
             "If language or region is provided, adapt wording and food examples to that context. "
             "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps. "
-            "explanation: 1-2 short sentences. "
-            "urgency_guidance: 1 short sentence. "
-            "food_advice: 1 short sentence with food ideas only. "
-            "next_steps: array of 2-4 short action strings. "
+            "explanation: 2 sentences — mention the specific hemoglobin estimate and risk level from the data. "
+            "urgency_guidance: 1 sentence — be specific about timeline based on the triage band. "
+            "food_advice: 1 sentence — give concrete food examples relevant to the region if provided. "
+            "next_steps: array of 3-4 short action strings, specific to the screening result. "
             "No markdown, no extra keys, no preamble."
         )
 
@@ -207,7 +208,7 @@ class GuidanceService:
                 {"role": "user", "content": self._user_prompt(payload)},
             ],
             "max_tokens": self.guidance_max_tokens,
-            "temperature": 0.15,
+            "temperature": 0.4,
             "response_format": {"type": "json_object"},
         }
         resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
