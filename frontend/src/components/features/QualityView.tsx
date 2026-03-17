@@ -153,11 +153,11 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
           {/* Actions */}
           <div style={{ display:'flex', gap:'0.875rem' }}>
             <button className="btn btn-glass" style={{ flex:1, gap:'0.5rem' }} onClick={onBack} disabled={loading}>
-              <RotateCcw size={13} /> <span className="liquid-text" data-text="Retake Image">Retake Image</span>
+              <RotateCcw size={13} /> Retake Image
             </button>
             <button className="btn btn-primary" style={{ flex:1, gap:'0.5rem', opacity: (!passed || loading) ? 0.4 : 1 }}
               onClick={onContinue} disabled={!passed || loading}>
-              {loading ? 'Analyzing...' : <><ArrowRight size={13} /> <span className="liquid-text" data-text="Continue">Continue</span></>}
+              {loading ? 'Analyzing...' : <><ArrowRight size={13} /> Continue</>}
             </button>
           </div>
         </div>
