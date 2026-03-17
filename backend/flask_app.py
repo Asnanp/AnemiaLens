@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import logging
 import os
 import time
 import uuid
@@ -11,6 +12,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from PIL import UnidentifiedImageError
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # Limit PyTorch to 1 CPU thread — critical for low-RAM environments (Render Starter)
 torch.set_num_threads(1)
@@ -213,6 +216,8 @@ def _free_memory(response):
     return response
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     debug_enabled = os.getenv("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=debug_enabled, use_reloader=debug_enabled)

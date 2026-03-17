@@ -65,6 +65,7 @@ class GuidanceService:
         region: str | None = None,
     ) -> GuidanceResult:
         if not self._should_use_llm(triage, prediction):
+            log.info("Skipping LLM: prediction=%s, band=%s", prediction is not None, triage.band)
             return self.generate_smart_fallback(
                 triage.band,
                 prediction.predicted_hemoglobin if prediction else None,
@@ -77,8 +78,14 @@ class GuidanceService:
         cache_key = self._cache_key(payload)
         cached = self._response_cache.get(cache_key)
         if cached is not None:
+            log.info("Returning cached guidance (source=%s)", cached.source)
             self._response_cache.move_to_end(cache_key)
             return GuidanceResult.model_validate(cached.model_dump())
+
+        log.info(
+            "Calling Mistral: enabled=%s, key_set=%s, model=%s",
+            self.mistral_enabled, self.api_key_configured, self.mistral_model,
+        )
 
         if self._mistral_ready():
             result = self._generate_mistral(
@@ -90,10 +97,16 @@ class GuidanceService:
                 region=region,
             )
             if result is not None:
+                log.info("Guidance source: %s", result.source)
                 if result.source == "mistral":
                     self._last_provider_error = None
                     self._store_cached_result(cache_key, result)
                 return result
+        else:
+            log.warning(
+                "Mistral not ready: enabled=%s, key_configured=%s, fallback_reason=%s",
+                self.mistral_enabled, self.api_key_configured, self._fallback_reason,
+            )
 
         return self.generate_smart_fallback(
             triage.band,
@@ -251,7 +264,11 @@ class GuidanceService:
             "temperature": 0.4,
             "response_format": {"type": "json_object"},
         }
+        log.info("POST %s model=%s max_tokens=%s", _MISTRAL_API_URL, self.mistral_model, self.guidance_max_tokens)
         resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
+        log.info("Mistral HTTP %s", resp.status_code)
+        if not resp.ok:
+            log.error("Mistral error body: %s", resp.text[:400])
         resp.raise_for_status()
         data = resp.json()
         try:
@@ -260,6 +277,7 @@ class GuidanceService:
             raise ValueError(f"Unexpected Mistral response shape: {exc}") from exc
         if not text:
             raise ValueError("Mistral response was empty.")
+        log.info("Mistral response length: %d chars", len(text))
         return text
 
     def _mistral_ready(self) -> bool:
