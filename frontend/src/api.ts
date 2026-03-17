@@ -9,9 +9,9 @@ const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ?? ''
 ).replace(/\/$/, '');
 
-// Compress image to max 800px and ~80% JPEG quality before sending to backend.
-// Shrinks 2-3MB demo/phone images down to ~80-150KB — prevents OOM on free-tier servers.
-async function compressImage(file: File, maxDim = 800, quality = 0.82): Promise<File> {
+// Compress image to max 300KB before sending to backend.
+// Resizes to max 800px then iterates quality down until under the size cap.
+async function compressImage(file: File, maxDim = 800, maxBytes = 300_000): Promise<File> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -24,11 +24,24 @@ async function compressImage(file: File, maxDim = 800, quality = 0.82): Promise<
       canvas.height = Math.round(height * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file),
-        'image/jpeg',
-        quality
-      );
+
+      // Try quality steps from 0.82 down to 0.40 until under maxBytes
+      const qualities = [0.82, 0.72, 0.62, 0.52, 0.42];
+      let idx = 0;
+
+      const tryNext = () => {
+        const q = qualities[idx++];
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return; }
+          if (blob.size <= maxBytes || idx >= qualities.length) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            tryNext();
+          }
+        }, 'image/jpeg', q);
+      };
+
+      tryNext();
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
