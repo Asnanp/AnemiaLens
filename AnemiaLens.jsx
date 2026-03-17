@@ -501,7 +501,7 @@ function Hero({ eyeRef }) {
             initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.7, duration:0.8 }}
             style={{ display:'flex', gap:'3.5rem', paddingTop:'2.5rem', borderTop:'1px solid var(--b2)', marginTop:'0.5rem' }}
           >
-            {[['1.6B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
+            {[['1.92B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
               <div key={label}>
                 <div style={{ fontSize:'2.2rem', fontWeight:300, fontFamily:'var(--serif)', color:'var(--white)' }}>
                   {val.replace(/[^0-9.]/g,'')}

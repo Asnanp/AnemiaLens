@@ -2,7 +2,7 @@
 
 AnemiaLens is a mobile-first screening app for early anemia risk detection from smartphone eye images. It combines a conjunctiva image-quality gate, a PyTorch EfficientNet-B0 screening model, symptom fusion, rule-based triage, Mistral AI guidance, and clinician-ready handoff output.
 
-> This is a screening tool, not a diagnostic device.
+> Anemia affects an estimated 1.92 billion people globally (GBD Study 2021). This is a screening tool, not a diagnostic device.
 
 ## How it works
 
@@ -56,20 +56,23 @@ ANEMIALENS_GUIDANCE_TIMEOUT=20
 Get a
  free API key at [console.mistral.ai](https://console.mistral.ai).
 
-## Deployment (Railway + Vercel)
+## Deployment (Render + Vercel)
 
-**Backend → Railway:**
-1. New Project → Deploy from GitHub → select this repo
-2. Add env vars in Railway dashboard:
+**Backend → Render:**
+1. New Web Service → Deploy from GitHub → select this repo
+2. Runtime: Docker, uses `Dockerfile` automatically
+3. Add env vars in Render dashboard:
    - `ANEMIALENS_MISTRAL_API_KEY`
    - `ANEMIALENS_MISTRAL_ENABLED=true`
    - `ANEMIALENS_MISTRAL_MODEL=mistral-small-latest`
    - `ANEMIALENS_GUIDANCE_TIMEOUT=20`
-3. Railway uses the `Dockerfile` and `railway.toml` automatically
+   - `PORT=5000`
 
 **Frontend → Vercel:**
-1. Import repo on Vercel, set root to `frontend`
-2. Add env var: `VITE_API_BASE_URL` = your Railway backend URL
+1. Import repo on Vercel
+2. Build command: `cd frontend && npm install && npm run build`
+3. Output directory: `frontend/dist`
+4. Add env var: `VITE_API_BASE_URL` = your Render backend URL
 
 ## System layers
 
