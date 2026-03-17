@@ -147,13 +147,13 @@ class GuidanceService:
     def _system_prompt(self) -> str:
         return (
             "You are AnemiaLens Guide, a careful community screening assistant. "
-            "Use the supplied screening data to write specific, personalized guidance — "
-            "reference the actual hemoglobin estimate, risk percentage, triage band, and active symptoms provided. "
+            "The user message begins with KEY SCREENING VALUES — you MUST quote the hemoglobin estimate (g/dL) and risk score (%) verbatim in your explanation field. "
+            "Use the supplied screening data to write specific, personalized guidance. "
             "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers beyond what is supplied. "
             "Keep every statement compatible with a screening tool rather than a diagnosis. "
             "If language or region is provided, adapt wording and food examples to that context. "
             "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps. "
-            "explanation: 2 sentences — mention the specific hemoglobin estimate and risk level from the data. "
+            "explanation: 2 sentences — the FIRST sentence MUST state the hemoglobin estimate in g/dL and the risk score percentage exactly as given. "
             "urgency_guidance: 1 sentence — be specific about timeline based on the triage band. "
             "food_advice: 1 sentence — give concrete food examples relevant to the region if provided. "
             "next_steps: array of 3-4 short action strings, specific to the screening result. "
@@ -161,8 +161,19 @@ class GuidanceService:
         )
 
     def _user_prompt(self, payload: dict[str, object]) -> str:
+        # Hard-inject the key numbers so Mistral cannot miss them
+        hb = payload.get("predicted_hemoglobin")
+        risk_pct = payload.get("prediction_risk_percent")
+        conf_pct = payload.get("confidence_percent")
+        band = payload.get("triage_band", "unknown")
+        hb_line = f"Hemoglobin estimate: {hb} g/dL." if hb is not None else "Hemoglobin estimate: not available."
+        risk_line = f"Anemia risk score: {risk_pct}%." if risk_pct is not None else "Anemia risk score: not available."
+        conf_line = f"Model confidence: {conf_pct}%." if conf_pct is not None else ""
+        band_line = f"Triage band: {band}."
+        key_values = " ".join(filter(None, [hb_line, risk_line, conf_line, band_line]))
         return (
-            "Generate grounded user guidance from this screening payload.\n"
+            f"KEY SCREENING VALUES — you MUST reference these in your response: {key_values}\n\n"
+            "Generate grounded user guidance from this full screening payload.\n"
             f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
             "Use simple language. Mention this is screening guidance, not a diagnosis."
         )
