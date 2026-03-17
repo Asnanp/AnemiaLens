@@ -40,7 +40,7 @@ body {
   color: var(--text);
   font-family: var(--sans);
   overflow-x: hidden;
-  cursor: pointer;
+  cursor: auto;
 }
 a { color: inherit; text-decoration: none; }
 
