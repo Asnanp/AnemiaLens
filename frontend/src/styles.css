@@ -73,7 +73,7 @@ body::before {
   position: fixed; top: 0; left: 0; width: 32px; height: 32px;
   border: 1.5px solid rgba(200,0,30,0.6);
   border-radius: 50%;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(2px);
   pointer-events: none; z-index: 9998;
   /* transform set by JS — GPU composited, no layout */
   will-change: transform;
