@@ -14,6 +14,24 @@ import {
 
 const E = [0.22, 1, 0.36, 1] as const;
 
+// ── COUNT-UP HOOK ─────────────────────────────────────────────────────────────
+function useCountUp(target: number, duration = 1400, start = false) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!start) return;
+    let startTime: number | null = null;
+    const step = (ts: number) => {
+      if (!startTime) startTime = ts;
+      const progress = Math.min((ts - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setVal(Math.floor(ease * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, start]);
+  return val;
+}
+
 // ── MARQUEE TICKER ────────────────────────────────────────────────────────────
 const TICKER_ITEMS = [
   '1.92B+ people affected by anemia globally',
@@ -347,6 +365,30 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   );
 }
 
+// ── HERO STAT — count-up on mount ────────────────────────────────────────────
+function HeroStat({ raw, suffix, label, target, div }: { raw: string; suffix: string; label: string; target: number; div: number }) {
+  const [started, setStarted] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const count = useCountUp(target, 1600, started);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStarted(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const display = div > 1 ? (count / div).toFixed(2) : String(count);
+
+  return (
+    <div ref={ref} className="hero-stat">
+      <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
+        <span className="stat-number">{display}</span>
+        <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', fontSize:'1.4rem' }}>{suffix}</span>
+      </div>
+      <div className="label-tag" style={{ marginTop:'0.4rem' }}>{label}</div>
+    </div>
+  );
+}
+
 // ── #6 HERO — variable font animation ────────────────────────────────────────
 function Hero() {
   return (
@@ -396,20 +438,18 @@ function Hero() {
             </button>
           </motion.div>
 
-          {/* Stats — large serif display like prototype */}
+          {/* Stats — count-up on mount */}
           <motion.div
             initial={{ opacity:0 }} animate={{ opacity:1 }}
             transition={{ delay:0.7, duration:0.8 }}
             style={{ display:'flex', gap:'3.5rem', paddingTop:'2.5rem', borderTop:'1px solid var(--glass-border)', marginTop:'0.5rem' }}
           >
-            {[['1.92B+','Anemia Cases Globally'],['92%','Model Sensitivity'],['710','Clinical Specimens']].map(([val, label]) => (
-              <div key={label}>
-                <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
-                  {val.replace(/[^0-9.]/g,'')}
-                  <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', fontSize:'1.4rem' }}>{val.replace(/[0-9.]/g,'')}</span>
-                </div>
-                <div className="label-tag" style={{ marginTop:'0.4rem' }}>{label}</div>
-              </div>
+            {[
+              { raw:'1.92', suffix:'B+', label:'Anemia Cases Globally', target:192, div:100 },
+              { raw:'92',   suffix:'%',  label:'Model Sensitivity',     target:92,  div:1 },
+              { raw:'710',  suffix:'',   label:'Clinical Specimens',    target:710, div:1 },
+            ].map(({ raw, suffix, label, target, div }) => (
+              <HeroStat key={label} raw={raw} suffix={suffix} label={label} target={target} div={div} />
             ))}
           </motion.div>
         </div>
@@ -523,7 +563,7 @@ function Challenge() {
               viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
               style={{ padding:'1.75rem 2rem', display:'flex', gap:'1.5rem', alignItems:'center' }}
             >
-              <div style={{
+              <div className="icon-box" style={{
                 width:48, height:48, borderRadius:'0.875rem', flexShrink:0,
                 background:'linear-gradient(135deg, rgba(200,0,30,0.2) 0%, rgba(200,0,30,0.06) 100%)',
                 border:'1px solid rgba(200,0,30,0.25)',
@@ -563,8 +603,8 @@ function WorkflowStepper() {
 
         {/* 5-column grid */}
         <div className="workflow-5col" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'1.25rem', position:'relative' }}>
-          {/* Connector line */}
-          <div style={{ position:'absolute', top:52, left:'10%', right:'10%', height:1, background:'linear-gradient(90deg, transparent, var(--glass-border) 20%, var(--glass-border) 80%, transparent)', zIndex:0, pointerEvents:'none' }} />
+          {/* Upgraded connector line */}
+          <div className="workflow-connector" />
 
           {WORKFLOW.map((step, i) => (
             <motion.div
@@ -581,7 +621,10 @@ function WorkflowStepper() {
                 boxShadow: active===i ? '0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(200,0,30,0.12)' : undefined,
               }}
             >
-              <div style={{
+              {/* Step number badge */}
+              <div className="step-badge">{String(i+1).padStart(2,'0')}</div>
+
+              <div className="icon-box" style={{
                 width:52, height:52, borderRadius:'1rem', margin:'0 auto',
                 background: active===i
                   ? 'linear-gradient(135deg, rgba(200,0,30,0.3) 0%, rgba(200,0,30,0.1) 100%)'
@@ -720,7 +763,9 @@ function ScreeningSection() {
     i===0 || (i===1 && !!file) || (i===2 && !!quality) || (i===3 && !!analysis);
 
   return (
-    <section id="screening" style={{ position:'relative', zIndex:1, padding:'10rem 4rem' }} className="section-pad">
+    <section id="screening" style={{ position:'relative', zIndex:1, padding:'10rem 4rem', overflow:'hidden' }} className="section-pad">
+      {/* Ambient orb */}
+      <div className="screening-ambient" />
       <div style={{ maxWidth:1200, margin:'0 auto' }}>
         <motion.div
           initial={{ opacity:0, y:30 }} whileInView={{ opacity:1, y:0 }}
@@ -890,7 +935,7 @@ function TechSection() {
               viewport={{ once:true }} transition={{ duration:0.6, delay:i*0.1, ease:E }}
               style={{ padding:'2rem', display:'flex', gap:'1.5rem', alignItems:'flex-start' }}
             >
-              <div style={{
+              <div className="icon-box" style={{
                 width:52, height:52, borderRadius:'1rem', flexShrink:0,
                 background:'linear-gradient(135deg, rgba(200,0,30,0.2) 0%, rgba(200,0,30,0.06) 100%)',
                 border:'1px solid rgba(200,0,30,0.25)',
@@ -913,8 +958,8 @@ function TechSection() {
 // ── FOOTER ────────────────────────────────────────────────────────────────────
 function Footer() {
   return (
-    <footer style={{ position:'relative', zIndex:1, borderTop:'1px solid var(--glass-border)' }}>
-      <div className="glass" style={{ borderRadius:0, padding:'5rem 4rem 3rem', background:'rgba(2,2,8,0.7)' }}>
+    <footer style={{ position:'relative', zIndex:1 }} className="footer-glow">
+      <div className="glass" style={{ borderRadius:0, padding:'5rem 4rem 3rem', background:'rgba(2,2,8,0.8)' }}>
         <div style={{ maxWidth:1400, margin:'0 auto' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr', gap:'5rem', marginBottom:'4rem' }}>
             <div>
