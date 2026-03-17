@@ -211,7 +211,9 @@ def _free_memory(response):
     except Exception:
         pass
     return response
-
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 if __name__ == "__main__":
     debug_enabled = os.getenv("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
     port = int(os.environ.get("PORT", 5000))
