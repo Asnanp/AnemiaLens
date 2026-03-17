@@ -62,7 +62,8 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const bandGlow   = isHigh ? 'rgba(239,68,68,0.2)'  : isModerate ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)';
 
   const hbRaw  = analysis.prediction?.predicted_hemoglobin ?? 0;
-  const risk   = Math.round((analysis.triage.score ?? analysis.prediction?.anemia_risk ?? 0) * 100);
+  // Use anemia_risk (model output) so the arc matches what Mistral references
+  const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const conf   = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
 
@@ -187,6 +188,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             {/* Confidence + Reliability */}
             <div style={{ display:'flex', flexDirection:'row', gap:'2rem', flexWrap:'wrap' }}>
               {[
+                { label:'Triage Score', val:`${Math.round((analysis.triage.score ?? 0) * 100)}%` },
                 { label:'Confidence', val:`${conf}%` },
                 { label:'Reliability', val: analysis.prediction?.reliability_flag ?? 'N/A' },
               ].map(s => (
