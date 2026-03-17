@@ -6,6 +6,7 @@ import { QualityView } from './components/features/QualityView';
 import { SymptomView } from './components/features/SymptomView';
 import { ResultView } from './components/features/ResultView';
 import { ThreeBackground, AuroraCanvas, EyeScanner } from './components/features/VisualSystem';
+import { onWakeStatus } from './api';
 import {
   Zap, Download, Globe, Microscope, Stethoscope, ArrowRight,
   ShieldCheck, Brain, MessageSquare, HeartPulse, Camera,
@@ -14,6 +15,58 @@ import {
 
 const E = [0.22, 1, 0.36, 1] as const;
 
+// ── WAKE BANNER — shown while Render cold-starts ─────────────────────────────
+function WakeBanner() {
+  const [status, setStatus] = useState<'waking' | 'ready' | 'failed'>('waking');
+  const [dots, setDots] = useState('');
+
+  useEffect(() => {
+    const unsub = onWakeStatus(setStatus);
+    return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    if (status !== 'waking') return;
+    const t = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
+    return () => clearInterval(t);
+  }, [status]);
+
+  if (status === 'ready') return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.4 }}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+        background: status === 'failed' ? 'rgba(239,68,68,0.12)' : 'rgba(200,0,30,0.10)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: status === 'failed' ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(200,0,30,0.2)',
+        padding: '0.55rem 1.5rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+      }}
+    >
+      {status === 'waking' ? (
+        <>
+          <span style={{
+            display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+            border: '2px solid rgba(200,0,30,0.4)', borderTopColor: 'var(--accent-bright)',
+            animation: 'spin 0.8s linear infinite', flexShrink: 0,
+          }} />
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+            Backend waking up — first load takes ~60s on Render free tier{dots}
+          </span>
+        </>
+      ) : (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)' }}>
+          Backend unreachable — please refresh or try again shortly
+        </span>
+      )}
+    </motion.div>
+  );
+}
 // ── COUNT-UP HOOK ─────────────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 1400, start = false) {
   const [val, setVal] = useState(0);
@@ -1060,6 +1113,7 @@ export default function App() {
 
   return (
     <div style={{ position:'relative', minHeight:'100vh', background:'var(--void)' }}>
+      <AnimatePresence><WakeBanner /></AnimatePresence>
       <Cursor />
       <LuxuryParticles />
       <AuroraCanvas />
