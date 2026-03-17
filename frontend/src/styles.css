@@ -107,17 +107,11 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
     0 32px 80px rgba(0,0,0,0.55),
     0 0 0 0.5px rgba(255,255,255,0.04);
 }
-/* Iridescent top-edge shimmer — shifts crimson→violet */
+/* Iridescent top-edge shimmer — crimson only */
 .glass::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(200,0,30,0.5) 20%,
-    rgba(255,255,255,0.22) 50%,
-    rgba(124,58,237,0.5) 80%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg, transparent 0%, var(--glass-highlight) 40%, rgba(255,255,255,0.10) 60%, transparent 100%);
   pointer-events: none; z-index: 2;
 }
 /* Inner diagonal shimmer */
@@ -281,24 +275,16 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   letter-spacing: 0.18em;
   color: var(--text-muted);
 }
-/* Section eyebrow — crimson→violet shimmer */
+/* Section eyebrow — crimson only */
 .section-eyebrow {
   font-family: var(--mono);
   font-size: 0.62rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  background: linear-gradient(90deg, var(--accent-bright) 0%, var(--violet-light) 60%, var(--accent-bright) 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: eyebrow-shimmer 6s linear infinite, eyebrow-glitch 14s infinite;
+  color: var(--accent-bright);
+  animation: eyebrow-glitch 14s infinite;
   will-change: opacity;
-}
-@keyframes eyebrow-shimmer {
-  0%   { background-position: 0% center; }
-  100% { background-position: 200% center; }
 }
 @keyframes eyebrow-glitch {
   0%,94%,100% { opacity: 1; transform: none; filter: none; }
@@ -325,7 +311,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
 }
 .stat-chip:hover {
   background: var(--glass-md);
-  border-color: rgba(124,58,237,0.35);
+  border-color: rgba(200,0,30,0.35);
   transform: translateY(-3px);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.18),
@@ -1187,23 +1173,20 @@ body::before {
 
 /* ── GRADIENT TEXT UTILITIES ────────────────────────────────────────────────── */
 .text-gold {
-  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--violet-light) 60%, #C4B5FD 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-muted);
 }
 .text-crimson-gold {
-  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--violet-light) 100%);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ── LUXURY CARD HOVER — violet top border reveal ───────────────────────────── */
+/* ── LUXURY CARD HOVER — crimson top border reveal ──────────────────────────── */
 .glass-hover::after {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--crimson), var(--violet-light), var(--crimson), transparent);
+  background: linear-gradient(90deg, transparent, var(--crimson), var(--accent-bright), var(--crimson), transparent);
   opacity: 0;
   transition: opacity 0.4s var(--ease);
   border-radius: 99px 99px 0 0;
@@ -1211,9 +1194,9 @@ body::before {
 }
 .glass-hover:hover::after { opacity: 1; }
 
-/* ── MARQUEE — violet separator ─────────────────────────────────────────────── */
-.marquee-item { border-right-color: rgba(124,58,237,0.18); }
-.marquee-item:hover { color: var(--violet-light); }
+/* ── MARQUEE — crimson separator ────────────────────────────────────────────── */
+.marquee-item { border-right-color: rgba(200,0,30,0.12); }
+.marquee-item:hover { color: var(--text-muted); }
 
 /* ── STEP BADGE — crimson gradient ──────────────────────────────────────────── */
 .step-badge {
@@ -1221,83 +1204,82 @@ body::before {
   box-shadow: 0 0 14px rgba(200,0,30,0.5), 0 0 28px rgba(200,0,30,0.2);
 }
 
-/* ── WORKFLOW CONNECTOR — crimson→violet gradient ───────────────────────────── */
+/* ── WORKFLOW CONNECTOR — crimson only ──────────────────────────────────────── */
 .workflow-connector {
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(200,0,30,0.2) 15%,
-    rgba(124,58,237,0.4) 40%,
-    rgba(167,139,250,0.5) 50%,
-    rgba(124,58,237,0.4) 60%,
-    rgba(200,0,30,0.2) 85%,
+    rgba(200,0,30,0.15) 10%,
+    rgba(200,0,30,0.3) 30%,
+    rgba(200,0,30,0.3) 70%,
+    rgba(200,0,30,0.15) 90%,
     transparent 100%
   );
 }
 .workflow-connector::after {
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(124,58,237,0.12) 30%,
-    rgba(167,139,250,0.2) 50%,
-    rgba(124,58,237,0.12) 70%,
+    rgba(200,0,30,0.08) 20%,
+    rgba(200,0,30,0.15) 50%,
+    rgba(200,0,30,0.08) 80%,
     transparent 100%
   );
-  filter: blur(6px);
+  filter: blur(4px);
 }
 
-/* ── SCREENING STEP ACTIVE — violet ring ────────────────────────────────────── */
+/* ── SCREENING STEP ACTIVE — crimson ring ───────────────────────────────────── */
 .screening-step-circle.active {
-  border-color: var(--violet-light);
-  background: linear-gradient(135deg, rgba(124,58,237,0.22), rgba(124,58,237,0.06));
-  color: var(--violet-light);
-  box-shadow: 0 0 0 4px rgba(124,58,237,0.12), 0 0 24px rgba(124,58,237,0.35);
+  border-color: var(--accent-bright);
+  background: linear-gradient(135deg, rgba(200,0,30,0.25), rgba(200,0,30,0.08));
+  color: var(--text);
+  box-shadow: 0 0 0 4px rgba(200,0,30,0.12), 0 0 20px rgba(200,0,30,0.3);
 }
-.screening-step-node.active .screening-step-label { color: var(--violet-light); }
+.screening-step-node.active .screening-step-label { color: var(--text-muted); }
 
-/* ── FOOTER GLOW — crimson→violet ───────────────────────────────────────────── */
+/* ── FOOTER GLOW — crimson only ─────────────────────────────────────────────── */
 .footer-glow::before {
   background: linear-gradient(90deg,
     transparent,
     rgba(200,0,30,0.3) 20%,
-    rgba(124,58,237,0.6) 40%,
-    rgba(167,139,250,0.8) 50%,
-    rgba(124,58,237,0.6) 60%,
+    rgba(200,0,30,0.5) 40%,
+    rgba(232,41,74,0.8) 50%,
+    rgba(200,0,30,0.5) 60%,
     rgba(200,0,30,0.3) 80%,
     transparent
   );
-  box-shadow: 0 0 24px rgba(124,58,237,0.25), 0 0 48px rgba(200,0,30,0.12);
+  box-shadow: 0 0 20px rgba(200,0,30,0.3), 0 0 40px rgba(200,0,30,0.1);
 }
 
-/* ── ICON BOX — violet glow on hover ────────────────────────────────────────── */
+/* ── ICON BOX — crimson glow on hover ───────────────────────────────────────── */
 .glass-hover:hover .icon-box {
-  box-shadow: 0 0 32px rgba(124,58,237,0.3), 0 0 16px rgba(200,0,30,0.2) !important;
-  background: linear-gradient(135deg, rgba(124,58,237,0.22) 0%, rgba(200,0,30,0.10) 100%) !important;
+  box-shadow: 0 0 30px rgba(200,0,30,0.35) !important;
+  transform: scale(1.08);
+  background: linear-gradient(135deg, rgba(200,0,30,0.28) 0%, rgba(200,0,30,0.10) 100%) !important;
 }
 
-/* ── HERO STAT — crimson→violet underline sweep ─────────────────────────────── */
+/* ── HERO STAT — crimson underline sweep ────────────────────────────────────── */
 .hero-stat::before {
-  background: linear-gradient(90deg, var(--crimson), var(--violet-light), transparent);
+  background: linear-gradient(90deg, var(--crimson), transparent);
 }
 
-/* ── NAV LINK — crimson→violet underline ────────────────────────────────────── */
+/* ── NAV LINK — crimson underline ───────────────────────────────────────────── */
 .nav-link::after {
-  background: linear-gradient(90deg, var(--crimson), var(--violet-light));
+  background: var(--crimson);
 }
 
-/* ── SCROLLBAR — violet tint ─────────────────────────────────────────────────── */
+/* ── SCROLLBAR — crimson only ────────────────────────────────────────────────── */
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(200,0,30,0.4), rgba(124,58,237,0.4));
+  background: rgba(200,0,30,0.3); border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(200,0,30,0.7), rgba(124,58,237,0.7));
+  background: rgba(200,0,30,0.6);
 }
 
-/* ── CURSOR — violet ring on hover ──────────────────────────────────────────── */
+/* ── CURSOR — crimson ring on hover ─────────────────────────────────────────── */
 body:has(button:hover) #cursor-ring,
 body:has(a:hover) #cursor-ring {
-  width: 52px; height: 52px;
-  border-color: var(--violet-light);
+  width: 48px; height: 48px;
+  border-color: var(--crimson);
   border-width: 2px;
-  box-shadow: 0 0 12px var(--violet-glow);
 }
 
 /* ── SECTION HEADING — luxury size ──────────────────────────────────────────── */
@@ -1309,14 +1291,14 @@ body:has(a:hover) #cursor-ring {
   letter-spacing: -0.035em;
 }
 
-/* ── AMBIENT ORB — dual crimson/violet ──────────────────────────────────────── */
+/* ── AMBIENT ORB — crimson only ─────────────────────────────────────────────── */
 .ambient-orb-dual {
   position: absolute;
   border-radius: 50%;
   filter: blur(100px);
   pointer-events: none;
   animation: orb-drift 16s ease-in-out infinite;
-  background: radial-gradient(circle at 40% 40%, rgba(200,0,30,0.12) 0%, rgba(124,58,237,0.08) 50%, transparent 70%);
+  background: radial-gradient(circle at 40% 40%, rgba(200,0,30,0.12) 0%, transparent 70%);
 }
 
 /* ── GLASS CARD — luxury inner glow ─────────────────────────────────────────── */
@@ -1330,18 +1312,18 @@ body:has(a:hover) #cursor-ring {
     0 0 0 0.5px rgba(255,255,255,0.06);
 }
 
-/* ── PROGRESS TRACK — crimson→violet fill ───────────────────────────────────── */
+/* ── PROGRESS TRACK — crimson fill ──────────────────────────────────────────── */
 .progress-fill {
-  background: linear-gradient(90deg, var(--crimson), var(--accent-bright), var(--violet-light));
-  box-shadow: 0 0 10px var(--crimson-glow), 0 0 20px rgba(124,58,237,0.2);
+  background: linear-gradient(90deg, var(--crimson), var(--accent-bright));
+  box-shadow: 0 0 8px var(--crimson-glow);
 }
 
-/* ── TERMINAL — violet left border ──────────────────────────────────────────── */
+/* ── TERMINAL — crimson left border ─────────────────────────────────────────── */
 .terminal {
-  border-left-color: var(--violet-light);
+  border-left-color: var(--crimson);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
-    -4px 0 30px rgba(124,58,237,0.12),
+    -4px 0 30px rgba(200,0,30,0.15),
     0 24px 48px rgba(0,0,0,0.5);
 }
 
@@ -1349,15 +1331,15 @@ body:has(a:hover) #cursor-ring {
 .eyebrow-dot {
   display: inline-block;
   width: 5px; height: 5px; border-radius: 50%;
-  background: var(--violet-light);
-  box-shadow: 0 0 8px var(--violet-glow);
+  background: var(--accent-bright);
+  box-shadow: 0 0 8px var(--crimson-glow);
   margin-right: 0.5rem;
   vertical-align: middle;
   animation: eyebrow-dot-pulse 2s ease-in-out infinite;
 }
 @keyframes eyebrow-dot-pulse {
-  0%,100% { box-shadow: 0 0 6px var(--violet-glow); transform: scale(1); }
-  50%      { box-shadow: 0 0 14px var(--violet-glow), 0 0 28px rgba(124,58,237,0.3); transform: scale(1.3); }
+  0%,100% { box-shadow: 0 0 6px var(--crimson-glow); transform: scale(1); }
+  50%      { box-shadow: 0 0 14px var(--crimson-glow), 0 0 28px rgba(200,0,30,0.3); transform: scale(1.3); }
 }
 
 /* ── LUXURY CARD BORDER ANIMATION ───────────────────────────────────────────── */
@@ -1372,7 +1354,7 @@ body:has(a:hover) #cursor-ring {
 .glass-border-animate::before {
   content: '';
   position: absolute; inset: -1px; border-radius: inherit;
-  background: linear-gradient(90deg, rgba(200,0,30,0.4), rgba(124,58,237,0.6), rgba(167,139,250,0.4), rgba(124,58,237,0.6), rgba(200,0,30,0.4));
+  background: linear-gradient(90deg, rgba(200,0,30,0.4), rgba(232,41,74,0.6), rgba(200,0,30,0.4));
   background-size: 300% 100%;
   animation: border-shimmer 4s linear infinite;
   z-index: -1;
@@ -1417,12 +1399,12 @@ body:has(a:hover) #cursor-ring {
 
 /* ── LUXURY FOCUS RING ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--violet-light);
+  outline: 2px solid var(--accent-bright);
   outline-offset: 3px;
   border-radius: 4px;
 }
 button:focus-visible, a:focus-visible {
-  outline: 2px solid var(--violet-light);
+  outline: 2px solid var(--accent-bright);
   outline-offset: 3px;
 }
 
