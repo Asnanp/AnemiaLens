@@ -19,9 +19,9 @@ from app.schemas import (
 )
 
 _FIELD_LIMITS = {
-    "explanation": 320,
-    "urgency_guidance": 240,
-    "food_advice": 260,
+    "explanation": 480,
+    "urgency_guidance": 280,
+    "food_advice": 300,
 }
 _UNSAFE_CLAIM_PATTERN = re.compile(
     r"\b(definitely\s+(?:have|has|anemic|anaemic)|confirmed\s+(?:anemia|anaemia)|"
@@ -146,36 +146,65 @@ class GuidanceService:
 
     def _system_prompt(self) -> str:
         return (
-            "You are AnemiaLens Guide, a careful community screening assistant. "
-            "The user message begins with KEY SCREENING VALUES — you MUST quote the hemoglobin estimate (g/dL) and risk score (%) verbatim in your explanation field. "
-            "Use the supplied screening data to write specific, personalized guidance. "
-            "Do not diagnose, do not claim certainty, and do not invent symptoms, causes, medicines, supplements, tests, or numbers beyond what is supplied. "
-            "Keep every statement compatible with a screening tool rather than a diagnosis. "
-            "If language or region is provided, adapt wording and food examples to that context. "
-            "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps. "
-            "explanation: 2 sentences — the FIRST sentence MUST state the hemoglobin estimate in g/dL and the risk score percentage exactly as given. "
-            "urgency_guidance: 1 sentence — be specific about timeline based on the triage band. "
-            "food_advice: 1 sentence — give concrete food examples relevant to the region if provided. "
-            "next_steps: array of 3-4 short action strings, specific to the screening result. "
+            "You are the guidance engine for AnemiaLens, a smartphone-based anemia screening tool that analyzes conjunctival pallor (inner lower eyelid color) using computer vision. "
+            "AnemiaLens estimates hemoglobin levels from eye images and fuses that with self-reported symptoms to produce a triage band: low_risk, moderate_risk, high_concern, or uncertain_retake_needed. "
+            "This is a SCREENING tool only — not a diagnostic device. Results must be confirmed with clinical blood testing.\n\n"
+            "Your job: write personalized, grounded guidance based on the screening data provided. "
+            "Interpret what the hemoglobin estimate and risk score MEAN for this person — don't just repeat the numbers. "
+            "For example: if Hb is 13.9 g/dL and risk is 15%, explain that 13.9 is within normal range (normal adult range ~12-17 g/dL) and 15% risk is low. "
+            "If Hb is 8.5 g/dL, explain that is significantly below normal and warrants urgent attention. "
+            "Reference active symptoms in your guidance — if fatigue + dizziness are present, mention them. "
+            "Adapt food advice to the region if provided.\n\n"
+            "RULES:\n"
+            "- Never say 'you have anemia' or 'you are anemic' — say 'screening suggests' or 'this result indicates'\n"
+            "- Never invent numbers, symptoms, or treatments not in the payload\n"
+            "- Keep language simple and compassionate\n\n"
+            "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps.\n"
+            "explanation: 2 sentences — interpret what the Hb estimate and risk score mean in plain language (not just repeat them). Mention triage band context.\n"
+            "urgency_guidance: 1 sentence — specific timeline based on triage band (low_risk=routine, moderate_risk=1-2 weeks, high_concern=24-48h).\n"
+            "food_advice: 1 sentence — concrete iron-rich food examples for the region.\n"
+            "next_steps: array of 3-4 short actionable strings tailored to this result.\n"
             "No markdown, no extra keys, no preamble."
         )
 
     def _user_prompt(self, payload: dict[str, object]) -> str:
-        # Hard-inject the key numbers so Mistral cannot miss them
         hb = payload.get("predicted_hemoglobin")
         risk_pct = payload.get("prediction_risk_percent")
         conf_pct = payload.get("confidence_percent")
         band = payload.get("triage_band", "unknown")
-        hb_line = f"Hemoglobin estimate: {hb} g/dL." if hb is not None else "Hemoglobin estimate: not available."
-        risk_line = f"Anemia risk score: {risk_pct}%." if risk_pct is not None else "Anemia risk score: not available."
-        conf_line = f"Model confidence: {conf_pct}%." if conf_pct is not None else ""
-        band_line = f"Triage band: {band}."
-        key_values = " ".join(filter(None, [hb_line, risk_line, conf_line, band_line]))
+        label = payload.get("triage_label", "")
+        active_symptoms = payload.get("active_symptoms") or []
+        region = payload.get("region") or "not specified"
+        screening_text = payload.get("screening_text") or ""
+
+        hb_str = f"{hb} g/dL" if hb is not None else "not available"
+        # Normal adult Hb range context
+        if hb is not None:
+            if hb >= 12.0:
+                hb_context = "within normal range"
+            elif hb >= 10.0:
+                hb_context = "mildly below normal"
+            elif hb >= 8.0:
+                hb_context = "moderately below normal"
+            else:
+                hb_context = "severely below normal"
+        else:
+            hb_context = "unknown"
+
+        symptom_str = ", ".join(active_symptoms) if active_symptoms else "none reported"
+
         return (
-            f"KEY SCREENING VALUES — you MUST reference these in your response: {key_values}\n\n"
-            "Generate grounded user guidance from this full screening payload.\n"
-            f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
-            "Use simple language. Mention this is screening guidance, not a diagnosis."
+            f"AnemiaLens Screening Result:\n"
+            f"- Hemoglobin estimate: {hb_str} ({hb_context})\n"
+            f"- Anemia risk score: {risk_pct}%\n"
+            f"- Model confidence: {conf_pct}%\n"
+            f"- Triage band: {band} ({label})\n"
+            f"- Active symptoms: {symptom_str}\n"
+            f"- Region: {region}\n"
+            f"- Model screening text: {screening_text}\n\n"
+            "Write personalized guidance for this person based on the above. "
+            "Interpret what these numbers mean for them — don't just repeat the values. "
+            "This is screening guidance, not a diagnosis."
         )
 
     def _generate_mistral(
