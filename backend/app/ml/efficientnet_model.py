@@ -113,13 +113,11 @@ def predict_with_efficientnet_model(
 
     rgb = image.convert("RGB")
 
-    # Build TTA variants: original + horizontal flip + slight brightness shifts
+    # Build TTA variants: original + horizontal flip only (reduced for low-RAM deployment)
     from PIL import ImageEnhance
     tta_images = [
         rgb,
         rgb.transpose(Image.FLIP_LEFT_RIGHT),
-        ImageEnhance.Brightness(rgb).enhance(1.10),
-        ImageEnhance.Brightness(rgb).enhance(0.90),
     ]
 
     probabilities: list[float] = []

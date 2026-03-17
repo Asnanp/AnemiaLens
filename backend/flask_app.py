@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import gc
 import os
 import time
 import uuid
 from pathlib import Path
 
+import torch
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from PIL import UnidentifiedImageError
 from dotenv import load_dotenv
+
+# Limit PyTorch to 1 CPU thread — critical for low-RAM environments (Render Starter)
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 
 from app.ml.features import load_image_bytes
 from app.services.analysis_meta import build_analysis_meta
@@ -194,11 +200,16 @@ def analyze() -> tuple[object, int]:
     }
     return jsonify(payload), 200
 
-import gc
 
 @app.after_request
 def _free_memory(response):
     gc.collect()
+    # Free any lingering torch tensors
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
     return response
 
 if __name__ == "__main__":

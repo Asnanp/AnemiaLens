@@ -48,7 +48,7 @@ class ScreeningPredictor:
                         efficientnet_secondary = predict_with_efficientnet_model(
                             self.efficientnet_bundle,
                             image,
-                            mc_passes=12,
+                            mc_passes=4,  # reduced from 12 to lower peak RAM on Render
                         )
                     except Exception:
                         efficientnet_secondary = None
@@ -73,7 +73,7 @@ class ScreeningPredictor:
                 prediction = predict_with_efficientnet_model(
                     self.efficientnet_bundle,
                     image,
-                    mc_passes=16,
+                    mc_passes=4,  # reduced from 16 to lower peak RAM on Render
                 )
                 model_source = str(self.efficientnet_bundle.get("version", EFFICIENTNET_VERSION))
                 decision_threshold = float(prediction.get("decision_threshold", 0.5))
