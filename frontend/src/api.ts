@@ -9,6 +9,32 @@ const API_BASE = (
   import.meta.env.VITE_API_BASE_URL ?? ''
 ).replace(/\/$/, '');
 
+// Compress image to max 800px and ~80% JPEG quality before sending to backend.
+// Shrinks 2-3MB demo/phone images down to ~80-150KB — prevents OOM on free-tier servers.
+async function compressImage(file: File, maxDim = 800, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const { width, height } = img;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file),
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 function endpoint(path: string): string {
   return API_BASE ? `${API_BASE}${path}` : path;
 }
@@ -37,8 +63,9 @@ export async function getRuntimeStatus(): Promise<RuntimeStatusResponse> {
 }
 
 export async function checkImageQuality(file: File): Promise<QualityAssessment> {
+  const compressed = await compressImage(file);
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('image', compressed);
 
   const response = await fetch(endpoint('/api/quality-check'), {
     method: 'POST',
@@ -64,8 +91,9 @@ export async function analyzeScreening(
   language?: string,
   region?: string
 ): Promise<AnalyzeResponse> {
+  const compressed = await compressImage(file);
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('image', compressed);
   formData.append('symptoms', JSON.stringify(symptoms));
   if (language) {
     formData.append('language', language);
