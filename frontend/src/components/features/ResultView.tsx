@@ -74,7 +74,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
       <motion.div className="glass result-hero-card"
         initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }}
         transition={{ duration:0.6, ease:E }}
-        style={{ padding:'3rem', borderLeft:`4px solid ${bandColor}`, background:bandBg,
+        style={{ padding:'clamp(1.25rem, 4vw, 3rem)', borderLeft:`4px solid ${bandColor}`, background:bandBg,
           boxShadow:`inset 0 1px 0 rgba(255,255,255,0.12), -8px 0 80px ${bandGlow}, 0 60px 120px rgba(0,0,0,0.6)`,
           position:'relative', overflow:'hidden' }}
       >
@@ -101,10 +101,10 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           </div>
 
           {/* Main metrics row */}
-          <div style={{ display:'flex', alignItems:'center', gap:'3rem', flexWrap:'wrap', marginBottom:'2rem' }}>
+          <div className="result-metrics-row" style={{ display:'flex', alignItems:'center', gap:'3rem', flexWrap:'wrap', marginBottom:'2rem' }}>
             {/* Giant Hb number */}
             <div>
-              <div style={{ fontFamily:'var(--serif)', fontSize:'clamp(5rem,10vw,8rem)', fontWeight:300,
+              <div style={{ fontFamily:'var(--serif)', fontSize:'clamp(3.5rem,10vw,8rem)', fontWeight:300,
                 lineHeight:1, letterSpacing:'-0.04em', color:bandColor,
                 textShadow:`0 0 80px ${bandColor}40` }}>
                 {hbAnim.toFixed(1)}
@@ -115,17 +115,17 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               </div>
             </div>
 
-            {/* Divider */}
-            <div style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
+            {/* Divider — hidden on mobile */}
+            <div className="result-divider" style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
 
             {/* Risk arc */}
             <RiskArc value={risk} color={bandColor} />
 
-            {/* Divider */}
-            <div style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
+            {/* Divider — hidden on mobile */}
+            <div className="result-divider" style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
 
             {/* Confidence + Reliability */}
-            <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+            <div style={{ display:'flex', flexDirection:'row', gap:'2rem', flexWrap:'wrap' }}>
               {[
                 { label:'Confidence', val:`${conf}%` },
                 { label:'Reliability', val: analysis.prediction?.reliability_flag ?? 'N/A' },
@@ -138,8 +138,8 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               ))}
             </div>
 
-            {/* Triage label — right side */}
-            <div style={{ marginLeft:'auto' }}>
+            {/* Triage label — hidden on mobile (already shown in badge above) */}
+            <div className="result-triage-label" style={{ marginLeft:'auto' }}>
               <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(1.8rem,3vw,2.8rem)', fontWeight:700,
                 lineHeight:1.05, letterSpacing:'-0.03em', color:'var(--text)', maxWidth:280 }}>
                 {analysis.triage.label}
@@ -186,7 +186,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           </div>
 
           {/* Body */}
-          <div style={{ padding:'2rem 2.5rem', background:'rgba(0,10,30,0.6)' }}>
+          <div style={{ padding:'clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2.5rem)', background:'rgba(0,10,30,0.6)' }}>
 
             {/* Main explanation — big and clear */}
             <div style={{ marginBottom:'1.75rem', padding:'1.25rem 1.5rem', borderRadius:'0.875rem',
@@ -201,7 +201,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               </p>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1.5rem' }}>
+            <div className="guidance-2col" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1.5rem' }}>
               {/* Urgency */}
               <div style={{ padding:'1rem 1.25rem', borderRadius:'0.875rem',
                 background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)',
@@ -260,7 +260,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         {/* Clinical Guidance */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           transition={{ delay:0.15, duration:0.5, ease:E }}
-          style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1rem',
+          style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1rem',
             ...(analysis.guidance.source === 'mistral' ? { borderTop:'2px solid rgba(0,194,255,0.3)' } : {}) }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'0.75rem' }}>
             <div className="section-eyebrow">Clinical Guidance</div>
@@ -323,7 +323,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         {/* Biomarker Analysis */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           transition={{ delay:0.22, duration:0.5, ease:E }}
-          style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+          style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1.25rem' }}>
           <div className="section-eyebrow">Biomarker Analysis</div>
           {[
             { label:'Conjunctival Pallor', val: analysis.prediction?.anemia_risk ?? 0 },
@@ -348,14 +348,14 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ marginTop:'auto', width:'100%', padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem', cursor:'pointer' }}
             onClick={onDownload}>
-            <Download size={13} /> Export Report
+            <Download size={13} /> <span className="liquid-text" data-text="Export Report">Export Report</span>
           </motion.button>
         </motion.div>
 
         {/* Handoff + Actions */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           transition={{ delay:0.3, duration:0.5, ease:E }}
-          style={{ padding:'2rem', display:'flex', flexDirection:'column', gap:'1.25rem',
+          style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1.25rem',
             borderLeft:'3px solid rgba(200,0,30,0.4)',
             boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 30px rgba(200,0,30,0.08)' }}>
           <div className="section-eyebrow">Handoff Summary</div>
@@ -367,7 +367,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.button className="btn btn-primary" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ width:'100%', padding:'0.75rem', fontSize:'0.68rem', cursor:'pointer' }}
             onClick={() => navigator.share?.({ text: analysis.handoff_summary.share_text })}>
-            <Share2 size={13} /> Share with Provider
+            <Share2 size={13} /> <span className="liquid-text" data-text="Share with Provider">Share with Provider</span>
           </motion.button>
           <div style={{ padding:'1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)',
             border:'1px solid rgba(255,255,255,0.05)' }}>
@@ -377,7 +377,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
               style={{ width:'100%', padding:'0.65rem', fontSize:'0.62rem', borderRadius:'0.75rem', cursor:'pointer' }}
               onClick={onReset}>
-              <RefreshCw size={12} /> New Screening
+              <RefreshCw size={12} /> <span className="liquid-text" data-text="New Screening">New Screening</span>
             </motion.button>
           </div>
         </motion.div>

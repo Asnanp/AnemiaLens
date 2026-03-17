@@ -256,7 +256,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
             boxShadow:'inset 0 0 0 1px rgba(200,0,30,0.4), inset 0 1px 0 rgba(255,100,100,0.15), 0 0 20px rgba(200,0,30,0.1)' }}
           onClick={() => scrollTo('screening')}
         >
-          Get Started <ArrowRight size={12} />
+          <span className="liquid-text" data-text="Get Started">Get Started</span> <ArrowRight size={12} />
         </button>
 
         {/* Mobile hamburger */}
@@ -337,7 +337,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem' }}
                 onClick={() => scrollTo('screening')}
               >
-                <ScanEye size={15} /> Start Screening
+                <ScanEye size={15} /> <span className="liquid-text" data-text="Start Screening">Start Screening</span>
               </motion.button>
             </div>
           </motion.div>
@@ -389,10 +389,10 @@ function Hero() {
           >
             <button className="btn btn-primary"
               onClick={() => document.getElementById('screening')?.scrollIntoView({ behavior:'smooth' })}>
-              <ScanEye size={15} /> Start Screening
+              <ScanEye size={15} /> <span className="liquid-text" data-text="Start Screening">Start Screening</span>
             </button>
             <button className="btn btn-glass">
-              Impact Narrative <ArrowRight size={13} />
+              <span className="liquid-text" data-text="Impact Narrative">Impact Narrative</span> <ArrowRight size={13} />
             </button>
           </motion.div>
 
