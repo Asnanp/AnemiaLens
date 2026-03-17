@@ -70,7 +70,7 @@ export function UploadZone({ onFileSelect, previewUrl, onClear, onRunQuality, lo
               >
                 <button className="btn btn-glass" style={{ padding:'0.6rem 1.4rem', fontSize:'0.65rem', borderRadius:'99px' }}
                   onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}>
-                  <RefreshCw size={12} /> Replace
+                  <RefreshCw size={12} /> <span className="liquid-text" data-text="Replace">Replace</span>
                 </button>
                 <button style={{ padding:'0.5rem 1.2rem', borderRadius:'99px', fontSize:'0.62rem', fontFamily:'var(--mono)', fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.3)', color:'#FCA5A5', cursor:'none', transition:'all 0.2s' }}
                   onClick={e => { e.stopPropagation(); onClear(); }}>
@@ -110,7 +110,7 @@ export function UploadZone({ onFileSelect, previewUrl, onClear, onRunQuality, lo
 
               <button className="btn btn-glass" style={{ padding:'0.55rem 1.5rem', fontSize:'0.65rem', borderRadius:'99px' }}
                 onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}>
-                Select Image
+                <span className="liquid-text" data-text="Select Image">Select Image</span>
               </button>
 
               {/* Corner HUD marks */}
@@ -132,7 +132,7 @@ export function UploadZone({ onFileSelect, previewUrl, onClear, onRunQuality, lo
         >
           {loading
             ? <><span style={{ display:'inline-block', width:12, height:12, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite', marginRight:8 }} />Analyzing...</>
-            : <><ShieldCheck size={14} /> Validate Quality</>
+            : <><ShieldCheck size={14} /> <span className="liquid-text" data-text="Validate Quality">Validate Quality</span></>
           }
         </button>
         <button

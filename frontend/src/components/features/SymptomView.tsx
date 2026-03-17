@@ -150,11 +150,11 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
           </div>
         </div>
         <div style={{ display:'flex', gap:'0.75rem' }}>
-          <button className="btn btn-glass" style={{ padding:'0.65rem 1.5rem', fontSize:'0.7rem' }} onClick={onBack}>Back</button>
+          <button className="btn btn-glass" style={{ padding:'0.65rem 1.5rem', fontSize:'0.7rem' }} onClick={onBack}><span className="liquid-text" data-text="Back">Back</span></button>
           <button className="btn btn-primary" style={{ padding:'0.65rem 1.75rem', fontSize:'0.7rem' }} onClick={onContinue} disabled={loading}>
             {loading
               ? <><span style={{ display:'inline-block', width:11, height:11, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite', marginRight:6 }} />Analyzing...</>
-              : 'Run Diagnostics'
+              : <span className="liquid-text" data-text="Run Diagnostics">Run Diagnostics</span>
             }
           </button>
         </div>
