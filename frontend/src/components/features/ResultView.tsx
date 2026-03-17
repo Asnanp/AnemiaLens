@@ -43,7 +43,7 @@ function RiskArc({ value, color }: { value: number; color: string }) {
       <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
         <span style={{ fontFamily:'var(--mono)', fontWeight:700, fontSize:'1.4rem', color, lineHeight:1 }}>{value}%</span>
         <span style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:'0.12em', textTransform:'uppercase', marginTop:4 }}>Risk Score</span>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -442,6 +442,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           </div>
         </motion.div>
       </div>
+      </motion.div>
     </div>
   );
 }
