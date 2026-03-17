@@ -32,7 +32,35 @@ function useCountUp(target: number, duration = 1400, start = false) {
   return val;
 }
 
-// ── MARQUEE TICKER ────────────────────────────────────────────────────────────
+// ── FLOATING LUXURY PARTICLES ────────────────────────────────────────────────
+function LuxuryParticles() {
+  const particles = Array.from({ length: 18 }, (_, i) => ({
+    id: i,
+    size: Math.random() * 3 + 1,
+    left: Math.random() * 100,
+    duration: Math.random() * 20 + 15,
+    delay: Math.random() * 20,
+    color: i % 3 === 0 ? 'rgba(202,138,4,0.5)' : i % 3 === 1 ? 'rgba(200,0,30,0.4)' : 'rgba(255,255,255,0.2)',
+  }));
+  return (
+    <>
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="luxury-particle"
+          style={{
+            width: p.size, height: p.size,
+            left: `${p.left}%`,
+            background: p.color,
+            boxShadow: `0 0 ${p.size * 3}px ${p.color}`,
+            animationDuration: `${p.duration}s`,
+            animationDelay: `${p.delay}s`,
+          }}
+        />
+      ))}
+    </>
+  );
+}
 const TICKER_ITEMS = [
   '1.92B+ people affected by anemia globally',
   '92% model sensitivity on clinical specimens',
@@ -242,7 +270,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
         <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
           <div className="nav-logo-badge" style={{
             width:32, height:32, borderRadius:'10px',
-            background:'linear-gradient(135deg, #C8001E 0%, #E8294A 100%)',
+            background:'linear-gradient(135deg, #92600A 0%, #CA8A04 50%, #F0B429 100%)',
             display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:'0.6rem', fontWeight:800, color:'#fff', letterSpacing:'0.05em',
             fontFamily:'var(--mono)', flexShrink:0,
@@ -379,10 +407,10 @@ function HeroStat({ raw, suffix, label, target, div }: { raw: string; suffix: st
   const display = div > 1 ? (count / div).toFixed(2) : String(count);
 
   return (
-    <div ref={ref} className="hero-stat">
+    <div ref={ref} className="hero-stat glass-border-animate" style={{ padding:'0.75rem 1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
         <span className="stat-number">{display}</span>
-        <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', fontSize:'1.4rem' }}>{suffix}</span>
+        <span className="text-crimson-gold" style={{ fontSize:'1.4rem' }}>{suffix}</span>
       </div>
       <div className="label-tag" style={{ marginTop:'0.4rem' }}>{label}</div>
     </div>
@@ -410,7 +438,7 @@ function Hero() {
             <span className="hero-line-1" style={{ display:'block', fontWeight:900, color:'var(--text)' }}>See what</span>
             <span className="hero-line-2" style={{ display:'block', fontStyle:'italic', fontWeight:300, color:'var(--text-muted)', fontFamily:'var(--serif)' }}>your blood</span>
             <span className="hero-line-3" style={{ display:'block', fontWeight:900 }}>
-              <span style={{ background:'linear-gradient(135deg, var(--accent-bright) 0%, #FF6B8A 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>reveals.</span>
+              <span className="text-crimson-gold">reveals.</span>
             </span>
           </h1>
 
@@ -442,7 +470,7 @@ function Hero() {
           <motion.div
             initial={{ opacity:0 }} animate={{ opacity:1 }}
             transition={{ delay:0.7, duration:0.8 }}
-            style={{ display:'flex', gap:'3.5rem', paddingTop:'2.5rem', borderTop:'1px solid var(--glass-border)', marginTop:'0.5rem' }}
+            style={{ display:'flex', gap:'2rem', paddingTop:'2.5rem', borderTop:'1px solid rgba(202,138,4,0.2)', marginTop:'0.5rem', flexWrap:'wrap' }}
           >
             {[
               { raw:'1.92', suffix:'B+', label:'Anemia Cases Globally', target:192, div:100 },
@@ -539,7 +567,7 @@ function Challenge() {
           <div className="section-eyebrow" style={{ marginBottom:'1.5rem' }}>The Challenge</div>
           <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(2.2rem,4vw,3.2rem)', fontWeight:700, lineHeight:1.05, letterSpacing:'-0.03em', marginBottom:'1.75rem' }}>
             Bridging the<br/>
-            <span style={{ fontStyle:'italic', fontWeight:300, color:'var(--text-muted)' }}>Screening Gap.</span>
+            <span style={{ fontStyle:'italic', fontWeight:300 }} className="text-gold">Screening Gap.</span>
           </h2>
           <p style={{ fontSize:'0.95rem', color:'var(--text-muted)', lineHeight:1.75, marginBottom:'2.5rem' }}>
             Anemia affects 25% of the world's population, yet detection remains expensive and slow. Early action is delayed by clinic distance, blood testing costs, and lack of specialized hardware.
@@ -547,7 +575,7 @@ function Challenge() {
           <div style={{ display:'flex', gap:'3rem' }}>
             {[['$0','Marginal Cost'],['100%','Smartphone-First']].map(([v,l]) => (
               <div key={l}>
-                <div style={{ fontFamily:'var(--serif)', fontSize:'2.5rem', fontWeight:600, color:'var(--text)' }}>{v}</div>
+                <div style={{ fontFamily:'var(--serif)', fontSize:'2.5rem', fontWeight:600 }} className="text-crimson-gold">{v}</div>
                 <div className="label-tag" style={{ marginTop:'0.3rem' }}>{l}</div>
               </div>
             ))}
@@ -597,7 +625,7 @@ function WorkflowStepper() {
           <div className="section-eyebrow" style={{ marginBottom:'1.25rem' }}>The Architecture</div>
           <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(2.5rem,5vw,4.5rem)', fontWeight:700, lineHeight:1.0, letterSpacing:'-0.03em' }}>
             Five Steps to<br/>
-            <span style={{ fontStyle:'italic', fontWeight:300, color:'var(--text-muted)' }}>Screening Clarity.</span>
+            <span style={{ fontStyle:'italic', fontWeight:300 }} className="text-gold">Screening Clarity.</span>
           </h2>
         </motion.div>
 
@@ -775,7 +803,7 @@ function ScreeningSection() {
           <div className="section-eyebrow" style={{ marginBottom:'1.25rem' }}>Diagnostic Hub</div>
           <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(2.5rem,5vw,4.5rem)', fontWeight:700, lineHeight:1.0, letterSpacing:'-0.03em' }}>
             Interactive<br/>
-            <span style={{ fontStyle:'italic', fontWeight:300, color:'var(--text-muted)' }}>Screening Experience.</span>
+            <span style={{ fontStyle:'italic', fontWeight:300 }} className="text-gold">Screening Experience.</span>
           </h2>
         </motion.div>
 
@@ -893,7 +921,7 @@ function TechSection() {
             <div className="section-eyebrow" style={{ marginBottom:'1.25rem' }}>Architecture</div>
             <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(2.2rem,4vw,3.5rem)', fontWeight:700, lineHeight:1.05, letterSpacing:'-0.03em' }}>
               The Intelligence<br/>
-              <span style={{ fontStyle:'italic', fontWeight:300, color:'var(--text-muted)' }}>Framework.</span>
+              <span style={{ fontStyle:'italic', fontWeight:300 }} className="text-gold">Framework.</span>
             </h2>
           </motion.div>
 
@@ -964,7 +992,7 @@ function Footer() {
           <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr', gap:'5rem', marginBottom:'4rem' }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
-                <div style={{ width:38, height:38, borderRadius:'10px', background:'linear-gradient(135deg, #C8001E, #E8294A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:900, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 6px 20px rgba(200,0,30,0.4)' }}>AL</div>
+                <div style={{ width:38, height:38, borderRadius:'10px', background:'linear-gradient(135deg, #92600A, #CA8A04, #F0B429)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:900, color:'#fff', fontFamily:'var(--mono)', boxShadow:'0 6px 20px rgba(202,138,4,0.4)' }}>AL</div>
                 <span style={{ fontWeight:800, fontSize:'1.1rem', letterSpacing:'-0.02em' }}>Anemia<span style={{ color:'var(--accent-bright)' }}>Lens</span></span>
               </div>
               <p style={{ fontSize:'0.82rem', color:'var(--text-dim)', lineHeight:1.8, maxWidth:340, marginBottom:'2rem' }}>
@@ -1033,6 +1061,7 @@ export default function App() {
   return (
     <div style={{ position:'relative', minHeight:'100vh', background:'var(--void)' }}>
       <Cursor />
+      <LuxuryParticles />
       <AuroraCanvas />
       <ThreeBackground />
       <Navbar backendUp={backendUp} />
