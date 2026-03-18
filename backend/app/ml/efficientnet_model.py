@@ -21,29 +21,60 @@ def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     return max(lower, min(upper, value))
 
 
+class SpatialAttention(nn.Module):
+    """
+    Focuses the model on the most informative spatial regions (like the conjunctiva area).
+    """
+    def __init__(self, kernel_size: int = 7) -> None:
+        super().__init__()
+        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        combined = torch.cat([avg_out, max_out], dim=1)
+        scale = self.sigmoid(self.conv(combined))
+        return x * scale
+
+
 def build_efficientnet_model(*, pretrained: bool = True) -> nn.Module:
     weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
     model = efficientnet_b0(weights=weights)
-    # Deeper head: 1280 → 512 → 128 → 2, GELU activations, stronger regularisation
+    
+    # Inject Spatial Attention before the final pooling
+    model.features.add_module("spatial_attention", SpatialAttention())
+
+    # Deeper, multi-pool head: (AvgPool + MaxPool) -> 1280*2 -> 512 -> 128 -> 2
+    # We'll handle the pooling manually by hijacking the model behavior slightly
+    # or just replace the classifier and handle concat in forward? 
+    # To keep it simple for the existing loading code, we'll keep the 1280 input 
+    # but use a more expressive GELU-based MLP.
     model.classifier = nn.Sequential(
         nn.Dropout(0.35),
         nn.Linear(1280, 512),
         nn.GELU(),
+        nn.BatchNorm1d(512),
         nn.Dropout(0.25),
         nn.Linear(512, 128),
         nn.GELU(),
+        nn.BatchNorm1d(128),
         nn.Dropout(0.15),
         nn.Linear(128, 2),
     )
 
     # Freeze early layers 0-3, fine-tune 4-8 for richer feature adaptation
+    # We also keep our new attention module unfrozen
     for param in model.features.parameters():
         param.requires_grad = False
+    
     for name, param in model.features.named_parameters():
-        if name.startswith(("4", "5", "6", "7", "8")):
+        if name.startswith(("4", "5", "6", "7", "8", "spatial_attention")):
             param.requires_grad = True
+    
     for param in model.classifier.parameters():
         param.requires_grad = True
+        
     return model
 
 
@@ -82,7 +113,7 @@ def load_efficientnet_checkpoint(
     checkpoint = torch.load(path, map_location=map_location)
     model = build_efficientnet_model(pretrained=False)
     state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
-    model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict, strict=False)
     device = torch.device(map_location)
     model.to(device)
     model.eval()

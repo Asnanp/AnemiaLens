@@ -77,6 +77,24 @@ class ConjunctivaDataset(Dataset):
         return image.convert("RGB"), float(record.label), float(record.hb)
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha: float = 0.25, gamma: float = 2.0, pos_weight: torch.Tensor | None = None) -> None:
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction="none")
+
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        bce_loss = self.bce(inputs, targets)
+        probabilities = torch.sigmoid(inputs)
+        p_t = probabilities * targets + (1 - probabilities) * (1 - targets)
+        loss = bce_loss * ((1 - p_t) ** self.gamma)
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+            loss = alpha_t * loss
+        return loss.mean()
+
+
 def main() -> None:
     _set_seed(SEED)
     dataset_root = DATA_ROOT if DATA_ROOT.exists() else ARCHIVE_ROOT
@@ -97,10 +115,10 @@ def main() -> None:
     model = build_efficientnet_model(pretrained=True).to(device)
     optimizer = AdamW(
         [
-            {"params": list(model.classifier.parameters()), "lr": 2e-4},
-            {"params": [param for param in model.features.parameters() if param.requires_grad], "lr": 8e-6},
+            {"params": list(model.classifier.parameters()), "lr": 1.5e-4}, # Slightly lower for stability
+            {"params": [param for param in model.features.parameters() if param.requires_grad], "lr": 5e-6},
         ],
-        weight_decay=2e-4,
+        weight_decay=4e-4, # Higher weight decay for better regularization
     )
 
     # Warmup then cosine annealing
@@ -112,9 +130,9 @@ def main() -> None:
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warmup_cosine_lr)
 
-    # Label smoothing on BCE
+    # Use Focal Loss with positive weights
     pos_weight = torch.tensor([_positive_class_weight(train_records)], device=device)
-    cls_loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    cls_loss_fn = FocalLoss(alpha=0.25, gamma=2.0, pos_weight=pos_weight)
     hb_loss_fn = nn.SmoothL1Loss(beta=0.5)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=train_sampler, num_workers=0)
