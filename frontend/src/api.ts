@@ -5,10 +5,16 @@ import type {
   SymptomInput
 } from './types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+// In production (Vercel), we use relative paths so Vercel's rewrites proxy requests to Render.
+// This avoids VITE_API_BASE_URL injection issues and CORS complexity.
+const IS_PROD = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+
+const API_BASE = IS_PROD
+  ? '' 
+  : (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
 function endpoint(path: string): string {
-  return API_BASE ? `${API_BASE}${path}` : path;
+  return `${API_BASE}${path}`;
 }
 
 // ── WAKE STATE — subscribers notified when backend comes online ───────────────
