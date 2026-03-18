@@ -3,7 +3,14 @@
   "outputDirectory": "frontend/dist",
   "installCommand": "echo 'skip root install'",
   "framework": null,
-  "env": {
-    "VITE_API_BASE_URL": "https://anemialens-3.onrender.com"
-  }
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://anemialens-3.onrender.com/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://anemialens-3.onrender.com/health"
+    }
+  ]
 }
