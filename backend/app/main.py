@@ -1,20 +1,29 @@
 """
-AnemiaLens FastAPI application.
+AnemiaLens FastAPI application — production-grade single entrypoint.
 
-Improvements over the original:
-- Lifespan context manager replaces deprecated on_event hooks.
-- Structured JSON logging with a per-request trace ID injected via middleware.
+Phase 1 improvements:
+- Lifespan context manager with model warm-up and DB table creation.
+- Structured JSON logging with per-request trace ID.
+- Rate-limiting middleware (token-bucket, in-process).
+- Memory guard middleware (gc.collect after inference).
 - Hard image-size gate before any decoding (prevents trivial DoS).
 - Explicit 413 / 415 responses with clear error messages.
-- /api/analyze is fully async — no blocking I/O on the event loop.
-- Runtime-status endpoint enriches model metadata from the training report.
-- All service singletons are initialised once during lifespan startup and
-  attached to app.state so tests can inject fakes without monkey-patching.
+- PyTorch single-threaded for memory-constrained deployments.
+
+Phase 2 improvements:
+- Database integration: every screening is persisted.
+- Auth routes: register, login, refresh, profile.
+- History routes: list, detail, delete past screenings.
+- Optional auth on screening endpoints (works anonymous, persists if logged in).
+- Admin route stub for future analytics.
 """
 
 from __future__ import annotations
 
+import gc
+import json
 import logging
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -22,7 +31,7 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Request, UploadFile, status
+from fastapi import FastAPI, File, Form, Request, UploadFile, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from PIL import UnidentifiedImageError
@@ -49,13 +58,38 @@ from app.services.triage import TriageService
 load_dotenv(BACKEND_ROOT / ".env")
 
 # ---------------------------------------------------------------------------
-# Logging
+# Ensure PyTorch uses minimal threads (BEFORE any torch import in services)
+# ---------------------------------------------------------------------------
+try:
+    import torch
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
+# Structured JSON Logging
 # ---------------------------------------------------------------------------
 
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format="%(asctime)s [%(levelname)s] %(name)s %(message)s",
-)
+class _JSONFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "ts": self.formatTime(record, self.datefmt),
+                "level": record.levelname,
+                "logger": record.name,
+                "msg": record.getMessage(),
+                "request_id": getattr(record, "request_id", None),
+            },
+            ensure_ascii=False,
+        )
+
+
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(_JSONFormatter())
+logging.root.handlers = [_handler]
+logging.root.setLevel(getattr(logging, settings.log_level))
+
 log = logging.getLogger("anemialens")
 
 
@@ -66,6 +100,13 @@ log = logging.getLogger("anemialens")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("AnemiaLens starting up …")
+
+    # ---------- Database ----------
+    from app.database import create_tables
+    await create_tables()
+    log.info("Database tables ensured.")
+
+    # ---------- ML Services ----------
     app.state.quality_service = ImageQualityService()
     app.state.predictor = ScreeningPredictor()
     app.state.triage_service = TriageService()
@@ -73,8 +114,29 @@ async def lifespan(app: FastAPI):
     app.state.case_insight_service = CaseInsightService()
     app.state.clinical_brief_service = ClinicalBriefService()
     app.state.handoff_service = HandoffSummaryService()
-    log.info("All services initialised.")
+    log.info("All ML services initialised.")
+
+    # ---------- Model warm-up ----------
+    if app.state.predictor.is_ready():
+        try:
+            from PIL import Image
+            import numpy as np
+            dummy = Image.fromarray(
+                np.random.randint(80, 200, (120, 200, 3), dtype=np.uint8), mode="RGB"
+            )
+            from app.schemas import QualityAssessment
+            dummy_quality = QualityAssessment(
+                passed=True, blur_score=100.0, brightness_score=0.3,
+                contrast_score=0.15, framing_score=1.5, issues=[],
+            )
+            app.state.predictor.predict(dummy, dummy_quality)
+            gc.collect()
+            log.info("Model warm-up complete — first inference latency eliminated.")
+        except Exception as exc:
+            log.warning("Model warm-up failed (non-fatal): %s", exc)
+
     yield
+
     log.info("AnemiaLens shutting down.")
 
 
@@ -84,9 +146,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AnemiaLens API",
-    version="0.3.0",
+    version="1.0.0",
     description=(
-        "Conjunctiva-based anemia screening API. "
+        "Conjunctiva-based anemia screening API with authentication, "
+        "scan history, and AI-powered guidance. "
         "All predictions are screening aids only — not medical diagnoses."
     ),
     lifespan=lifespan,
@@ -94,6 +157,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ---------------------------------------------------------------------------
+# Middleware stack (order matters — outermost first)
+# ---------------------------------------------------------------------------
+
+# 1. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -101,6 +169,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 2. Rate limiting
+from app.middleware.rate_limit import RateLimitMiddleware
+app.add_middleware(
+    RateLimitMiddleware,
+    analyze_rpm=10,
+    quality_rpm=30,
+    default_rpm=60,
+)
+
+# 3. Memory guard
+from app.middleware.memory_guard import MemoryGuardMiddleware
+app.add_middleware(MemoryGuardMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +209,21 @@ async def request_id_middleware(request: Request, call_next):
         request_id,
     )
     return response
+
+
+# ---------------------------------------------------------------------------
+# Include API route modules (Phase 2 & 3)
+# ---------------------------------------------------------------------------
+
+from app.api.auth import router as auth_router
+from app.api.history import router as history_router
+from app.api.admin import router as admin_router
+from app.api.billing import router as billing_router
+
+app.include_router(auth_router)
+app.include_router(history_router)
+app.include_router(admin_router)
+app.include_router(billing_router)
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +265,66 @@ def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality):
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Screening persistence helper (Phase 2)
+# ---------------------------------------------------------------------------
+
+async def _persist_screening(
+    request_id: str,
+    analysis: AnalyzeResponse,
+    user_id: int | None,
+    processing_time_ms: float,
+) -> None:
+    """Save the screening result to the database."""
+    try:
+        from app.database import async_session_factory
+        from app.models.screening import Screening
+
+        screening = Screening(
+            request_id=request_id,
+            user_id=user_id,
+            triage_band=analysis.triage.band,
+            triage_score=analysis.triage.score,
+            triage_label=analysis.triage.label,
+            anemia_risk=analysis.prediction.anemia_risk if analysis.prediction else None,
+            predicted_hemoglobin=analysis.prediction.predicted_hemoglobin if analysis.prediction else None,
+            confidence=analysis.prediction.confidence if analysis.prediction else None,
+            uncertainty=analysis.prediction.uncertainty if analysis.prediction else None,
+            screening_label=analysis.prediction.screening_label if analysis.prediction else None,
+            model_source=analysis.prediction.model_source if analysis.prediction else None,
+            quality_passed=analysis.quality.passed,
+            blocked=analysis.blocked,
+            processing_path=analysis.decision_audit.processing_path,
+            guidance_source=analysis.guidance.source,
+            symptoms_json=json.dumps(analysis.symptoms.model_dump()),
+            full_response_json=json.dumps(analysis.model_dump(), default=str),
+            share_text=analysis.handoff_summary.share_text,
+            urgency_label=analysis.handoff_summary.urgency_label,
+            headline=analysis.handoff_summary.headline,
+            processing_time_ms=processing_time_ms,
+            language=analysis.language,
+            region=analysis.region,
+        )
+
+        async with async_session_factory() as session:
+            session.add(screening)
+            await session.commit()
+
+            # Update user scan count
+            if user_id is not None:
+                from app.models.user import User
+                from sqlalchemy import select
+                result = await session.execute(select(User).where(User.id == user_id))
+                user = result.scalar_one_or_none()
+                if user:
+                    user.scan_count += 1
+                    await session.commit()
+
+    except Exception as exc:
+        log.warning("Failed to persist screening (non-fatal): %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Health / Meta
 # ---------------------------------------------------------------------------
 
 @app.get("/health", tags=["meta"], summary="Liveness probe")
@@ -207,15 +362,15 @@ async def readyz(request: Request) -> JSONResponse:
     summary="Model and guidance runtime information",
 )
 async def runtime_status(request: Request) -> RuntimeStatusResponse:
-    """
-    Returns which models are loaded, their validation metrics, and which
-    guidance strategy is active.  Useful for operational dashboards.
-    """
     return build_runtime_status(
         request.app.state.predictor,
         request.app.state.guidance_service,
     )
 
+
+# ---------------------------------------------------------------------------
+# Routes — Screening
+# ---------------------------------------------------------------------------
 
 @app.post(
     "/api/quality-check",
@@ -228,10 +383,6 @@ async def quality_check(
     request: Request,
     image: Annotated[UploadFile, File(description="Eye photo (JPEG or PNG).")],
 ) -> QualityCheckResponse | JSONResponse:
-    """
-    Runs only the image-quality pipeline.  Use this for instant camera
-    feedback before committing to a full (slower) analysis call.
-    """
     rid = request.state.request_id
     image_bytes = await image.read()
 
@@ -261,18 +412,37 @@ async def analyze(
     region: Annotated[str | None, Form(description="Geographic region for localised guidance.")] = None,
 ) -> AnalyzeResponse | JSONResponse:
     """
-    Full pipeline:
-
-    1. Parse and validate the symptom payload.
-    2. Assess image quality; return early if blocking issues are found.
-    3. Run ML screening inference on the quality-gated ROI.
-    4. Compute a triage band from image + prediction + symptoms.
-    5. Generate LLM-backed (or fallback) personalised guidance.
-
-    When `blocked=true` in the response, `prediction` will be `null`.
+    Full pipeline: quality gate → ML inference → triage → guidance → insight packs.
+    Works for both authenticated and anonymous users.
+    Authenticated users get their results persisted to scan history.
     """
     rid = request.state.request_id
     svc = request.app.state
+
+    # --- Optional auth (get user if token present) -------------------------
+    user_id: int | None = None
+    try:
+        from app.dependencies import get_optional_user, _bearer_scheme
+        from app.database import async_session_factory
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            from app.utils.security import decode_token
+            payload = decode_token(token)
+            if payload and payload.get("type") == "access":
+                from sqlalchemy import select
+                from app.models.user import User
+                async with async_session_factory() as session:
+                    result = await session.execute(
+                        select(User).where(User.uid == payload.get("sub"))
+                    )
+                    user = result.scalar_one_or_none()
+                    if user and user.is_active:
+                        user_id = user.id
+    except Exception:
+        pass  # Anonymous is fine
 
     # --- Input validation --------------------------------------------------
     try:
@@ -347,17 +517,20 @@ async def analyze(
         handoff_summary,
         signal_breakdown,
     )
+
+    processing_time_ms = (time.perf_counter() - request.state.started_at) * 1000
+
     analysis_meta = build_analysis_meta(
         request_id=rid,
         api_version=app.version,
-        processing_time_ms=(time.perf_counter() - request.state.started_at) * 1000,
+        processing_time_ms=processing_time_ms,
         quality=quality,
         decision_audit=decision_audit,
         guidance=guidance,
         used_raw_frame_rescue=used_raw_frame_rescue,
     )
 
-    return AnalyzeResponse(
+    response = AnalyzeResponse(
         blocked=not quality.passed,
         quality=quality,
         prediction=prediction,
@@ -372,3 +545,11 @@ async def analyze(
         language=language,
         region=region,
     )
+
+    # --- Persist to database (async, non-blocking) -------------------------
+    import asyncio
+    asyncio.create_task(
+        _persist_screening(rid, response, user_id, processing_time_ms)
+    )
+
+    return response
