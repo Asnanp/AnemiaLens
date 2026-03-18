@@ -60,5 +60,9 @@ async def get_db() -> AsyncSession:
 
 async def create_tables() -> None:
     """Create all ORM tables — called once during app startup."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    import logging
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logging.getLogger("anemialens").warning(f"Database sync failed (non-fatal): {exc}")
