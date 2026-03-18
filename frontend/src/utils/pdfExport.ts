@@ -2,12 +2,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // Assuming identical type structure to the one in useScreening hook
-import { AnalysisResult } from '../types';
+import { AnalyzeResponse } from '../types';
 
 /**
  * Generates a professional clinical PDF report using jsPDF
  */
-export async function generatePdfReport(analysis: any) {
+export async function generatePdfReport(analysis: AnalyzeResponse) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -49,15 +49,15 @@ export async function generatePdfReport(analysis: any) {
   yPos += 10;
 
   // Convert triage string to readable
-  const triageLabel = analysis.triage.triage_band.replace(/_/g, ' ').toUpperCase();
+  const triageLabel = analysis.triage.band.replace(/_/g, ' ').toUpperCase();
   
   autoTable(doc, {
     startY: yPos,
     head: [['Metric', 'Value', 'Details']],
     body: [
-      ['Triage Band', triageLabel, `Score: ${analysis.triage.triage_score}`],
-      ['Screening Result', analysis.prediction.screening_label.replace(/_/g, ' '), `Risk: ${(analysis.prediction.anemia_risk * 100).toFixed(1)}%`],
-      ['Estimated Hemoglobin', `${analysis.prediction.predicted_hemoglobin.toFixed(1)} g/dL`, `Confidence: ${(analysis.prediction.confidence * 100).toFixed(0)}%`],
+      ['Triage Band', triageLabel, `Score: ${analysis.triage.score}`],
+      ['Screening Result', analysis.prediction?.screening_label.replace(/_/g, ' ') || 'N/A', `Risk: ${((analysis.prediction?.anemia_risk || 0) * 100).toFixed(1)}%`],
+      ['Estimated Hemoglobin', `${analysis.prediction?.predicted_hemoglobin?.toFixed(1) || 'N/A'} g/dL`, `Confidence: ${((analysis.prediction?.confidence || 0) * 100).toFixed(0)}%`],
     ],
     theme: 'grid',
     headStyles: { fillColor: accent, textColor: 255 },
@@ -77,7 +77,8 @@ export async function generatePdfReport(analysis: any) {
   doc.setFontSize(10);
   doc.setTextColor(...darkText);
   
-  const briefLines = doc.splitTextToSize(analysis.clinical_brief.brief.replace(/\\n/g, '\n'), pageWidth - 30);
+  const briefText = analysis.clinical_brief.share_text || analysis.clinical_brief.headline;
+  const briefLines = doc.splitTextToSize(briefText.replace(/\\n/g, '\n'), pageWidth - 30);
   doc.text(briefLines, 15, yPos);
   yPos += briefLines.length * 5 + 10;
 
@@ -94,8 +95,12 @@ export async function generatePdfReport(analysis: any) {
   doc.text('3. Reported Symptoms', 15, yPos);
   yPos += 8;
 
-  const symptomList = analysis.triage.symptoms_present.length > 0 
-    ? analysis.triage.symptoms_present.join(', ')
+  const presentSymptoms = Object.entries(analysis.symptoms)
+    .filter(([_, value]) => value === true)
+    .map(([key, _]) => key.replace(/_/g, ' '));
+
+  const symptomList = presentSymptoms.length > 0 
+    ? presentSymptoms.join(', ')
     : 'None reported';
     
   doc.setFont('helvetica', 'normal');
