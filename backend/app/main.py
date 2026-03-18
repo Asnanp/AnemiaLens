@@ -162,9 +162,10 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 # 1. CORS
+# In production, allow all origins to simplify connectivity across Render/Vercel namespaces.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
