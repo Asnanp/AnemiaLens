@@ -162,10 +162,17 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 # 1. CORS
-# In production, allow all origins to simplify connectivity across Render/Vercel namespaces.
+# Explicitly allowing common Vercel/localhost origins to satisfy allow_credentials=True.
+# If on a different Vercel preview domain, the wildcard '*' + credentials=False can also work,
+# but for auth we generally prefer specific origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://anemialens.vercel.app",
+        "https://asnanp.github.io", # just in case they're using gh-pages too
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -79,33 +79,42 @@ async def register(
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenResponse:
-    # Check if email already exists
-    result = await db.execute(select(User).where(User.email == body.email.lower().strip()))
-    if result.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists.",
+    log.info("Received registration request for email: %s", body.email)
+    try:
+        # Check if email already exists
+        result = await db.execute(select(User).where(User.email == body.email.lower().strip()))
+        if result.scalar_one_or_none() is not None:
+            log.warning("Registration failed: Email already exists - %s", body.email)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
+
+        user = User(
+            email=body.email.lower().strip(),
+            hashed_password=hash_password(body.password),
+            full_name=body.full_name,
+            role="user",
         )
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
 
-    user = User(
-        email=body.email.lower().strip(),
-        hashed_password=hash_password(body.password),
-        full_name=body.full_name,
-        role="user",
-    )
-    db.add(user)
-    await db.flush()
-    await db.refresh(user)
+        log.info("User registered successfully: %s (uid=%s)", user.email, user.uid)
 
-    log.info("User registered: %s (uid=%s)", user.email, user.uid)
-
-    access_token = create_access_token({"sub": user.uid, "role": user.role})
-    refresh_token = create_refresh_token({"sub": user.uid})
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        expires_in=3600,
-    )
+        access_token = create_access_token({"sub": user.uid, "role": user.role})
+        refresh_token = create_refresh_token({"sub": user.uid})
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=3600,
+        )
+    except Exception as exc:
+        log.error("Registration crash for %s: %s", body.email, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database connection error: {str(exc)}",
+        )
 
 
 @router.post(
