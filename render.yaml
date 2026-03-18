@@ -19,6 +19,6 @@ services:
       - key: JWT_SECRET_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false
+        value: "postgresql://postgres:Letsfreeking%40@db.ryvmcwtetnqxlwmgadpz.supabase.co:5432/postgres"
       - key: ANEMIALENS_CORS_ORIGINS
         value: '["https://anemia-lens.vercel.app"]'

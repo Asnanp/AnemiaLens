@@ -40,16 +40,24 @@ class CheckoutSessionResponse(BaseModel):
 async def create_checkout_session(
     request: Request,
     user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CheckoutSessionResponse:
+    origin = request.headers.get("origin", "http://localhost:5173")
+
     if not stripe.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Stripe is not configured on this server.",
-        )
+        # DEMO MODE: Automatically upgrade the user instead of failing
+        log.warning("No Stripe API key found. Operating in DEMO MODE.")
+        u = await db.scalar(select(User).where(User.uid == user.uid))
+        if u:
+            u.subscription_tier = "pro"
+            await db.commit()
+            log.info("DEMO MODE: User %s upgraded to pro", u.email)
+            
+        # Return success redirect directly
+        return CheckoutSessionResponse(checkout_url=f"{origin}/?payment_success=true")
 
     try:
         # The base origin for success/cancel URLs
-        origin = request.headers.get("origin", "http://localhost:5173")
 
         # Determine if we should create a new customer or use an existing one
         customer_id = user.stripe_customer_id
