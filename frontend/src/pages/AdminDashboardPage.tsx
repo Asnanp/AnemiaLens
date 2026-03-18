@@ -15,11 +15,11 @@ function endpoint(path: string): string {
 }
 
 interface AdminStats {
-  total_users: int;
-  total_scans: int;
-  scans_by_band: Record<string, int>;
-  avg_processing_time_ms: float;
-  blocked_scans: int;
+  total_users: number;
+  total_scans: number;
+  scans_by_band: Record<string, number>;
+  avg_processing_time_ms: number;
+  blocked_scans: number;
 }
 
 export default function AdminDashboardPage({ onClose }: { onClose: () => void }) {
