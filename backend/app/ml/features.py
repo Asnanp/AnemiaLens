@@ -124,6 +124,14 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
     hist_bright = sum(hist[160:224]) / total
     hist_highlight = sum(hist[224:256]) / total
 
+    # Spectral features: Conjunctival Pallor Index (CPI)
+    # CPI = R / (R + G + B) - a standard clinical screening metric
+    denom = (mean_r + mean_g + mean_b) or 1e-6
+    cpi = mean_r / denom
+    
+    center_denom = (center_mean_r + center_mean_g + center_mean_b) or 1e-6
+    center_cpi = center_mean_r / center_denom
+
     return {
         "mean_r": mean_r,
         "mean_g": mean_g,
@@ -154,6 +162,8 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
         "red_green_gap": mean_r - mean_g,
         "center_red_green_gap": center_mean_r - center_mean_g,
         "size_score": min(width, height) / 320.0,
+        "cpi": cpi,
+        "center_cpi": center_cpi,
     }
 
 
