@@ -19,11 +19,18 @@ if DATABASE_URL.startswith("postgres://"):
 elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+connect_args = {}
+if "sqlite" in DATABASE_URL:
+    connect_args["check_same_thread"] = False
+elif "postgres" in DATABASE_URL:
+    # Supabase / Render require SSL
+    connect_args["ssl"] = "require"
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    **({"connect_args": {"check_same_thread": False}} if "sqlite" in DATABASE_URL else {}),
+    connect_args=connect_args,
 )
 
 async_session_factory = async_sessionmaker(
