@@ -11,6 +11,14 @@
     {
       "source": "/health",
       "destination": "https://anemialens-3.onrender.com/health"
+    },
+    {
+      "source": "/api/runtime-status",
+      "destination": "https://anemialens-3.onrender.com/api/runtime-status"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
