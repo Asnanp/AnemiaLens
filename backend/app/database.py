@@ -61,8 +61,11 @@ async def get_db() -> AsyncSession:
 async def create_tables() -> None:
     """Create all ORM tables — called once during app startup."""
     import logging
+    log = logging.getLogger("anemialens")
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        log.info("Database tables created/verified successfully.")
     except Exception as exc:
-        logging.getLogger("anemialens").warning(f"Database sync failed (non-fatal): {exc}")
+        log.error(f"Database table creation FAILED: {exc}", exc_info=True)
+        raise  # re-raise so startup fails loudly instead of silently
