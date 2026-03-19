@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
 from PIL import Image
 
 from app.config import DEFAULT_ARCHIVE_MODEL_PATH, DEFAULT_EFFICIENTNET_MODEL_PATH
@@ -39,7 +40,7 @@ class ScreeningPredictor:
         self._calibrator = self._load_calibrator()
         self._roi_scorer = RoiConfidenceScorer()
 
-    def predict(self, image: Image.Image, quality: QualityAssessment) -> PredictionResult:
+    def predict(self, image: Image.Image, quality: QualityAssessment, symptom_score: float = 0.0) -> PredictionResult:
         prediction: dict[str, float] | None = None
         model_source = "missing-model"
         decision_threshold = 0.5
@@ -103,6 +104,20 @@ class ScreeningPredictor:
         uncertainty = float(prediction["uncertainty"])
         predicted_hemoglobin_raw = float(prediction["predicted_hemoglobin"])
         predicted_hemoglobin = round(predicted_hemoglobin_raw, 2)
+
+        # --- Symptom-driven post-processing --------------------------------
+        # When symptoms are present, they provide real clinical signal.
+        # Blend symptom evidence into risk and Hb even for real model outputs.
+        if symptom_score > 0.0:
+            # Symptoms push risk up: all symptoms (score=1.0) adds up to +0.30
+            symptom_risk_boost = symptom_score * 0.30
+            risk = float(np.clip(risk + symptom_risk_boost * (1.0 - risk), 0.0, 1.0))
+            # Symptoms lower Hb estimate: all symptoms → up to -2.5 g/dL
+            symptom_hb_penalty = symptom_score * 2.5
+            predicted_hemoglobin_raw = float(np.clip(predicted_hemoglobin_raw - symptom_hb_penalty, 6.0, 18.0))
+            predicted_hemoglobin = round(predicted_hemoglobin_raw, 2)
+            # Symptoms reduce uncertainty slightly (more signal available)
+            uncertainty = float(np.clip(uncertainty - symptom_score * 0.08, 0.05, 0.88))
         quality_delta = 0.0
         if quality.framing_score < 1.15:
             quality_delta += 0.08

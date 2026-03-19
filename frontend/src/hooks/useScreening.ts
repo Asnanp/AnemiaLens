@@ -127,7 +127,13 @@ export function useScreening() {
     setLoading(true);
     setError(null);
     try {
-      const result = await analyzeScreening(file, symptoms);
+      // Read severity from localStorage (set by SymptomView)
+      let symptomSeverity: Record<string, number> | undefined;
+      try {
+        const raw = localStorage.getItem('anemialens.symptom-severity');
+        if (raw) symptomSeverity = JSON.parse(raw);
+      } catch { /* ignore */ }
+      const result = await analyzeScreening(file, symptoms, undefined, undefined, symptomSeverity);
       setAnalysis(result);
       const item = buildRecent(result);
       if (item) {

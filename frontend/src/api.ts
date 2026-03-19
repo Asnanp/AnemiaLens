@@ -134,12 +134,17 @@ export async function analyzeScreening(
   file: File,
   symptoms: SymptomInput,
   language?: string,
-  region?: string
+  region?: string,
+  symptomSeverity?: Record<string, number>
 ): Promise<AnalyzeResponse> {
   const compressed = await compressImage(file);
   const form = new FormData();
   form.append('image', compressed);
-  form.append('symptoms', JSON.stringify(symptoms));
+  // Merge severity into symptoms payload so backend can weight them
+  const symptomsPayload = symptomSeverity
+    ? { ...symptoms, symptom_severity: symptomSeverity }
+    : symptoms;
+  form.append('symptoms', JSON.stringify(symptomsPayload));
   if (language) form.append('language', language);
   if (region) form.append('region', region);
   const r = await fetch(endpoint('/api/analyze'), {

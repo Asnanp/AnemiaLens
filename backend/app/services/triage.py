@@ -65,13 +65,13 @@ class TriageService:
         fused_score = breakdown.fused_score
 
         # Symptom-driven escalation: severe symptoms alone can push to high concern
-        if fused_score >= 0.58 or (
-            prediction.anemia_risk >= 0.52 and symptom_score >= 0.32
-        ) or symptom_score >= 0.68:
+        if fused_score >= 0.50 or (
+            prediction.anemia_risk >= 0.45 and symptom_score >= 0.28
+        ) or symptom_score >= 0.55:
             band = "high_concern"
             label = "High concern"
             summary = "This screening suggests a higher level of concern. Arrange formal medical review soon, especially if symptoms are increasing."
-        elif fused_score >= 0.28 or prediction.anemia_risk >= 0.42 or symptom_score >= 0.26:
+        elif fused_score >= 0.24 or prediction.anemia_risk >= 0.38 or symptom_score >= 0.22:
             band = "moderate_risk"
             label = "Moderate risk"
             summary = "This screening shows some concern. A routine check with a clinician or lab test would be reasonable."
@@ -130,6 +130,13 @@ class TriageService:
             has_severe_symptoms=has_severe,
         )
 
+        # Symptom escalation: if symptom burden is high, floor the fused score
+        # This ensures all-symptoms case always reaches high concern
+        if symptom_score >= 0.55:
+            fused_score = max(fused_score, 0.55)
+        elif symptom_score >= 0.35:
+            fused_score = max(fused_score, 0.30)
+
         # Effective weights for display (approximate from fusion output)
         if self._fusion_model.trained:
             # Derive display weights from perturbation
@@ -165,8 +172,12 @@ class TriageService:
 
     def _symptom_score(self, symptoms: SymptomInput) -> float:
         raw_score = 0.0
+        severity_map = symptoms.symptom_severity or {}
         for field_name, weight in self._WEIGHTS.items():
             value = getattr(symptoms, field_name)
             if value:
-                raw_score += weight
+                # Severity multiplier: none=1.0, mild=1.0, severe=1.5
+                sev = severity_map.get(field_name, 1)
+                multiplier = 1.5 if sev >= 2 else 1.0
+                raw_score += weight * multiplier
         return min(1.0, raw_score)
