@@ -102,9 +102,9 @@ async def lifespan(app: FastAPI):
     log.info("AnemiaLens starting up …")
 
     # ---------- Database ----------
-    from app.database import create_tables
-    await create_tables()
-    log.info("Database tables ensured.")
+    # Tables are pre-created via supabase_schema.sql — skip DDL on startup
+    # (asyncpg + Supabase transaction pooler drops connection during DDL)
+    log.info("Database tables assumed present (pre-created via SQL).")
 
     # ---------- ML Services ----------
     app.state.quality_service = ImageQualityService()
