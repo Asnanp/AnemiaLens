@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope } from 'lucide-react';
+﻿import { useEffect, useState } from 'react';
+import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AnalyzeResponse } from '../../types';
+import type { AnalyzeResponse, InsightDriver } from '../../types';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -127,6 +127,213 @@ function ClinicalModePanel({ analysis }: { analysis: AnalyzeResponse }) {
           {audit.review_flags.map((f, i) => (
             <div key={i} style={{ fontSize:'0.65rem', color:'var(--text-muted)', lineHeight:1.6 }}>• {f}</div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── WHO Hemoglobin Reference Band ────────────────────────────────────────────
+const WHO_BANDS = [
+  { label: 'Severe', max: 8,  color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
+  { label: 'Moderate', max: 11, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  { label: 'Mild', max: 12,  color: '#FBBF24', bg: 'rgba(251,191,36,0.1)' },
+  { label: 'Normal', max: 18, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
+];
+
+function HbReferenceBand({ hb }: { hb: number }) {
+  const MIN = 4, MAX = 18;
+  const clamp = (v: number) => Math.max(MIN, Math.min(MAX, v));
+  const pct = (v: number) => ((clamp(v) - MIN) / (MAX - MIN)) * 100;
+  const markerPct = pct(hb);
+
+  const activeBand = WHO_BANDS.find((b, i) => {
+    const prev = WHO_BANDS[i - 1];
+    return hb <= b.max && (!prev || hb > prev.max);
+  }) ?? WHO_BANDS[WHO_BANDS.length - 1];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,215,0,0.6)' }}>
+          WHO Hb Reference
+        </span>
+        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: activeBand.color, fontWeight: 700 }}>
+          {activeBand.label} Anemia {hb < 12 ? '⚠' : '✓'}
+        </span>
+      </div>
+
+      {/* Track */}
+      <div style={{ position: 'relative', height: 28, borderRadius: 99, overflow: 'visible' }}>
+        {/* Gradient track */}
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 99,
+          background: 'linear-gradient(90deg, #EF4444 0%, #F59E0B 35%, #FBBF24 55%, #10B981 100%)',
+          opacity: 0.25,
+        }} />
+        {/* Band segments */}
+        {WHO_BANDS.map((band, i) => {
+          const prevMax = WHO_BANDS[i - 1]?.max ?? MIN;
+          const left = pct(prevMax);
+          const width = pct(band.max) - left;
+          return (
+            <div key={band.label} style={{
+              position: 'absolute', top: 0, bottom: 0,
+              left: `${left}%`, width: `${width}%`,
+              background: band.bg, borderRight: i < WHO_BANDS.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: '0.42rem', fontFamily: 'var(--mono)', color: band.color, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                {band.label}
+              </span>
+            </div>
+          );
+        })}
+        {/* Marker */}
+        <motion.div
+          initial={{ left: '0%' }}
+          animate={{ left: `${markerPct}%` }}
+          transition={{ duration: 1.4, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)',
+            width: 14, height: 14, borderRadius: '50%',
+            background: activeBand.color,
+            border: '2px solid rgba(255,255,255,0.9)',
+            boxShadow: `0 0 12px ${activeBand.color}, 0 0 24px ${activeBand.color}60`,
+            zIndex: 2,
+          }}
+        />
+      </div>
+
+      {/* Scale labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        {[4, 8, 11, 12, 18].map(v => (
+          <span key={v} style={{ fontSize: '0.48rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{v}</span>
+        ))}
+      </div>
+      <div style={{ textAlign: 'center', fontSize: '0.48rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', marginTop: '-0.25rem' }}>
+        g/dL — WHO Adult Reference Ranges
+      </div>
+    </div>
+  );
+}
+
+// ── Insight Pack Panel ────────────────────────────────────────────────────────
+const DRIVER_ICONS: Record<InsightDriver['impact'], React.ReactNode> = {
+  up:    <TrendingUp size={12} />,
+  down:  <TrendingDown size={12} />,
+  limit: <Minus size={12} />,
+};
+const DRIVER_COLORS: Record<InsightDriver['strength'], string> = {
+  high:   '#EF4444',
+  medium: '#F59E0B',
+  watch:  '#94A3B8',
+};
+
+function InsightPackPanel({ analysis }: { analysis: AnalyzeResponse }) {
+  const ip = analysis.insight_pack;
+  const [tab, setTab] = useState<'drivers' | 'timeline' | 'tips'>('drivers');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.7)' }}>
+        Case Insight Pack
+      </div>
+
+      {/* Priority window badge */}
+      <div style={{
+        padding: '0.625rem 1rem', borderRadius: '0.75rem',
+        background: 'rgba(255,165,0,0.07)', border: '1px solid rgba(255,165,0,0.2)',
+        display: 'flex', alignItems: 'center', gap: '0.625rem',
+      }}>
+        <Clock size={13} style={{ color: '#FFA500', flexShrink: 0 }} />
+        <div>
+          <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', color: 'rgba(255,165,0,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Priority Window</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#FFA500' }}>{ip.priority_label}</div>
+        </div>
+      </div>
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', borderRadius: '0.625rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+        {(['drivers', 'timeline', 'tips'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            style={{
+              flex: 1, padding: '0.45rem', fontSize: '0.52rem', fontFamily: 'var(--mono)',
+              textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600,
+              background: tab === t ? 'rgba(255,165,0,0.15)' : 'transparent',
+              color: tab === t ? '#FFA500' : 'var(--text-dim)',
+              border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+              borderRight: t !== 'tips' ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            }}>
+            {t === 'drivers' ? 'Risk Drivers' : t === 'timeline' ? 'Timeline' : 'Capture Tips'}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+          {tab === 'drivers' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {ip.risk_drivers.length === 0 ? (
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>No specific risk drivers identified.</p>
+              ) : ip.risk_drivers.map((d, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
+                  style={{
+                    display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+                    padding: '0.625rem 0.875rem', borderRadius: '0.625rem',
+                    background: 'rgba(255,255,255,0.02)', border: `1px solid ${DRIVER_COLORS[d.strength]}22`,
+                    borderLeft: `3px solid ${DRIVER_COLORS[d.strength]}`,
+                  }}>
+                  <div style={{ color: DRIVER_COLORS[d.strength], flexShrink: 0, marginTop: 2 }}>{DRIVER_ICONS[d.impact]}</div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.2rem' }}>{d.title}</div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>{d.detail}</div>
+                  </div>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.48rem', fontFamily: 'var(--mono)', color: DRIVER_COLORS[d.strength], textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>{d.strength}</span>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'timeline' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {ip.follow_up_timeline.length === 0 ? (
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>No timeline steps available.</p>
+              ) : ip.follow_up_timeline.map((step, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
+                  style={{ display: 'flex', gap: '0.875rem', alignItems: 'flex-start', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '0.5rem', background: 'rgba(255,165,0,0.1)', border: '1px solid rgba(255,165,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Clock size={12} style={{ color: '#FFA500' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: '#FFA500', marginBottom: '0.2rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{step.window}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{step.action}</div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'tips' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {ip.capture_improvements.length === 0 ? (
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>Image quality was good — no improvements needed.</p>
+              ) : ip.capture_improvements.map((tip, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
+                  style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', background: 'rgba(0,194,255,0.04)', border: '1px solid rgba(0,194,255,0.12)' }}>
+                  <Camera size={12} style={{ color: 'rgba(0,194,255,0.7)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{tip}</span>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Judge summary */}
+      {ip.judge_summary && (
+        <div style={{ padding: '0.75rem 1rem', borderRadius: '0.625rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.6, fontStyle: 'italic' }}>
+          "{ip.judge_summary}"
         </div>
       )}
     </div>
@@ -349,6 +556,13 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             {analysis.triage.summary}
           </p>
 
+          {/* WHO Hb Reference Band */}
+          {hbRaw > 0 && (
+            <div style={{ marginBottom: '1.75rem', padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <HbReferenceBand hb={hbRaw} />
+            </div>
+          )}
+
           {/* Disclaimer bar */}
           <div style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start', padding:'1rem 1.25rem',
             borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -421,8 +635,8 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         </motion.div>
       )}
 
-      {/* ── BOTTOM ROW: 3 cards ── */}
-      <div className="result-bottom-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1.5rem' }}>
+      {/* ── BOTTOM ROW: 4 cards ── */}
+      <div className="result-bottom-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'1.5rem' }}>
 
         {/* Clinical Guidance */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
@@ -546,6 +760,15 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               <RefreshCw size={12} /> New Screening
             </motion.button>
           </div>
+        </motion.div>
+
+        {/* Insight Pack */}
+        <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+          transition={{ delay:0.38, duration:0.5, ease:E }}
+          style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1.25rem',
+            borderLeft:'3px solid rgba(255,165,0,0.4)',
+            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 30px rgba(255,165,0,0.06)' }}>
+          <InsightPackPanel analysis={analysis} />
         </motion.div>
       </div>
       </motion.div>
