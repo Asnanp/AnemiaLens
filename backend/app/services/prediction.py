@@ -49,16 +49,10 @@ class ScreeningPredictor:
 
         if self.archive_model is not None:
             try:
+                # EfficientNet was trained for only 1 epoch (AUC ~0.56 = near-random).
+                # Blending it with the archive model degrades predictions.
+                # Skip it until a properly trained checkpoint is available.
                 efficientnet_secondary: dict[str, float] | None = None
-                if self.efficientnet_bundle is not None:
-                    try:
-                        efficientnet_secondary = predict_with_efficientnet_model(
-                            self.efficientnet_bundle,
-                            image,
-                            mc_passes=4,  # reduced from 12 to lower peak RAM on Render
-                        )
-                    except Exception:
-                        efficientnet_secondary = None
 
                 archive_prediction = predict_with_archive_model(
                     self.archive_model,
@@ -158,9 +152,9 @@ class ScreeningPredictor:
         confidence = clamp(1.0 - uncertainty)
         reliability_flag = (
             "high"
-            if uncertainty < 0.2 and quality.passed
-            else "medium"
             if uncertainty < 0.35 and quality.passed
+            else "medium"
+            if uncertainty < 0.55 and quality.passed
             else "low"
         )
         predicted_hemoglobin = self._display_hemoglobin(predicted_hemoglobin, uncertainty)
@@ -349,7 +343,9 @@ class ScreeningPredictor:
     def _display_hemoglobin(self, predicted_hemoglobin: float | None, uncertainty: float) -> float | None:
         if predicted_hemoglobin is None:
             return None
-        if uncertainty >= 0.70:
+        # Show Hb unless uncertainty is very high (was 0.70, loosened to 0.80
+        # since the new model has higher base uncertainty on sparse feature vectors)
+        if uncertainty >= 0.80:
             return None
         return round(clamp(predicted_hemoglobin, 6.0, 18.0), 2)
 
