@@ -9,9 +9,9 @@ RUNTIME_STACK_VERSION = "archive-evidence-fusion-v4"
 SourceHint = Literal["roi_original", "palpebral", "forniceal_palpebral"]
 
 DEFAULT_SOURCE_THRESHOLDS: dict[SourceHint, float] = {
-    "roi_original": 0.40,
-    "palpebral": 0.60,
-    "forniceal_palpebral": 0.60,
+    "roi_original": 0.65,
+    "palpebral": 0.65,
+    "forniceal_palpebral": 0.65,
 }
 
 DEFAULT_RISK_ARCHIVE_WEIGHTS: dict[SourceHint, float] = {

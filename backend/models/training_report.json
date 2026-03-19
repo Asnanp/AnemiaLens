@@ -1,43 +1,55 @@
 {
   "dataset_name": "dataset anemia",
-  "record_count": 432,
+  "record_count": 433,
   "subject_count": 217,
-  "primary_model": "efficientnet-b0-ft-v2",
-  "selected_mode": "efficientnet_hybrid_dual",
-  "source_counts": {
-    "roi_original": 217,
-    "palpebral": 215
-  },
+  "primary_model": "archive-fusion-v3",
+  "selected_mode": "hybrid_dual",
   "metrics": {
-    "accuracy": 0.3372,
-    "precision": 0.3214,
-    "recall": 1.0,
-    "f1": 0.4865,
-    "auc": 0.5562,
-    "mae_hb": 1.6673,
-    "validation_size": 86,
-    "split_strategy": "group-shuffle-balance-select",
-    "sample_count": 432,
-    "subject_count": 217,
-    "decision_threshold": 0.53
+    "accuracy": 0.7,
+    "precision": 0.5196,
+    "recall": 0.934,
+    "f1": 0.6663,
+    "auc": 0.8279,
+    "mae_hb": 1.5195,
+    "threshold": 0.258
   },
-  "training": {
-    "epochs_requested": 1,
-    "history": [
-      {
-        "epoch": 1.0,
-        "train_loss": 0.367,
-        "val_f1": 0.4864864864864865,
-        "val_auc": 0.5561833019460137,
-        "val_hb_mae": 1.6672612678172976
-      }
-    ],
-    "batch_size": 16,
-    "patience": 12,
-    "device": "cpu",
-    "hb_target_mean": 12.8383,
-    "hb_target_std": 2.426,
-    "class_positive_weight": 2.2642,
-    "sampler": "weighted-random-balanced"
-  }
+  "calibration": {
+    "blend_threshold": 0.258,
+    "risk_scale": 0.22,
+    "classifier_weight": 0.55
+  },
+  "top_features": [
+    {
+      "name": "green_blue_ratio",
+      "importance": 0.1051
+    },
+    {
+      "name": "cpi",
+      "importance": 0.088
+    },
+    {
+      "name": "red_green_gap",
+      "importance": 0.0593
+    },
+    {
+      "name": "center_cpi",
+      "importance": 0.0515
+    },
+    {
+      "name": "center_red_green_gap",
+      "importance": 0.0406
+    },
+    {
+      "name": "redness_uniformity",
+      "importance": 0.0368
+    },
+    {
+      "name": "std_r",
+      "importance": 0.0329
+    },
+    {
+      "name": "hist_bright",
+      "importance": 0.0295
+    }
+  ]
 }

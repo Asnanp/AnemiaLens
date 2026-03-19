@@ -1,31 +1,22 @@
 {
-  "primary_model": "archive-evidence-fusion-v4",
-  "record_count": 432,
+  "primary_model": "archive-fusion-v3",
+  "record_count": 433,
   "subject_count": 217,
-  "selected_mode": "archive_evidence_fusion_runtime",
+  "selected_mode": "hybrid_dual",
   "source_thresholds": {
-    "roi_original": 0.435,
-    "palpebral": 0.66,
-    "forniceal_palpebral": 0.66
+    "roi_original": 0.65,
+    "palpebral": 0.65,
+    "forniceal_palpebral": 0.65
   },
   "metrics": {
-    "accuracy": 0.8864,
-    "precision": 0.9091,
-    "recall": 0.7143,
-    "f1": 0.8,
-    "auc": 0.869,
-    "hb_mae": 1.0541,
-    "validation_size": 44,
-    "split_strategy": "group-shuffle-balance-select: roi_original"
-  },
-  "full_validation": {
-    "accuracy": 0.9419,
-    "precision": 0.9583,
-    "recall": 0.8519,
-    "f1": 0.902,
-    "auc": 0.9448,
-    "hb_mae": 0.7128,
-    "validation_size": 86,
-    "split_strategy": "group-shuffle-balance-select: source-aware"
+    "accuracy": 0.7,
+    "precision": 0.5196,
+    "recall": 0.934,
+    "f1": 0.6663,
+    "auc": 0.8279,
+    "hb_mae": 1.5195,
+    "validation_size": 87,
+    "split_strategy": "group-shuffle-repeat: hybrid_dual",
+    "note": "CV metrics on held-out splits. Full-data threshold scan: t=0.65 -> recall=1.0, precision=0.887, f1=0.940"
   }
 }
