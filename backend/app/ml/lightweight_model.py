@@ -162,10 +162,11 @@ def predict_lightweight(
 # Feature-Only Heuristic Fallback (no torch required)
 # ---------------------------------------------------------------------------
 
-def predict_heuristic(feature_map: dict[str, float]) -> dict[str, float]:
+def predict_heuristic(feature_map: dict[str, float], symptom_score: float = 0.0) -> dict[str, float]:
     """
     Pure feature-based heuristic when no model is available at all.
     Uses CPI (Conjunctival Pallor Index) and red-green gap as primary signals.
+    Incorporates symptom_score to adjust Hb estimate when symptoms are present.
     This is a last-resort fallback — uncertainty is always high.
     """
     cpi = feature_map.get("cpi", feature_map.get("mean_r", 0.4))
@@ -185,14 +186,21 @@ def predict_heuristic(feature_map: dict[str, float]) -> dict[str, float]:
 
     raw_risk = float(np.clip((pallor_signal * 0.6 + rg_signal * 0.4) * quality_factor, 0.0, 1.0))
 
-    # Heuristic Hb estimate: linear mapping from CPI
+    # Symptom-adjusted risk: symptoms can push risk up even if image is ambiguous
+    # symptom_score of 1.0 (all symptoms) adds up to 0.35 to raw_risk
+    combined_risk = float(np.clip(raw_risk * 0.65 + symptom_score * 0.35, 0.0, 1.0))
+
+    # Heuristic Hb estimate: linear mapping from CPI + symptom adjustment
     # CPI 0.45 → ~14 g/dL, CPI 0.30 → ~9 g/dL
-    estimated_hb = float(np.clip(9.0 + (center_cpi - 0.30) / 0.15 * 5.0, 6.0, 18.0))
+    # Symptoms lower the Hb estimate: all symptoms → up to -2.5 g/dL adjustment
+    image_hb = float(np.clip(9.0 + (center_cpi - 0.30) / 0.15 * 5.0, 6.0, 18.0))
+    symptom_hb_penalty = symptom_score * 2.5  # max -2.5 g/dL when all symptoms present
+    estimated_hb = float(np.clip(image_hb - symptom_hb_penalty, 6.0, 18.0))
 
     return {
-        "anemia_risk": raw_risk,
+        "anemia_risk": combined_risk,
         "predicted_hemoglobin": estimated_hb,
-        "uncertainty": 0.65,  # always high for heuristic
+        "uncertainty": 0.55,  # slightly lower than before — symptoms add signal
         "decision_threshold": 0.5,
         "model_source": "heuristic-cpi-v1",
     }
@@ -213,13 +221,13 @@ class LightweightScreeningModel:
     def is_ready(self) -> bool:
         return self._bundle is not None
 
-    def predict(self, image: Image.Image, feature_map: dict[str, float]) -> dict[str, float]:
+    def predict(self, image: Image.Image, feature_map: dict[str, float], symptom_score: float = 0.0) -> dict[str, float]:
         if self._bundle is not None:
             try:
                 return predict_lightweight(image, self._bundle)
             except Exception:
                 pass
-        return predict_heuristic(feature_map)
+        return predict_heuristic(feature_map, symptom_score=symptom_score)
 
     def version(self) -> str:
         if self._bundle is not None:

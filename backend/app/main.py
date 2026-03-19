@@ -261,12 +261,12 @@ def _too_large_response(request_id: str, max_mb: float) -> JSONResponse:
     )
 
 
-def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality):
+def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality, symptom_score: float = 0.0):
     if quality.passed or not services.quality_service.allows_raw_frame_rescue(quality):
         return quality, None, False
 
     raw_image = load_image_bytes(image_bytes).convert("RGB")
-    raw_prediction = services.predictor.predict(raw_image, quality)
+    raw_prediction = services.predictor.predict(raw_image, quality, symptom_score=symptom_score)
     if not services.predictor.should_accept_raw_frame_rescue(raw_prediction):
         return quality, None, False
 
@@ -491,10 +491,12 @@ async def analyze(
         return _image_error_response(rid)
 
     # --- Inference (skipped on quality failure) -----------------------------
-    prediction = svc.predictor.predict(rgb, quality) if quality.passed else None
+    # Compute symptom_score early so it can influence ML prediction
+    symptom_score = svc.triage_service._symptom_score(symptom_input)
+    prediction = svc.predictor.predict(rgb, quality, symptom_score=symptom_score) if quality.passed else None
     used_raw_frame_rescue = False
     if prediction is None:
-        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(svc, image_bytes, quality)
+        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(svc, image_bytes, quality, symptom_score=symptom_score)
 
     # --- Triage + guidance -------------------------------------------------
     signal_breakdown = svc.triage_service.build_signal_breakdown(quality, prediction, symptom_input)

@@ -107,6 +107,13 @@ class SymptomInput(BaseModel):
         default=False,
         description="Diet consistently low in iron-rich foods.",
     )
+    symptom_severity: dict[str, int] | None = Field(
+        default=None,
+        description=(
+            "Optional per-symptom severity levels: 0=none, 1=mild, 2=severe. "
+            "Keys match symptom field names. Used to weight the symptom score."
+        ),
+    )
 
     # --- Validators --------------------------------------------------------
 
