@@ -26,12 +26,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password (truncated to 72 bytes for bcrypt compatibility)."""
-    return pwd_context.hash(password[:72])
+    truncated = password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    return pwd_context.hash(truncated)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a plaintext password against its hash (truncated to 72 bytes)."""
-    return pwd_context.verify(plain[:72], hashed)
+    truncated = plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    return pwd_context.verify(truncated, hashed)
 
 
 # ---------------------------------------------------------------------------
