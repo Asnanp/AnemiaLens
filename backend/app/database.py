@@ -24,13 +24,11 @@ if "sqlite" in DATABASE_URL:
     connect_args["check_same_thread"] = False
 elif "postgres" in DATABASE_URL:
     connect_args["ssl"] = "require"
-    connect_args["statement_timeout"] = "8000"  # 8s query timeout
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_timeout=10,
     connect_args=connect_args,
 )
 
