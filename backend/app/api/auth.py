@@ -113,11 +113,10 @@ async def register(
     except HTTPException:
         raise
     except Exception as exc:
-        log.exception("Registration failed for %s", body.email)
-        # Avoid misleading "Database connection error" if it's a code/logic error
+        log.exception("Registration failed for %s: %s", body.email, str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during account creation. Please try again later.",
+            detail=f"Registration error: {type(exc).__name__}: {str(exc)[:200]}",
         )
 
 
