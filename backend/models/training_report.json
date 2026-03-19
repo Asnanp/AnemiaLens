@@ -2,54 +2,20 @@
   "dataset_name": "dataset anemia",
   "record_count": 433,
   "subject_count": 217,
-  "primary_model": "archive-fusion-v3",
+  "primary_model": "stacked-ensemble-v4",
   "selected_mode": "hybrid_dual",
   "metrics": {
-    "accuracy": 0.7,
-    "precision": 0.5196,
-    "recall": 0.934,
-    "f1": 0.6663,
-    "auc": 0.8279,
-    "mae_hb": 1.5195,
-    "threshold": 0.258
+    "accuracy": 0.7065,
+    "precision": 0.4996,
+    "recall": 0.8611,
+    "f1": 0.6274,
+    "auc": 0.8178,
+    "mae_hb": 1.4958,
+    "threshold": 0.216
   },
   "calibration": {
-    "blend_threshold": 0.258,
+    "blend_threshold": 0.24,
     "risk_scale": 0.22,
     "classifier_weight": 0.55
-  },
-  "top_features": [
-    {
-      "name": "green_blue_ratio",
-      "importance": 0.1051
-    },
-    {
-      "name": "cpi",
-      "importance": 0.088
-    },
-    {
-      "name": "red_green_gap",
-      "importance": 0.0593
-    },
-    {
-      "name": "center_cpi",
-      "importance": 0.0515
-    },
-    {
-      "name": "center_red_green_gap",
-      "importance": 0.0406
-    },
-    {
-      "name": "redness_uniformity",
-      "importance": 0.0368
-    },
-    {
-      "name": "std_r",
-      "importance": 0.0329
-    },
-    {
-      "name": "hist_bright",
-      "importance": 0.0295
-    }
-  ]
+  }
 }
