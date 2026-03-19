@@ -110,11 +110,14 @@ async def register(
             refresh_token=refresh_token,
             expires_in=3600,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        log.error("Registration crash for %s: %s", body.email, exc, exc_info=True)
+        log.exception("Registration failed for %s", body.email)
+        # Avoid misleading "Database connection error" if it's a code/logic error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database connection error: {str(exc)}",
+            detail="An error occurred during account creation. Please try again later.",
         )
 
 
