@@ -60,14 +60,14 @@ class ConjunctivaDataset(Dataset):
         self.records = records
         self.transform = transform
         self.roi_extractor = ConjunctivaRoiExtractor()
-        self._items = [self._prepare_item(record) for record in records]
 
     def __len__(self) -> int:
-        return len(self._items)
+        return len(self.records)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        image, label, hb = self._items[index]
-        tensor = self.transform(image.copy())
+        record = self.records[index]
+        image, label, hb = self._prepare_item(record)
+        tensor = self.transform(image)
         return tensor, torch.tensor([label], dtype=torch.float32), torch.tensor([hb], dtype=torch.float32)
 
     def _prepare_item(self, record: ImageRecord) -> tuple[Image.Image, float, float]:

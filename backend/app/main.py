@@ -427,13 +427,13 @@ async def analyze(
     rid = request.state.request_id
     svc = request.app.state
 
+    from app.database import async_session_factory
+
     # --- Optional auth (get user if token present) -------------------------
     user_id: int | None = None
+    user_tier: str = "free"
+    user_scan_count: int = 0
     try:
-        from app.dependencies import get_optional_user, _bearer_scheme
-        from app.database import async_session_factory
-        from fastapi.security import HTTPAuthorizationCredentials
-
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
@@ -449,8 +449,22 @@ async def analyze(
                     user = result.scalar_one_or_none()
                     if user and user.is_active:
                         user_id = user.id
+                        user_tier = user.subscription_tier or "free"
+                        user_scan_count = user.scan_count or 0
     except Exception:
         pass  # Anonymous is fine
+
+    # --- Scan limit enforcement (free = 10 scans) --------------------------
+    FREE_SCAN_LIMIT = 10
+    if user_id is not None and user_tier == "free" and user_scan_count >= FREE_SCAN_LIMIT:
+        return JSONResponse(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            content={
+                "error": f"Free plan limit reached ({FREE_SCAN_LIMIT} scans). Upgrade to Pro for unlimited screenings.",
+                "upgrade_required": True,
+                "request_id": rid,
+            },
+        )
 
     # --- Input validation --------------------------------------------------
     try:

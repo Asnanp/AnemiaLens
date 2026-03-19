@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.config import SCREENING_DISCLAIMER
+from app.ml.learned_fusion import LearnedFusionModel
 from app.schemas import PredictionResult, QualityAssessment, SignalBreakdown, SymptomInput, TriageResult
+
+_FUSION_MODEL_PATH = Path(__file__).parent.parent / "artifacts" / "fusion_model.pkl"
 
 
 class TriageService:
@@ -16,6 +21,21 @@ class TriageService:
         "heavy_menstrual_bleeding": 0.20,
         "poor_diet_low_iron": 0.12,
     }
+
+    def __init__(self) -> None:
+        self._fusion_model: LearnedFusionModel = self._load_fusion_model()
+
+    def _load_fusion_model(self) -> LearnedFusionModel:
+        try:
+            if _FUSION_MODEL_PATH.exists():
+                return LearnedFusionModel.load(_FUSION_MODEL_PATH)
+        except Exception:
+            pass
+        return LearnedFusionModel()  # untrained → uses static 55/45 weights
+
+    @property
+    def fusion_model_active(self) -> bool:
+        return self._fusion_model.trained
 
     def assess(
         self,
@@ -93,15 +113,50 @@ class TriageService:
                 reliability_flag=None,
             )
 
+        # Use learned fusion if trained, else fall back to static weights
+        symptom_count = sum(
+            1 for field in self._WEIGHTS if getattr(symptoms, field, False)
+        )
+        has_severe = bool(
+            getattr(symptoms, "pale_skin", False)
+            or getattr(symptoms, "shortness_of_breath", False)
+        )
+
+        fused_score = self._fusion_model.predict(
+            image_risk=prediction.anemia_risk,
+            uncertainty=prediction.uncertainty,
+            symptom_score=symptom_score,
+            symptom_count=symptom_count,
+            has_severe_symptoms=has_severe,
+        )
+
+        # Effective weights for display (approximate from fusion output)
+        if self._fusion_model.trained:
+            # Derive display weights from perturbation
+            base = fused_score
+            img_perturbed = self._fusion_model.predict(
+                min(1.0, prediction.anemia_risk + 0.1),
+                prediction.uncertainty, symptom_score, symptom_count, has_severe,
+            )
+            sym_perturbed = self._fusion_model.predict(
+                prediction.anemia_risk, prediction.uncertainty,
+                min(1.0, symptom_score + 0.1), symptom_count, has_severe,
+            )
+            img_sens = abs(img_perturbed - base)
+            sym_sens = abs(sym_perturbed - base)
+            total_sens = img_sens + sym_sens + 1e-9
+            display_img_w = round(img_sens / total_sens, 2)
+            display_sym_w = round(sym_sens / total_sens, 2)
+        else:
+            display_img_w = self.IMAGE_WEIGHT
+            display_sym_w = self.SYMPTOM_WEIGHT
+
         return SignalBreakdown(
             image_risk=prediction.anemia_risk,
             symptom_score=symptom_score,
-            fused_score=min(
-                1.0,
-                prediction.anemia_risk * self.IMAGE_WEIGHT + symptom_score * self.SYMPTOM_WEIGHT,
-            ),
-            image_weight=self.IMAGE_WEIGHT,
-            symptom_weight=self.SYMPTOM_WEIGHT,
+            fused_score=min(1.0, fused_score),
+            image_weight=display_img_w,
+            symptom_weight=display_sym_w,
             symptom_burden=symptoms.symptom_burden,
             confidence=prediction.confidence,
             uncertainty=prediction.uncertainty,

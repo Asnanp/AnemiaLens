@@ -6,6 +6,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { setTokenAccessor } from '../api';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 function endpoint(path: string): string {
@@ -226,6 +227,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getAccessToken = useCallback(() => {
     return loadTokens()?.access_token ?? null;
   }, []);
+
+  // Wire token accessor so api.ts can attach auth headers automatically
+  useEffect(() => {
+    setTokenAccessor(getAccessToken);
+  }, [getAccessToken]);
 
   return (
     <AuthContext.Provider value={{

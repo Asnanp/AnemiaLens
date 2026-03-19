@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Info, Share2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse } from '../../types';
 
@@ -47,6 +47,92 @@ function RiskArc({ value, color }: { value: number; color: string }) {
     </div>
   );
 }
+
+// ── Signal Breakdown / Explainability Panel ──────────────────────────────────
+function SignalBar({ label, value, color, delay = 0 }: { label: string; value: number; color: string; delay?: number }) {
+  const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.4rem' }}>
+        <span style={{ fontSize:'0.7rem', color:'var(--text-muted)', fontFamily:'var(--mono)' }}>{label}</span>
+        <span style={{ fontSize:'0.72rem', fontWeight:700, fontFamily:'var(--mono)', color }}>{pct}%</span>
+      </div>
+      <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
+        <motion.div initial={{ width:0 }} animate={{ width:`${pct}%` }}
+          transition={{ duration:1.2, delay, ease:E }}
+          style={{ height:'100%', borderRadius:99, background:`linear-gradient(90deg, var(--crimson), ${color})`, boxShadow:`0 0 8px ${color}60` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ExplainabilityPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
+  const sb = analysis.clinical_brief?.signal_breakdown;
+  if (!sb) return null;
+
+  const imageContrib = sb.image_risk !== null ? (sb.image_risk ?? 0) * sb.image_weight : null;
+  const symptomContrib = sb.symptom_score * sb.symptom_weight;
+  const fused = sb.fused_score;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'0.875rem' }}>
+      <div style={{ fontSize:'0.55rem', fontFamily:'var(--mono)', letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(0,194,255,0.6)', marginBottom:'0.25rem' }}>
+        Signal Contributions
+      </div>
+      {imageContrib !== null && (
+        <SignalBar label="Image Signal (conjunctival pallor)" value={imageContrib} color={bandColor} delay={0.2} />
+      )}
+      <SignalBar label="Symptom Signal (self-reported)" value={symptomContrib} color="#F59E0B" delay={0.35} />
+      <SignalBar label="Fused Score (combined)" value={fused} color={bandColor} delay={0.5} />
+      <div style={{ display:'flex', gap:'1rem', marginTop:'0.25rem', flexWrap:'wrap' }}>
+        <div style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
+          Image weight: <span style={{ color:'var(--text-muted)' }}>{Math.round(sb.image_weight * 100)}%</span>
+        </div>
+        <div style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
+          Symptom weight: <span style={{ color:'var(--text-muted)' }}>{Math.round(sb.symptom_weight * 100)}%</span>
+        </div>
+        <div style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
+          Symptom burden: <span style={{ color:'var(--text-muted)', textTransform:'capitalize' }}>{sb.symptom_burden}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Clinical Mode Panel ───────────────────────────────────────────────────────
+function ClinicalModePanel({ analysis }: { analysis: AnalyzeResponse }) {
+  const audit = analysis.decision_audit;
+  const meta = analysis.analysis_meta;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
+      <div style={{ fontSize:'0.55rem', fontFamily:'var(--mono)', letterSpacing:'0.15em', textTransform:'uppercase', color:'rgba(0,229,150,0.7)', marginBottom:'0.25rem' }}>
+        Clinical Audit Data
+      </div>
+      {[
+        { label:'Calibration Band', val: audit.calibration_band?.replace(/_/g,' ') ?? 'N/A' },
+        { label:'Threshold Margin', val: audit.threshold_margin !== null ? `${(audit.threshold_margin * 100).toFixed(1)}%` : 'N/A' },
+        { label:'Processing Path', val: meta.processing_path?.replace(/_/g,' ') ?? 'N/A' },
+        { label:'Safety Layers', val: meta.safety_layers?.join(', ') || 'None' },
+      ].map(row => (
+        <div key={row.label} style={{ display:'flex', justifyContent:'space-between', gap:'1rem',
+          padding:'0.5rem 0.75rem', borderRadius:'0.5rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize:'0.65rem', fontFamily:'var(--mono)', color:'var(--text-dim)' }}>{row.label}</span>
+          <span style={{ fontSize:'0.65rem', fontFamily:'var(--mono)', color:'var(--text-muted)', textAlign:'right', textTransform:'capitalize' }}>{row.val}</span>
+        </div>
+      ))}
+      {audit.review_flags && audit.review_flags.length > 0 && (
+        <div style={{ padding:'0.625rem 0.75rem', borderRadius:'0.5rem', background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+          <div style={{ fontSize:'0.55rem', fontFamily:'var(--mono)', color:'rgba(245,158,11,0.8)', marginBottom:'0.35rem', textTransform:'uppercase', letterSpacing:'0.1em' }}>Review Flags</div>
+          {audit.review_flags.map((f, i) => (
+            <div key={i} style={{ fontSize:'0.65rem', color:'var(--text-muted)', lineHeight:1.6 }}>• {f}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ResultViewProps {
   analysis: AnalyzeResponse;
   onReset: () => void;
@@ -62,76 +148,122 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const bandGlow   = isHigh ? 'rgba(239,68,68,0.2)'  : isModerate ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)';
 
   const hbRaw  = analysis.prediction?.predicted_hemoglobin ?? 0;
-  // Use anemia_risk (model output) so the arc matches what Mistral references
   const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const conf   = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
 
-  // ── Dramatic reveal state ──
   const [flashDone, setFlashDone] = useState(false);
   const [revealed,  setRevealed]  = useState(false);
+  const [clinicalMode, setClinicalMode] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
   useEffect(() => {
-    // Flash lasts 600ms, then content reveals
     const t1 = setTimeout(() => setFlashDone(true), 600);
     const t2 = setTimeout(() => setRevealed(true),  700);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // Share with clipboard fallback
+  const handleShare = async () => {
+    const text = analysis.handoff_summary.share_text;
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch { /* fall through */ }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareToast('Copied to clipboard');
+    } catch {
+      setShareToast('Share text ready — copy manually');
+    }
+    setTimeout(() => setShareToast(null), 3000);
+  };
+
   return (
     <div style={{ position:'relative' }}>
+
+      {/* ── EMERGENCY ALERT — high_concern ── */}
+      <AnimatePresence>
+        {isHigh && revealed && (
+          <motion.div
+            initial={{ opacity:0, y:-12 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-12 }}
+            transition={{ duration:0.4, ease:E }}
+            style={{
+              marginBottom:'1.25rem', padding:'1rem 1.5rem',
+              borderRadius:'1rem', background:'rgba(239,68,68,0.12)',
+              border:'1px solid rgba(239,68,68,0.4)',
+              display:'flex', alignItems:'center', gap:'0.875rem',
+              boxShadow:'0 0 40px rgba(239,68,68,0.15)',
+            }}
+          >
+            <motion.div
+              animate={{ opacity:[1,0.4,1] }} transition={{ duration:1.5, repeat:Infinity }}
+              style={{ width:10, height:10, borderRadius:'50%', background:'#EF4444', flexShrink:0, boxShadow:'0 0 12px #EF4444' }}
+            />
+            <div>
+              <div style={{ fontFamily:'var(--mono)', fontSize:'0.6rem', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase', color:'#EF4444', marginBottom:'0.2rem' }}>
+                Urgent — Seek Medical Attention
+              </div>
+              <p style={{ fontSize:'0.78rem', color:'#FCA5A5', lineHeight:1.5 }}>
+                This result indicates high concern. Please visit a clinic or hospital within 24–48 hours and request a full blood count (CBC) test.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SHARE TOAST ── */}
+      <AnimatePresence>
+        {shareToast && (
+          <motion.div
+            initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:20 }}
+            style={{
+              position:'fixed', bottom:'2rem', left:'50%', transform:'translateX(-50%)',
+              zIndex:9999, padding:'0.75rem 1.5rem', borderRadius:'0.875rem',
+              background:'rgba(10,10,20,0.95)', border:'1px solid rgba(255,255,255,0.12)',
+              fontFamily:'var(--mono)', fontSize:'0.72rem', color:'var(--text)',
+              boxShadow:'0 8px 40px rgba(0,0,0,0.5)', whiteSpace:'nowrap',
+            }}
+          >
+            ✓ {shareToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── DRAMATIC FLASH OVERLAY ── */}
       <AnimatePresence>
         {!flashDone && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.55, 0] }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: [0, 0.55, 0] }} exit={{ opacity: 0 }}
             transition={{ duration: 0.6, times: [0, 0.3, 1], ease: 'easeOut' }}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 9000,
-              background: bandColor,
-              pointerEvents: 'none',
-            }}
+            style={{ position:'fixed', inset:0, zIndex:9000, background:bandColor, pointerEvents:'none' }}
           />
         )}
       </AnimatePresence>
 
-      {/* ── RESULT LABEL CINEMATIC ENTRANCE ── */}
       <AnimatePresence>
         {!flashDone && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: [0, 1, 1, 0], scale: [0.7, 1.05, 1, 0.9] }}
-            transition={{ duration: 0.6, times: [0, 0.25, 0.6, 1] }}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 9001,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none',
-            }}
+            initial={{ opacity:0, scale:0.7 }}
+            animate={{ opacity:[0,1,1,0], scale:[0.7,1.05,1,0.9] }}
+            transition={{ duration:0.6, times:[0,0.25,0.6,1] }}
+            style={{ position:'fixed', inset:0, zIndex:9001, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}
           >
-            <div style={{
-              fontFamily: 'var(--serif)', fontSize: 'clamp(3rem, 10vw, 7rem)',
-              fontWeight: 700, color: '#fff',
-              textShadow: `0 0 60px ${bandColor}, 0 0 120px ${bandColor}80`,
-              letterSpacing: '-0.04em',
-            }}>
+            <div style={{ fontFamily:'var(--serif)', fontSize:'clamp(3rem,10vw,7rem)', fontWeight:700, color:'#fff',
+              textShadow:`0 0 60px ${bandColor}, 0 0 120px ${bandColor}80`, letterSpacing:'-0.04em' }}>
               {analysis.triage.label}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── MAIN CONTENT — staggered reveal ── */}
+      {/* ── MAIN CONTENT ── */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: revealed ? 1 : 0 }}
-        transition={{ duration: 0.4 }}
+        initial={{ opacity:0 }} animate={{ opacity: revealed ? 1 : 0 }}
+        transition={{ duration:0.4 }}
         style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}
       >
 
-      {/* ── HERO CARD — full-width Hb display ── */}
+      {/* ── HERO CARD ── */}
       <motion.div className="glass result-hero-card"
         initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }}
         transition={{ duration:0.6, ease:E }}
@@ -139,13 +271,12 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           boxShadow:`inset 0 1px 0 rgba(255,255,255,0.12), -8px 0 80px ${bandGlow}, 0 60px 120px rgba(0,0,0,0.6)`,
           position:'relative', overflow:'hidden' }}
       >
-        {/* Ambient glow */}
         <motion.div animate={{ scale:[1,1.2,1], opacity:[0.12,0.2,0.12] }}
           transition={{ duration:6, repeat:Infinity, ease:'easeInOut' }}
           style={{ position:'absolute', top:-120, right:-120, width:500, height:500, borderRadius:'50%', background:bandColor, filter:'blur(160px)', pointerEvents:'none' }}
         />
         <div style={{ position:'relative', zIndex:1 }}>
-          {/* Top row: badge + label */}
+          {/* Top row: badge + label + clinical mode toggle */}
           <div style={{ display:'flex', alignItems:'center', gap:'1rem', marginBottom:'2rem', flexWrap:'wrap' }}>
             <span style={{ padding:'0.35rem 1rem', borderRadius:'99px', fontSize:'0.55rem',
               fontFamily:'var(--mono)', fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase',
@@ -159,15 +290,30 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 Mistral AI
               </span>
             )}
+            {/* Clinical Mode Toggle */}
+            <button
+              onClick={() => setClinicalMode(v => !v)}
+              style={{
+                marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem',
+                padding:'0.35rem 0.875rem', borderRadius:'99px', fontSize:'0.55rem',
+                fontFamily:'var(--mono)', fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase',
+                background: clinicalMode ? 'rgba(0,229,150,0.12)' : 'rgba(255,255,255,0.04)',
+                border: clinicalMode ? '1px solid rgba(0,229,150,0.35)' : '1px solid rgba(255,255,255,0.1)',
+                color: clinicalMode ? 'rgba(0,229,150,0.9)' : 'var(--text-dim)',
+                cursor:'pointer', transition:'all 0.2s',
+              }}
+            >
+              <Stethoscope size={11} />
+              {clinicalMode ? 'Clinical Mode ON' : 'Clinical Mode'}
+              {clinicalMode ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            </button>
           </div>
 
           {/* Main metrics row */}
           <div className="result-metrics-row" style={{ display:'flex', alignItems:'center', gap:'3rem', flexWrap:'wrap', marginBottom:'2rem' }}>
-            {/* Giant Hb number */}
             <div>
               <div style={{ fontFamily:'var(--serif)', fontSize:'clamp(3.5rem,10vw,8rem)', fontWeight:300,
-                lineHeight:1, letterSpacing:'-0.04em', color:bandColor,
-                textShadow:`0 0 80px ${bandColor}40` }}>
+                lineHeight:1, letterSpacing:'-0.04em', color:bandColor, textShadow:`0 0 80px ${bandColor}40` }}>
                 {hbAnim.toFixed(1)}
               </div>
               <div style={{ fontFamily:'var(--mono)', fontSize:'0.65rem', color:'var(--text-dim)',
@@ -175,17 +321,9 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 g/dL Hemoglobin
               </div>
             </div>
-
-            {/* Divider — hidden on mobile */}
             <div className="result-divider" style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
-
-            {/* Risk arc */}
             <RiskArc value={risk} color={bandColor} />
-
-            {/* Divider — hidden on mobile */}
             <div className="result-divider" style={{ width:1, height:100, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
-
-            {/* Confidence + Reliability */}
             <div style={{ display:'flex', flexDirection:'row', gap:'2rem', flexWrap:'wrap' }}>
               {[
                 { label:'Triage Score', val:`${Math.round((analysis.triage.score ?? 0) * 100)}%` },
@@ -199,8 +337,6 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 </div>
               ))}
             </div>
-
-            {/* Triage label — hidden on mobile (already shown in badge above) */}
             <div className="result-triage-label" style={{ marginLeft:'auto' }}>
               <h2 style={{ fontFamily:'var(--serif)', fontSize:'clamp(1.8rem,3vw,2.8rem)', fontWeight:700,
                 lineHeight:1.05, letterSpacing:'-0.03em', color:'var(--text)', maxWidth:280 }}>
@@ -209,7 +345,6 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             </div>
           </div>
 
-          {/* Summary */}
           <p style={{ fontSize:'0.92rem', color:'var(--text-muted)', lineHeight:1.75, maxWidth:700, marginBottom:'1.75rem' }}>
             {analysis.triage.summary}
           </p>
@@ -223,7 +358,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         </div>
       </motion.div>
 
-      {/* ── MISTRAL AI GUIDANCE — full-width ── */}
+      {/* ── MISTRAL AI GUIDANCE ── */}
       {analysis.guidance.source === 'mistral' && (
         <motion.div
           initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
@@ -231,8 +366,6 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           style={{ borderRadius:'1.25rem', overflow:'hidden',
             border:'1px solid rgba(0,194,255,0.25)',
             boxShadow:'0 0 80px rgba(0,194,255,0.08), 0 2px 40px rgba(0,0,0,0.4)' }}>
-
-          {/* Top bar */}
           <div style={{ padding:'0.875rem 1.5rem', display:'flex', alignItems:'center', gap:'0.75rem',
             background:'rgba(0,194,255,0.1)', borderBottom:'1px solid rgba(0,194,255,0.15)' }}>
             <div style={{ width:8, height:8, borderRadius:'50%', background:'rgba(0,194,255,1)',
@@ -246,67 +379,39 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               AI-GENERATED CLINICAL GUIDANCE
             </span>
           </div>
-
-          {/* Body */}
           <div style={{ padding:'clamp(1rem, 4vw, 2rem) clamp(1rem, 4vw, 2.5rem)', background:'rgba(0,10,30,0.6)' }}>
-
-            {/* Main explanation — big and clear */}
             <div style={{ marginBottom:'1.75rem', padding:'1.25rem 1.5rem', borderRadius:'0.875rem',
               background:'rgba(0,194,255,0.05)', border:'1px solid rgba(0,194,255,0.12)',
               borderLeft:'3px solid rgba(0,194,255,0.6)' }}>
               <div style={{ fontFamily:'var(--mono)', fontSize:'0.48rem', letterSpacing:'0.15em',
-                textTransform:'uppercase', color:'rgba(0,194,255,0.5)', marginBottom:'0.6rem' }}>
-                Assessment
-              </div>
-              <p style={{ fontSize:'1rem', color:'var(--text)', lineHeight:1.8, fontWeight:400 }}>
-                {analysis.guidance.explanation}
-              </p>
+                textTransform:'uppercase', color:'rgba(0,194,255,0.5)', marginBottom:'0.6rem' }}>Assessment</div>
+              <p style={{ fontSize:'1rem', color:'var(--text)', lineHeight:1.8 }}>{analysis.guidance.explanation}</p>
             </div>
-
             <div className="guidance-2col" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginBottom:'1.5rem' }}>
-              {/* Urgency */}
               <div style={{ padding:'1rem 1.25rem', borderRadius:'0.875rem',
-                background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)',
-                borderLeft:'3px solid rgba(239,68,68,0.6)' }}>
+                background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)', borderLeft:'3px solid rgba(239,68,68,0.6)' }}>
                 <div style={{ fontFamily:'var(--mono)', fontSize:'0.48rem', letterSpacing:'0.15em',
-                  textTransform:'uppercase', color:'rgba(239,68,68,0.8)', marginBottom:'0.5rem' }}>
-                  ⚠ Urgency
-                </div>
-                <p style={{ fontSize:'0.85rem', color:'var(--text)', lineHeight:1.65 }}>
-                  {analysis.guidance.urgency_guidance}
-                </p>
+                  textTransform:'uppercase', color:'rgba(239,68,68,0.8)', marginBottom:'0.5rem' }}>⚠ Urgency</div>
+                <p style={{ fontSize:'0.85rem', color:'var(--text)', lineHeight:1.65 }}>{analysis.guidance.urgency_guidance}</p>
               </div>
-
-              {/* Food advice */}
               <div style={{ padding:'1rem 1.25rem', borderRadius:'0.875rem',
-                background:'rgba(0,229,150,0.06)', border:'1px solid rgba(0,229,150,0.2)',
-                borderLeft:'3px solid rgba(0,229,150,0.6)' }}>
+                background:'rgba(0,229,150,0.06)', border:'1px solid rgba(0,229,150,0.2)', borderLeft:'3px solid rgba(0,229,150,0.6)' }}>
                 <div style={{ fontFamily:'var(--mono)', fontSize:'0.48rem', letterSpacing:'0.15em',
-                  textTransform:'uppercase', color:'rgba(0,229,150,0.8)', marginBottom:'0.5rem' }}>
-                  ✦ Dietary Advice
-                </div>
-                <p style={{ fontSize:'0.85rem', color:'var(--text)', lineHeight:1.65 }}>
-                  {analysis.guidance.food_advice || 'Maintain a balanced, iron-rich diet.'}
-                </p>
+                  textTransform:'uppercase', color:'rgba(0,229,150,0.8)', marginBottom:'0.5rem' }}>✦ Dietary Advice</div>
+                <p style={{ fontSize:'0.85rem', color:'var(--text)', lineHeight:1.65 }}>{analysis.guidance.food_advice || 'Maintain a balanced, iron-rich diet.'}</p>
               </div>
             </div>
-
-            {/* Next steps */}
             <div>
               <div style={{ fontFamily:'var(--mono)', fontSize:'0.48rem', letterSpacing:'0.15em',
-                textTransform:'uppercase', color:'rgba(0,194,255,0.6)', marginBottom:'0.75rem' }}>
-                Recommended Next Steps
-              </div>
+                textTransform:'uppercase', color:'rgba(0,194,255,0.6)', marginBottom:'0.75rem' }}>Recommended Next Steps</div>
               <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
                 {analysis.guidance.next_steps.map((step, i) => (
                   <motion.div key={i}
                     initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }}
                     transition={{ delay:0.3 + i*0.08, duration:0.4, ease:E }}
-                    style={{ display:'flex', gap:'1rem', alignItems:'center',
-                      padding:'0.75rem 1rem', borderRadius:'0.625rem',
-                      background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontFamily:'var(--mono)', fontSize:'0.7rem', color:'rgba(0,194,255,0.7)',
-                      fontWeight:700, flexShrink:0, minWidth:24 }}>{i+1}.</span>
+                    style={{ display:'flex', gap:'1rem', alignItems:'center', padding:'0.75rem 1rem',
+                      borderRadius:'0.625rem', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontFamily:'var(--mono)', fontSize:'0.7rem', color:'rgba(0,194,255,0.7)', fontWeight:700, flexShrink:0, minWidth:24 }}>{i+1}.</span>
                     <span style={{ fontSize:'0.85rem', color:'var(--text)', lineHeight:1.5 }}>{step}</span>
                   </motion.div>
                 ))}
@@ -382,31 +487,30 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           )}
         </motion.div>
 
-        {/* Biomarker Analysis */}
+        {/* Explainability / Biomarker Analysis */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
           transition={{ delay:0.22, duration:0.5, ease:E }}
           style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1.25rem' }}>
-          <div className="section-eyebrow">Biomarker Analysis</div>
-          {[
-            { label:'Conjunctival Pallor', val: analysis.prediction?.anemia_risk ?? 0 },
-            { label:'Vascular Density',    val: 1 - (analysis.prediction?.anemia_risk ?? 0) },
-            { label:'Chromatic Stability', val: analysis.prediction?.confidence ?? 0 },
-          ].map((m, i) => (
-            <div key={m.label} className="biomarker-row">
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.5rem' }}>
-                <span style={{ fontSize:'0.72rem', color:'var(--text-muted)', fontFamily:'var(--mono)' }}>{m.label}</span>
-                <span style={{ fontSize:'0.75rem', fontWeight:700, fontFamily:'var(--mono)', color:bandColor }}>{Math.round(m.val*100)}%</span>
-              </div>
-              <div className="progress-track">
-                <motion.div initial={{ width:0 }} animate={{ width:`${m.val*100}%` }}
-                  transition={{ duration:1.4, delay:0.4+i*0.12, ease:E }}
-                  style={{ height:'100%', borderRadius:'99px',
-                    background:`linear-gradient(90deg, var(--crimson), ${bandColor})`,
-                    boxShadow:`0 0 8px ${bandColor}60` }}
-                />
-              </div>
-            </div>
-          ))}
+          <div className="section-eyebrow">Signal Analysis</div>
+
+          {/* Real explainability from signal_breakdown */}
+          <ExplainabilityPanel analysis={analysis} bandColor={bandColor} />
+
+          {/* Clinical Mode expansion */}
+          <AnimatePresence>
+            {clinicalMode && (
+              <motion.div
+                initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }}
+                exit={{ opacity:0, height:0 }} transition={{ duration:0.3 }}
+                style={{ overflow:'hidden' }}
+              >
+                <div style={{ paddingTop:'0.875rem', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                  <ClinicalModePanel analysis={analysis} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ marginTop:'auto', width:'100%', padding:'0.7rem', fontSize:'0.65rem', borderRadius:'0.875rem', cursor:'pointer' }}
             onClick={onDownload}>
@@ -428,7 +532,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           </div>
           <motion.button className="btn btn-primary" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
             style={{ width:'100%', padding:'0.75rem', fontSize:'0.68rem', cursor:'pointer' }}
-            onClick={() => navigator.share?.({ text: analysis.handoff_summary.share_text })}>
+            onClick={handleShare}>
             <Share2 size={13} /> Share with Provider
           </motion.button>
           <div style={{ padding:'1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)',
