@@ -18,7 +18,7 @@ import {
   STEPS_META, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
 import {
-  Hero, Challenge, WorkflowStepper, TechSection, Footer, PricingSection,
+  Hero, Challenge, WorkflowStepper, TechSection, Footer,
 } from './pages/LandingSections';
 import { ArrowRight, ChevronRight, User } from 'lucide-react';
 
@@ -27,7 +27,6 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import { generatePdfReport } from './utils/pdfExport';
 import { SupabaseTest } from './components/SupabaseTest';
 import { ToastContainer } from './components/Toast';
-import { StripeCheckoutModal } from './components/StripeCheckoutModal';
 
 const NAV_LINKS = ['Technology', 'Workflow', 'Screening'] as const;
 
@@ -315,11 +314,6 @@ function ScreeningSection() {
 function AppContent() {
   const { backendUp } = useScreening();
   const { isAuthenticated, user } = useAuth();
-  const [showStripeFromPricing, setShowStripeFromPricing] = useState(false);
-
-  const handlePricingUpgrade = () => {
-    if (isAuthenticated && user) setShowStripeFromPricing(true);
-  };
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -357,22 +351,11 @@ function AppContent() {
         <div className="section-divider" />
         <ScreeningSection />
         <div className="section-divider" />
-        <PricingSection onUpgrade={handlePricingUpgrade} />
-        <div className="section-divider" />
         <TechSection />
       </main>
       <Footer />
       <SupabaseTest />
       <ToastContainer />
-      <AnimatePresence>
-        {showStripeFromPricing && user && (
-          <StripeCheckoutModal
-            userEmail={user.email}
-            onClose={() => setShowStripeFromPricing(false)}
-            onSuccess={() => { setShowStripeFromPricing(false); window.location.reload(); }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
