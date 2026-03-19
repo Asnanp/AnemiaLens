@@ -26,7 +26,7 @@ import {
   STEPS_META, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
 import {
-  Hero, Challenge, WorkflowStepper, TechSection, Footer,
+  Hero, Challenge, WorkflowStepper, TechSection, Footer, PricingSection,
 } from './pages/LandingSections';
 import { ScanEye, ArrowRight, ChevronRight, User } from 'lucide-react';
 
@@ -35,6 +35,9 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import { generatePdfReport } from './utils/pdfExport';
+import { SupabaseTest } from './components/SupabaseTest';
+import { ToastContainer } from './components/Toast';
+import { StripeCheckoutModal } from './components/StripeCheckoutModal';
 
 
 // ── NAVBAR — with auth integration ────────────────────────────────────────────
@@ -286,8 +289,8 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
 function ScreeningSection() {
   const {
     step, setStep, file, previewUrl, symptoms, toggleSymptom,
-    quality, analysis, loading, error, backendUp,
-    pickFile, runQuality, runAnalysis, loadSample, reset, symptomLabels
+    quality, analysis, loading, error, backendUp, isOfflineMode,
+    pickFile, runQuality, runAnalysis, loadSample, reset, symptomOnlyAssess, symptomLabels
   } = useScreening();
 
   const handleDownload = async () => {
@@ -342,6 +345,34 @@ function ScreeningSection() {
             </>
           ))}
         </div>
+
+        {/* Offline mode banner */}
+        <AnimatePresence>
+          {!backendUp && step < 3 && (
+            <motion.div
+              initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
+              style={{ padding:'0.875rem 1.5rem', marginBottom:'1.5rem', borderRadius:'0.875rem',
+                background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)',
+                display:'flex', alignItems:'center', gap:'0.875rem', flexWrap:'wrap' }}
+            >
+              <div style={{ width:8, height:8, borderRadius:'50%', background:'#F59E0B', flexShrink:0 }} />
+              <span style={{ fontSize:'0.78rem', color:'#FCD34D', flex:1 }}>
+                Backend unavailable. You can still run a symptom-only assessment.
+              </span>
+              {step === 2 && (
+                <button
+                  onClick={symptomOnlyAssess}
+                  style={{ padding:'0.4rem 1rem', fontSize:'0.65rem', fontFamily:'var(--mono)',
+                    background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.3)',
+                    borderRadius:'0.5rem', color:'#FCD34D', cursor:'pointer', fontWeight:600,
+                    textTransform:'uppercase', letterSpacing:'0.08em' }}
+                >
+                  Symptom-Only Assessment
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {error && (
@@ -420,6 +451,17 @@ function ScreeningSection() {
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 function AppContent() {
   const { backendUp } = useScreening();
+  const { isAuthenticated, user } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
+  const [showStripeFromPricing, setShowStripeFromPricing] = useState(false);
+
+  const handlePricingUpgrade = () => {
+    if (isAuthenticated) {
+      setShowStripeFromPricing(true);
+    } else {
+      setShowAuth(true);
+    }
+  };
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -457,9 +499,23 @@ function AppContent() {
         <div className="section-divider" />
         <ScreeningSection />
         <div className="section-divider" />
+        <PricingSection onUpgrade={handlePricingUpgrade} />
+        <div className="section-divider" />
         <TechSection />
       </main>
       <Footer />
+      <SupabaseTest />
+      <ToastContainer />
+      <AnimatePresence>
+        {showAuth && <AuthPage onClose={() => setShowAuth(false)} />}
+        {showStripeFromPricing && user && (
+          <StripeCheckoutModal
+            userEmail={user.email}
+            onClose={() => setShowStripeFromPricing(false)}
+            onSuccess={() => { setShowStripeFromPricing(false); window.location.reload(); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

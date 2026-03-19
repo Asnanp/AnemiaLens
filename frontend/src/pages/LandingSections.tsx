@@ -458,3 +458,236 @@ export function Footer() {
     </footer>
   );
 }
+
+// ── PRICING ───────────────────────────────────────────────────────────────────
+import { Check, X as XIcon, Crown, Sparkles } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+
+const E_P = [0.22, 1, 0.36, 1] as const;
+
+const FEATURES = [
+  { label: '10 screenings / lifetime', free: true },
+  { label: 'AI-powered risk analysis', free: true },
+  { label: 'Symptom input', free: true },
+  { label: 'Basic history (last 10)', free: true },
+  { label: 'Unlimited screenings', free: false },
+  { label: 'Full history & search', free: false },
+  { label: 'CSV data export', free: false },
+  { label: 'Hb trend chart', free: false },
+  { label: 'Priority AI responses', free: false },
+  { label: 'PDF report download', free: false },
+];
+
+export function PricingSection({ onUpgrade }: { onUpgrade?: () => void }) {
+  const { user, isAuthenticated } = useAuth();
+  const isPro = isAuthenticated && (user?.subscription_tier === 'pro' || user?.role === 'admin');
+
+  return (
+    <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '8rem 4rem' }} className="section-pad">
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+
+        {/* Heading */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }} transition={{ duration: 0.7 }}
+          style={{ textAlign: 'center', marginBottom: '4rem' }}
+        >
+          <div className="section-eyebrow" style={{ marginBottom: '1.25rem' }}>Pricing</div>
+          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2rem,4vw,3.5rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em' }}>
+            Simple,{' '}
+            <span style={{ fontStyle: 'italic', fontWeight: 300 }} className="text-gold">transparent pricing.</span>
+          </h2>
+          <p style={{ marginTop: '1.25rem', color: 'var(--text-dim)', fontSize: '0.9rem', maxWidth: 440, margin: '1.25rem auto 0' }}>
+            Start free. Upgrade when you need more. No hidden fees, no contracts.
+          </p>
+        </motion.div>
+
+        {/* Pro user — already subscribed banner */}
+        {isPro ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6, ease: E_P }}
+            style={{
+              borderRadius: '1.5rem', padding: '3rem 2.5rem',
+              background: 'linear-gradient(135deg, rgba(255,215,0,0.07) 0%, rgba(255,165,0,0.03) 100%)',
+              border: '1px solid rgba(255,215,0,0.25)',
+              boxShadow: '0 0 80px rgba(255,215,0,0.06)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{
+              width: 64, height: 64, borderRadius: '1.25rem',
+              background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 40px rgba(255,215,0,0.3)',
+            }}>
+              <Crown size={28} color="#000" />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                You're on Pro
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.6, maxWidth: 400 }}>
+                You already have full access to unlimited screenings, CSV export, trend charts, and priority AI responses.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', justifyContent: 'center', marginTop: '0.25rem' }}>
+              {['Unlimited Screenings', 'CSV Export', 'Hb Trend Chart', 'Priority AI', 'Full History'].map(f => (
+                <span key={f} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  fontSize: '0.7rem', padding: '0.3rem 0.75rem', borderRadius: '99px',
+                  background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
+                  color: '#10B981',
+                }}>
+                  <Check size={10} /> {f}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        ) : (
+          /* Free vs Pro cards */
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.08fr', gap: '1.25rem', alignItems: 'start' }}>
+
+              {/* Free card */}
+              <motion.div
+                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ delay: 0, duration: 0.55, ease: E_P }}
+                style={{
+                  borderRadius: '1.25rem', padding: '2rem',
+                  background: 'rgba(255,255,255,0.025)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', fontWeight: 700 }}>Free</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', margin: '0.625rem 0 0.5rem' }}>
+                    <span style={{ fontFamily: 'var(--serif)', fontSize: '2.4rem', fontWeight: 700 }}>$0</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>forever</span>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>
+                    Get started with basic anemia screening at no cost.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => onUpgrade?.()}
+                  style={{
+                    width: '100%', padding: '0.7rem', borderRadius: '0.75rem',
+                    cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem',
+                    fontFamily: 'var(--mono)', letterSpacing: '0.04em', textTransform: 'uppercase',
+                    marginBottom: '1.5rem',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  {isAuthenticated ? 'Current Plan' : 'Get Started Free'}
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {FEATURES.map(f => (
+                    <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', opacity: f.free ? 1 : 0.4 }}>
+                      <div style={{
+                        width: 17, height: 17, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: f.free ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${f.free ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                      }}>
+                        {f.free ? <Check size={9} color="#10B981" /> : <XIcon size={9} color="rgba(255,255,255,0.2)" />}
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: f.free ? 'var(--text-muted)' : 'var(--text-dim)' }}>{f.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* Pro card */}
+              <motion.div
+                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ delay: 0.1, duration: 0.55, ease: E_P }}
+                style={{
+                  borderRadius: '1.25rem', padding: '2rem',
+                  background: 'linear-gradient(145deg, rgba(255,215,0,0.07) 0%, rgba(255,140,0,0.03) 100%)',
+                  border: '1px solid rgba(255,215,0,0.22)',
+                  boxShadow: '0 0 60px rgba(255,215,0,0.05), 0 24px 60px rgba(0,0,0,0.3)',
+                  position: 'relative', overflow: 'hidden',
+                }}
+              >
+                {/* Glow accent */}
+                <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,215,0,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+                {/* Badge */}
+                <div style={{
+                  position: 'absolute', top: '1.25rem', right: '1.25rem',
+                  fontSize: '0.48rem', fontFamily: 'var(--mono)', fontWeight: 700,
+                  padding: '0.2rem 0.6rem', borderRadius: '99px', textTransform: 'uppercase',
+                  letterSpacing: '0.1em', background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#000',
+                }}>Most Popular</div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.1rem' }}>
+                    <Crown size={14} color="#FFD700" />
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#FFD700', fontWeight: 700 }}>Pro</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', margin: '0.625rem 0 0.5rem' }}>
+                    <span style={{ fontFamily: 'var(--serif)', fontSize: '2.4rem', fontWeight: 700 }}>$9.99</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>/ month</span>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>
+                    Unlimited screenings for individuals and clinics.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => onUpgrade?.()}
+                  style={{
+                    width: '100%', padding: '0.8rem', borderRadius: '0.75rem',
+                    cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem',
+                    fontFamily: 'var(--mono)', letterSpacing: '0.05em', textTransform: 'uppercase',
+                    marginBottom: '1.5rem',
+                    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                    color: '#000', border: 'none',
+                    boxShadow: '0 4px 24px rgba(255,215,0,0.25)',
+                    transition: 'box-shadow 0.2s, opacity 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 32px rgba(255,215,0,0.4)')}
+                  onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 24px rgba(255,215,0,0.25)')}
+                >
+                  <Sparkles size={13} /> Upgrade to Pro
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {FEATURES.map(f => (
+                    <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                      <div style={{
+                        width: 17, height: 17, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(16,185,129,0.1)',
+                        border: '1px solid rgba(16,185,129,0.2)',
+                      }}>
+                        <Check size={9} color="#10B981" />
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{f.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+
+            <motion.p
+              initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+              transition={{ delay: 0.35 }}
+              style={{ textAlign: 'center', marginTop: '1.75rem', fontSize: '0.68rem', color: 'var(--text-dim)', fontStyle: 'italic' }}
+            >
+              Demo mode — test card pre-filled. No real charge will occur.
+            </motion.p>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

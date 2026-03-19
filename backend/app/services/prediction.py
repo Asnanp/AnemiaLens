@@ -11,18 +11,22 @@ from app.ml.archive_model import (
     load_archive_model,
     predict_with_archive_model,
 )
+from app.ml.calibration import CompositeCalibrator
 from app.ml.efficientnet_model import (
     EFFICIENTNET_VERSION,
     load_efficientnet_checkpoint,
     predict_with_efficientnet_model,
 )
 from app.ml.features import extract_eye_features
+from app.ml.roi_confidence import RoiConfidenceScorer, blend_roi_fullframe
 from app.ml.runtime_stack import (
     RUNTIME_STACK_VERSION,
     build_runtime_stack_prediction,
     decision_threshold_for_source,
 )
 from app.schemas import ModelRuntimeStatus, PredictionResult, QualityAssessment
+
+_CALIBRATOR_PATH = Path(__file__).parent.parent / "artifacts" / "calibrator.pkl"
 
 
 class ScreeningPredictor:
@@ -32,6 +36,8 @@ class ScreeningPredictor:
         self.load_error: str | None = None
         self.efficientnet_bundle = self._load_efficientnet_model()
         self.archive_model = self._load_archive_model()
+        self._calibrator = self._load_calibrator()
+        self._roi_scorer = RoiConfidenceScorer()
 
     def predict(self, image: Image.Image, quality: QualityAssessment) -> PredictionResult:
         prediction: dict[str, float] | None = None
@@ -92,6 +98,8 @@ class ScreeningPredictor:
                 model_source="missing-model",
             )
         risk = float(prediction["anemia_risk"])
+        # Apply probability calibration if available
+        risk = self._calibrator.calibrate(risk)
         uncertainty = float(prediction["uncertainty"])
         predicted_hemoglobin_raw = float(prediction["predicted_hemoglobin"])
         predicted_hemoglobin = round(predicted_hemoglobin_raw, 2)
@@ -159,6 +167,14 @@ class ScreeningPredictor:
             screening_text=screening_text,
             model_source=model_source,
         )
+
+    def _load_calibrator(self) -> CompositeCalibrator:
+        try:
+            if _CALIBRATOR_PATH.exists():
+                return CompositeCalibrator.load(_CALIBRATOR_PATH)
+        except Exception:
+            pass
+        return CompositeCalibrator(method="none")  # identity — no-op until trained
 
     def _load_efficientnet_model(self) -> dict[str, object] | None:
         if not self.efficientnet_path.exists():

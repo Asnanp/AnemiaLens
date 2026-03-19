@@ -37,6 +37,11 @@ FEATURE_NAMES = [
     "red_green_gap",
     "center_red_green_gap",
     "size_score",
+    # Pallor-specific features
+    "cpi",
+    "center_cpi",
+    "redness_uniformity",
+    "green_blue_ratio",
 ]
 
 COLOR_FEATURES = [
@@ -128,9 +133,16 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
     # CPI = R / (R + G + B) - a standard clinical screening metric
     denom = (mean_r + mean_g + mean_b) or 1e-6
     cpi = mean_r / denom
-    
+
     center_denom = (center_mean_r + center_mean_g + center_mean_b) or 1e-6
     center_cpi = center_mean_r / center_denom
+
+    # Redness uniformity: std of red channel across 4 quadrants
+    # Low uniformity (high std) can indicate patchy pallor
+    redness_uniformity = _quadrant_red_std(normalized)
+
+    # Green-blue ratio: complementary to R/G for pallor detection
+    green_blue_ratio = mean_g / max(mean_b, 1e-6)
 
     return {
         "mean_r": mean_r,
@@ -164,6 +176,8 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
         "size_score": min(width, height) / 320.0,
         "cpi": cpi,
         "center_cpi": center_cpi,
+        "redness_uniformity": redness_uniformity,
+        "green_blue_ratio": green_blue_ratio,
     }
 
 
@@ -204,3 +218,23 @@ def _center_crop(image: Image.Image) -> Image.Image:
 def _mean_saturation(image: Image.Image) -> float:
     sample = image.resize((64, 64)).convert("HSV")
     return ImageStat.Stat(sample).mean[1] / 255.0
+
+
+def _quadrant_red_std(image: Image.Image) -> float:
+    """
+    Compute std of mean red channel across 4 quadrants.
+    Low std → uniform redness (healthy); high std → patchy pallor.
+    Normalised to [0, 1].
+    """
+    w, h = image.size
+    hw, hh = w // 2, h // 2
+    quadrants = [
+        image.crop((0, 0, hw, hh)),
+        image.crop((hw, 0, w, hh)),
+        image.crop((0, hh, hw, h)),
+        image.crop((hw, hh, w, h)),
+    ]
+    means = [ImageStat.Stat(q).mean[0] / 255.0 for q in quadrants]
+    std = float(mean([(m - sum(means) / 4) ** 2 for m in means]) ** 0.5)
+    # Normalise: typical range 0-0.15 → map to 0-1
+    return min(std / 0.15, 1.0)

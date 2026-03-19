@@ -1,22 +1,19 @@
 /**
- * User dashboard — screening history, account info, and quick stats.
+ * User dashboard — screening history, account info, pro upgrade.
  */
-
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useHistory } from '../hooks/useHistory';
 import {
   History, Trash2, RefreshCw, ChevronRight,
-  Activity, Clock, Shield, TrendingUp
+  Activity, Clock, Shield, TrendingUp, Zap, Star, X, Crown
 } from 'lucide-react';
+import { upgradeToProDemo } from '../api';
+import { StripeCheckoutModal } from '../components/StripeCheckoutModal';
 
 const E = [0.22, 1, 0.36, 1] as const;
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-function endpoint(path: string): string {
-  return API_BASE ? `${API_BASE}${path}` : path;
-}
+const FREE_SCAN_LIMIT = 10;
 
 function bandColor(band: string): string {
   switch (band) {
@@ -38,292 +35,471 @@ function bandLabel(band: string): string {
   }
 }
 
-export default function DashboardPage({ onClose }: { onClose: () => void }) {
-  const { user, logout, getAccessToken } = useAuth();
-  const { screenings, total, isLoading, error, refresh, deleteScreening, loadMore } = useHistory();
-  const [isUpgrading, setIsUpgrading] = useState(false);
-
-  if (!user) return null;
-
-  const handleUpgrade = async () => {
-    try {
-      setIsUpgrading(true);
-      const res = await fetch(endpoint('/api/billing/create-checkout-session'), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
-      if (!res.ok) throw new Error('Failed to create checkout session');
-      const data = await res.json();
-      window.location.href = data.checkout_url;
-    } catch (err) {
-      console.error(err);
-      alert('Failed to initiate upgrade.');
-    } finally {
-      setIsUpgrading(false);
-    }
-  };
-
-  const avgRisk = screenings.length > 0
-    ? screenings.filter(s => s.anemia_risk !== null).reduce((sum, s) => sum + (s.anemia_risk ?? 0), 0) /
-      Math.max(screenings.filter(s => s.anemia_risk !== null).length, 1)
-    : 0;
-
+// ── Pro Upgrade Modal ─────────────────────────────────────────────────────────
+function ProUpgradeModal({ onClose, onUpgrade, isUpgrading }: {
+  onClose: () => void;
+  onUpgrade: () => void;
+  isUpgrading: boolean;
+}) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        background: 'rgba(4,4,10,0.9)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        overflowY: 'auto',
-        padding: '4rem 1rem',
+        position: 'fixed', inset: 0, zIndex: 20000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(4,4,10,0.85)', backdropFilter: 'blur(24px)',
+        padding: '1rem',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: E }}
+        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92, y: 20 }}
+        transition={{ duration: 0.4, ease: E }}
         style={{
-          width: 'min(780px, 100%)',
+          width: 'min(480px, 100%)',
           borderRadius: '1.5rem',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(40px)',
-          boxShadow: '0 48px 100px rgba(0,0,0,0.6)',
+          background: 'rgba(10,10,20,0.95)',
+          border: '1px solid rgba(255,215,0,0.2)',
+          boxShadow: '0 0 80px rgba(255,215,0,0.08), 0 48px 100px rgba(0,0,0,0.7)',
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
+        {/* Gold gradient header */}
         <div style={{
-          padding: '2rem 2.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '2rem 2rem 1.5rem',
+          background: 'linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,165,0,0.04) 100%)',
+          borderBottom: '1px solid rgba(255,215,0,0.1)',
+          textAlign: 'center',
+          position: 'relative',
         }}>
-          <div>
-            <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.3rem' }}>
-              Dashboard
-            </h2>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-              {user.email} · {user.scan_count} screening{user.scan_count !== 1 ? 's' : ''}
-            </p>
+          <button onClick={onClose} style={{
+            position: 'absolute', top: '1rem', right: '1rem',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '0.5rem', padding: '0.35rem', cursor: 'pointer', color: 'var(--text-dim)',
+          }}>
+            <X size={14} />
+          </button>
+          <div style={{
+            width: 56, height: 56, borderRadius: '1rem', margin: '0 auto 1rem',
+            background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 30px rgba(255,215,0,0.3)',
+          }}>
+            <Crown size={26} color="#000" />
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={onClose}
-              className="btn btn-glass"
-              style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '0.625rem' }}
-            >
-              Close
-            </button>
-            <button
-              onClick={() => { logout(); onClose(); }}
-              className="btn btn-glass"
-              style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '0.625rem', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
-            >
-              Sign Out
-            </button>
-          </div>
+          <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+            Upgrade to Pro
+          </h3>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            Unlock unlimited screenings and advanced features
+          </p>
         </div>
 
-        {/* Quick stats */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem',
-          padding: '1.5rem 2.5rem',
-        }}>
+        {/* Features */}
+        <div style={{ padding: '1.5rem 2rem' }}>
           {[
-            { icon: <Activity size={16} />, label: 'Total Scans', value: String(total) },
-            { icon: <TrendingUp size={16} />, label: 'Avg Risk', value: `${(avgRisk * 100).toFixed(0)}%` },
-            { icon: <Clock size={16} />, label: 'Member Since', value: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) },
-            { 
-              icon: <Shield size={16} />, 
-              label: 'Account', 
-              value: user.role === 'admin' ? 'Admin' : (user.subscription_tier === 'pro' ? 'Pro' : 'Free') 
-            },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, ease: E }}
+            { icon: <Zap size={15} />, title: 'Unlimited Screenings', desc: 'No monthly cap — scan as often as needed' },
+            { icon: <Star size={15} />, title: 'Priority AI Guidance', desc: 'Faster Mistral AI responses with richer detail' },
+            { icon: <Activity size={15} />, title: 'Full History & Export', desc: 'PDF reports, trend charts, and data export' },
+            { icon: <Shield size={15} />, title: 'Pro Badge', desc: 'Early access to new features and models' },
+          ].map((f, i) => (
+            <motion.div key={i}
+              initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.07, ease: E }}
               style={{
-                padding: '1rem',
-                borderRadius: '0.875rem',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                textAlign: 'center',
+                display: 'flex', alignItems: 'flex-start', gap: '0.875rem',
+                padding: '0.75rem 0',
+                borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none',
               }}
             >
-              <div style={{ color: 'var(--accent-bright)', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>{stat.icon}</div>
-              <div style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.2rem' }}>{stat.value}</div>
-              <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)' }}>{stat.label}</div>
+              <div style={{
+                width: 32, height: 32, borderRadius: '0.625rem', flexShrink: 0,
+                background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#FFD700',
+              }}>{f.icon}</div>
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.15rem' }}>{f.title}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{f.desc}</div>
+              </div>
             </motion.div>
           ))}
         </div>
 
-        {/* History header */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1rem 2.5rem 0.5rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <History size={16} style={{ color: 'var(--accent-bright)' }} />
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
-              Screening History
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {user.subscription_tier !== 'pro' && (
-              <button
-                onClick={handleUpgrade}
-                disabled={isUpgrading}
-                className="btn btn-primary"
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.6rem', borderRadius: '0.5rem', background: 'linear-gradient(135deg, #10B981, #059669)', border: 'none' }}
-              >
-                {isUpgrading ? 'Redirecting...' : 'Upgrade to Pro'}
-              </button>
-            )}
-            <button
-              onClick={refresh}
-              disabled={isLoading}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                padding: '0.4rem 0.75rem', fontSize: '0.6rem',
-                fontFamily: 'var(--mono)', textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'var(--text-dim)', border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '0.5rem', cursor: 'pointer',
-              }}
-            >
-              <RefreshCw size={11} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* History list */}
-        <div style={{ padding: '0.75rem 2.5rem 2rem' }}>
-          {error && (
-            <div style={{
-              padding: '0.75rem 1rem', borderRadius: '0.625rem',
-              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
-              fontSize: '0.75rem', color: '#FCA5A5', marginBottom: '1rem',
-            }}>
-              {error}
-            </div>
-          )}
-
-          {screenings.length === 0 && !isLoading && (
-            <div style={{
-              padding: '3rem 1rem', textAlign: 'center',
-              color: 'var(--text-dim)', fontSize: '0.82rem',
-            }}>
-              No screenings yet. Run your first screening to see results here.
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-            <AnimatePresence>
-              {screenings.map((s, i) => (
-                <motion.div
-                  key={s.uid}
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 12 }}
-                  transition={{ delay: i * 0.03, ease: E }}
-                  className="glass glass-hover"
-                  style={{
-                    padding: '1rem 1.25rem',
-                    display: 'flex', alignItems: 'center', gap: '1rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {/* Band indicator */}
-                  <div style={{
-                    width: 8, height: 36, borderRadius: 4,
-                    background: bandColor(s.triage_band),
-                    boxShadow: `0 0 10px ${bandColor(s.triage_band)}40`,
-                    flexShrink: 0,
-                  }} />
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{
-                        fontSize: '0.55rem', fontFamily: 'var(--mono)',
-                        textTransform: 'uppercase', letterSpacing: '0.1em',
-                        padding: '0.15rem 0.5rem', borderRadius: '0.35rem',
-                        background: `${bandColor(s.triage_band)}15`,
-                        color: bandColor(s.triage_band),
-                        border: `1px solid ${bandColor(s.triage_band)}30`,
-                        fontWeight: 600,
-                      }}>
-                        {bandLabel(s.triage_band)}
-                      </span>
-                      {s.screening_label && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{s.screening_label.replace(/_/g, ' ')}</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                      {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      {s.anemia_risk !== null && (
-                        <span style={{ marginLeft: '0.75rem' }}>Risk: {(s.anemia_risk * 100).toFixed(0)}%</span>
-                      )}
-                      {s.predicted_hemoglobin !== null && (
-                        <span style={{ marginLeft: '0.75rem' }}>Hb: {s.predicted_hemoglobin.toFixed(1)} g/dL</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteScreening(s.uid); }}
-                    style={{
-                      background: 'rgba(239,68,68,0.08)',
-                      border: '1px solid rgba(239,68,68,0.15)',
-                      borderRadius: '0.5rem',
-                      padding: '0.4rem',
-                      cursor: 'pointer',
-                      color: 'rgba(239,68,68,0.6)',
-                      transition: 'all 0.2s',
-                      flexShrink: 0,
-                    }}
-                    title="Delete screening"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {/* Load more */}
-          {screenings.length < total && (
-            <button
-              onClick={loadMore}
-              disabled={isLoading}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                width: '100%', padding: '0.75rem', marginTop: '1rem',
-                fontSize: '0.68rem', fontFamily: 'var(--mono)',
-                textTransform: 'uppercase', letterSpacing: '0.1em',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'var(--text-muted)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: '0.75rem', cursor: 'pointer',
-              }}
-            >
-              Load More <ChevronRight size={12} />
-            </button>
-          )}
+        {/* CTA */}
+        <div style={{ padding: '0 2rem 2rem' }}>
+          <button
+            onClick={onUpgrade}
+            disabled={isUpgrading}
+            style={{
+              width: '100%', padding: '0.9rem',
+              borderRadius: '0.875rem', border: 'none', cursor: isUpgrading ? 'wait' : 'pointer',
+              background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+              color: '#000', fontWeight: 700, fontSize: '0.85rem',
+              fontFamily: 'var(--mono)', letterSpacing: '0.05em', textTransform: 'uppercase',
+              boxShadow: '0 0 30px rgba(255,215,0,0.25)',
+              opacity: isUpgrading ? 0.7 : 1,
+              transition: 'opacity 0.2s',
+            }}
+          >
+            {isUpgrading ? 'Processing...' : 'Continue to Payment →'}
+          </button>
+          <p style={{ textAlign: 'center', fontSize: '0.62rem', color: 'var(--text-dim)', marginTop: '0.75rem' }}>
+            Secured by Stripe · Test mode · No real charge
+          </p>
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
+export default function DashboardPage({ onClose }: { onClose: () => void }) {
+  const { user, logout, getAccessToken } = useAuth();
+  const { screenings, total, isLoading, error, refresh, deleteScreening, loadMore } = useHistory();
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
+  const [showStripe, setShowStripe] = useState(false);
+  const [upgradeSuccess, setUpgradeSuccess] = useState(false);
+
+  if (!user) return null;
+
+  const isPro = user.subscription_tier === 'pro' || user.role === 'admin';
+  const scansUsed = user.scan_count || 0;
+  const scanPct = isPro ? 100 : Math.min((scansUsed / FREE_SCAN_LIMIT) * 100, 100);
+  const scansLeft = isPro ? '∞' : Math.max(FREE_SCAN_LIMIT - scansUsed, 0);
+
+  // Opens Stripe checkout modal
+  const handleUpgrade = () => {
+    setShowProModal(false);
+    setShowStripe(true);
+  };
+
+  // Called after Stripe checkout succeeds
+  const handleStripeSuccess = () => {
+    setShowStripe(false);
+    setUpgradeSuccess(true);
+    setTimeout(() => window.location.reload(), 2000);
+  };
+
+  const avgRisk = screenings.length > 0
+    ? screenings.filter(s => s.anemia_risk !== null)
+        .reduce((sum, s) => sum + (s.anemia_risk ?? 0), 0) /
+      Math.max(screenings.filter(s => s.anemia_risk !== null).length, 1)
+    : 0;
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          background: 'rgba(4,4,10,0.9)', backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)', overflowY: 'auto', padding: '4rem 1rem',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: E }}
+          style={{
+            width: 'min(820px, 100%)', borderRadius: '1.5rem',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(40px)', boxShadow: '0 48px 100px rgba(0,0,0,0.6)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            padding: '1.75rem 2.5rem',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: isPro
+              ? 'linear-gradient(135deg, rgba(255,215,0,0.04) 0%, transparent 60%)'
+              : 'transparent',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: '0.875rem',
+                background: isPro
+                  ? 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,165,0,0.1))'
+                  : 'rgba(200,0,30,0.12)',
+                border: `1px solid ${isPro ? 'rgba(255,215,0,0.25)' : 'rgba(200,0,30,0.2)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--mono)',
+                color: isPro ? '#FFD700' : 'var(--accent-bright)',
+              }}>
+                {isPro ? <Crown size={20} /> : (user.full_name?.[0] || user.email[0]).toUpperCase()}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', fontWeight: 700 }}>
+                    {user.full_name || user.email.split('@')[0]}
+                  </span>
+                  {isPro && (
+                    <span style={{
+                      fontSize: '0.5rem', fontFamily: 'var(--mono)', fontWeight: 700,
+                      padding: '0.15rem 0.5rem', borderRadius: '99px', textTransform: 'uppercase',
+                      letterSpacing: '0.1em', background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                      color: '#000',
+                    }}>PRO</span>
+                  )}
+                </div>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '0.1rem' }}>
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.625rem' }}>
+              <button onClick={onClose} className="btn btn-glass"
+                style={{ padding: '0.45rem 0.875rem', fontSize: '0.62rem', borderRadius: '0.625rem' }}>
+                Close
+              </button>
+              <button onClick={() => { logout(); onClose(); }} className="btn btn-glass"
+                style={{ padding: '0.45rem 0.875rem', fontSize: '0.62rem', borderRadius: '0.625rem', color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          {/* Upgrade success banner */}
+          <AnimatePresence>
+            {upgradeSuccess && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{
+                  padding: '0.875rem 2.5rem',
+                  background: 'rgba(255,215,0,0.08)', borderBottom: '1px solid rgba(255,215,0,0.15)',
+                  display: 'flex', alignItems: 'center', gap: '0.75rem',
+                }}
+              >
+                <Crown size={16} color="#FFD700" />
+                <span style={{ fontSize: '0.78rem', color: '#FFD700', fontWeight: 600 }}>
+                  Upgraded to Pro! Reloading...
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Stats grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.875rem', padding: '1.5rem 2.5rem' }}>
+            {[
+              { icon: <Activity size={15} />, label: 'Total Scans', value: String(total) },
+              { icon: <TrendingUp size={15} />, label: 'Avg Risk', value: `${(avgRisk * 100).toFixed(0)}%` },
+              { icon: <Clock size={15} />, label: 'Member Since', value: new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) },
+              { icon: <Shield size={15} />, label: 'Plan', value: isPro ? 'Pro' : 'Free' },
+            ].map((stat, i) => (
+              <motion.div key={stat.label}
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.07, ease: E }}
+                style={{
+                  padding: '1rem', borderRadius: '0.875rem', textAlign: 'center',
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <div style={{ color: 'var(--accent-bright)', marginBottom: '0.4rem', display: 'flex', justifyContent: 'center' }}>{stat.icon}</div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.15rem' }}>{stat.value}</div>
+                <div style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)' }}>{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Scan usage bar (free users) */}
+          {!isPro && (
+            <div style={{ padding: '0 2.5rem 1.25rem' }}>
+              <div style={{
+                padding: '1rem 1.25rem', borderRadius: '0.875rem',
+                background: scansUsed >= FREE_SCAN_LIMIT
+                  ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${scansUsed >= FREE_SCAN_LIMIT ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.625rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                    Free Plan Usage
+                  </span>
+                  <span style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', color: scansUsed >= FREE_SCAN_LIMIT ? '#EF4444' : 'var(--text-muted)' }}>
+                    {scansUsed} / {FREE_SCAN_LIMIT} scans
+                  </span>
+                </div>
+                <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <motion.div
+                    initial={{ width: 0 }} animate={{ width: `${scanPct}%` }}
+                    transition={{ duration: 0.8, ease: E }}
+                    style={{
+                      height: '100%', borderRadius: 99,
+                      background: scansUsed >= FREE_SCAN_LIMIT
+                        ? '#EF4444'
+                        : scanPct > 70 ? '#F59E0B' : '#10B981',
+                    }}
+                  />
+                </div>
+                {scansUsed >= FREE_SCAN_LIMIT ? (
+                  <p style={{ fontSize: '0.68rem', color: '#FCA5A5', marginTop: '0.5rem' }}>
+                    Limit reached. Upgrade to Pro for unlimited screenings.
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>
+                    {scansLeft} scans remaining on free plan
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* History header */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '0.5rem 2.5rem 0.75rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <History size={15} style={{ color: 'var(--accent-bright)' }} />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
+                Screening History
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+              {!isPro && (
+                <button
+                  onClick={() => setShowProModal(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.4rem 0.875rem', fontSize: '0.6rem',
+                    fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em',
+                    background: 'linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,165,0,0.08))',
+                    color: '#FFD700', border: '1px solid rgba(255,215,0,0.25)',
+                    borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 700,
+                  }}
+                >
+                  <Crown size={11} /> Upgrade to Pro
+                </button>
+              )}
+              <button onClick={refresh} disabled={isLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0.4rem 0.75rem', fontSize: '0.6rem',
+                  fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em',
+                  background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)',
+                  border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0.5rem', cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={11} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* History list */}
+          <div style={{ padding: '0 2.5rem 2rem' }}>
+            {error && (
+              <div style={{
+                padding: '0.75rem 1rem', borderRadius: '0.625rem',
+                background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
+                fontSize: '0.75rem', color: '#FCA5A5', marginBottom: '1rem',
+              }}>{error}</div>
+            )}
+
+            {screenings.length === 0 && !isLoading && (
+              <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.82rem' }}>
+                No screenings yet. Run your first scan to see results here.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <AnimatePresence>
+                {screenings.map((s, i) => (
+                  <motion.div key={s.uid}
+                    initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 12 }} transition={{ delay: i * 0.03, ease: E }}
+                    className="glass glass-hover"
+                    style={{ padding: '0.875rem 1.125rem', display: 'flex', alignItems: 'center', gap: '0.875rem', cursor: 'pointer' }}
+                  >
+                    <div style={{
+                      width: 6, height: 32, borderRadius: 3, flexShrink: 0,
+                      background: bandColor(s.triage_band),
+                      boxShadow: `0 0 8px ${bandColor(s.triage_band)}50`,
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                        <span style={{
+                          fontSize: '0.52rem', fontFamily: 'var(--mono)', textTransform: 'uppercase',
+                          letterSpacing: '0.1em', padding: '0.12rem 0.45rem', borderRadius: '0.3rem',
+                          background: `${bandColor(s.triage_band)}15`, color: bandColor(s.triage_band),
+                          border: `1px solid ${bandColor(s.triage_band)}30`, fontWeight: 600,
+                        }}>
+                          {bandLabel(s.triage_band)}
+                        </span>
+                        {s.screening_label && (
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                            {s.screening_label.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>
+                        {new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {s.anemia_risk !== null && <span style={{ marginLeft: '0.75rem' }}>Risk: {(s.anemia_risk * 100).toFixed(0)}%</span>}
+                        {s.predicted_hemoglobin !== null && <span style={{ marginLeft: '0.75rem' }}>Hb: {s.predicted_hemoglobin.toFixed(1)} g/dL</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteScreening(s.uid); }}
+                      style={{
+                        background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.12)',
+                        borderRadius: '0.45rem', padding: '0.35rem', cursor: 'pointer',
+                        color: 'rgba(239,68,68,0.55)', transition: 'all 0.2s', flexShrink: 0,
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {screenings.length < total && (
+              <button onClick={loadMore} disabled={isLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  width: '100%', padding: '0.75rem', marginTop: '0.875rem',
+                  fontSize: '0.65rem', fontFamily: 'var(--mono)', textTransform: 'uppercase',
+                  letterSpacing: '0.1em', background: 'rgba(255,255,255,0.03)',
+                  color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '0.75rem', cursor: 'pointer',
+                }}
+              >
+                Load More <ChevronRight size={12} />
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Pro upgrade modal */}
+      <AnimatePresence>
+        {showProModal && (
+          <ProUpgradeModal
+            onClose={() => setShowProModal(false)}
+            onUpgrade={handleUpgrade}
+            isUpgrading={isUpgrading}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Stripe checkout modal */}
+      <AnimatePresence>
+        {showStripe && (
+          <StripeCheckoutModal
+            userEmail={user.email}
+            onClose={() => setShowStripe(false)}
+            onSuccess={handleStripeSuccess}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

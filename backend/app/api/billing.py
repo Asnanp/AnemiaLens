@@ -24,8 +24,15 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-# In a real setup, this would be your Stripe product Price ID
 PRO_SUBSCRIPTION_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID", "price_test_123")
+
+# Demo mode if key is missing or looks like a placeholder
+_DEMO_MODE = (
+    not stripe.api_key
+    or len(stripe.api_key) < 30
+    or stripe.api_key.endswith("this")
+    or "placeholder" in stripe.api_key.lower()
+)
 
 
 class CheckoutSessionResponse(BaseModel):
@@ -44,7 +51,7 @@ async def create_checkout_session(
 ) -> CheckoutSessionResponse:
     origin = request.headers.get("origin", "http://localhost:5173")
 
-    if not stripe.api_key:
+    if _DEMO_MODE:
         # DEMO MODE: Automatically upgrade the user instead of failing
         log.warning("No Stripe API key found. Operating in DEMO MODE.")
         u = await db.scalar(select(User).where(User.uid == user.uid))

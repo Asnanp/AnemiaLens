@@ -60,6 +60,7 @@ class UserProfile(BaseModel):
     email: str
     full_name: str | None
     role: str
+    subscription_tier: str
     scan_count: int
     created_at: str
     last_login_at: str | None
@@ -204,7 +205,93 @@ async def me(
         email=user.email,
         full_name=user.full_name,
         role=user.role,
+        subscription_tier=user.subscription_tier or "free",
         scan_count=user.scan_count,
         created_at=user.created_at.isoformat(),
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Personal stats
+# ---------------------------------------------------------------------------
+
+from sqlalchemy import func as sa_func
+from app.models.screening import Screening
+
+
+class UserStatsResponse(BaseModel):
+    total_scans: int
+    scans_this_month: int
+    avg_risk: float | None
+    avg_hemoglobin: float | None
+    high_concern_count: int
+    low_risk_count: int
+    last_scan_at: str | None
+
+
+@router.get(
+    "/me/stats",
+    response_model=UserStatsResponse,
+    summary="Get personal screening statistics",
+)
+async def me_stats(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserStatsResponse:
+    from datetime import datetime, timezone
+    from sqlalchemy import select, func, and_
+
+    # Total scans
+    total = await db.scalar(
+        select(func.count()).where(Screening.user_id == user.id)
+    ) or 0
+
+    # This month
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    this_month = await db.scalar(
+        select(func.count()).where(
+            and_(Screening.user_id == user.id, Screening.created_at >= month_start)
+        )
+    ) or 0
+
+    # Averages
+    avg_risk = await db.scalar(
+        select(func.avg(Screening.anemia_risk)).where(
+            and_(Screening.user_id == user.id, Screening.anemia_risk.isnot(None))
+        )
+    )
+    avg_hb = await db.scalar(
+        select(func.avg(Screening.predicted_hemoglobin)).where(
+            and_(Screening.user_id == user.id, Screening.predicted_hemoglobin.isnot(None))
+        )
+    )
+
+    # Band counts
+    high = await db.scalar(
+        select(func.count()).where(
+            and_(Screening.user_id == user.id, Screening.triage_band == "high_concern")
+        )
+    ) or 0
+    low = await db.scalar(
+        select(func.count()).where(
+            and_(Screening.user_id == user.id, Screening.triage_band == "low_risk")
+        )
+    ) or 0
+
+    # Last scan
+    last = await db.scalar(
+        select(Screening.created_at).where(Screening.user_id == user.id)
+        .order_by(Screening.created_at.desc()).limit(1)
+    )
+
+    return UserStatsResponse(
+        total_scans=total,
+        scans_this_month=this_month,
+        avg_risk=round(float(avg_risk), 4) if avg_risk is not None else None,
+        avg_hemoglobin=round(float(avg_hb), 2) if avg_hb is not None else None,
+        high_concern_count=high,
+        low_risk_count=low,
+        last_scan_at=last.isoformat() if last else None,
     )

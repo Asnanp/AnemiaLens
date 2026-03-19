@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
 from PIL import Image
+
+from app.ml.roi_confidence import RoiConfidenceScorer
+
+_roi_scorer = RoiConfidenceScorer()
 
 
 @dataclass
 class RoiExtractionResult:
     image: Image.Image
     extracted: bool
+    confidence: float = 0.5  # ROI extraction quality score [0, 1]
 
 
 class ConjunctivaRoiExtractor:
@@ -28,9 +33,11 @@ class ConjunctivaRoiExtractor:
             crop = self._fallback_conjunctiva_crop(array)
 
         if crop is None:
-            return RoiExtractionResult(image=rgb, extracted=False)
+            return RoiExtractionResult(image=rgb, extracted=False, confidence=0.0)
 
-        return RoiExtractionResult(image=Image.fromarray(crop.astype(np.uint8), mode="RGB"), extracted=True)
+        roi_image = Image.fromarray(crop.astype(np.uint8), mode="RGB")
+        confidence = _roi_scorer.score(roi_image, original=rgb)
+        return RoiExtractionResult(image=roi_image, extracted=True, confidence=confidence)
 
     def _detect_iris(self, image: np.ndarray) -> tuple[float, float, float] | None:
         height, width = image.shape[:2]
