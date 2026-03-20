@@ -42,6 +42,15 @@ FEATURE_NAMES = [
     "center_cpi",
     "redness_uniformity",
     "green_blue_ratio",
+    # New v4 features
+    "redness_ratio",          # R / (R+G+B) full image (alias of cpi, kept separate for clarity)
+    "center_redness_ratio",   # R / (R+G+B) center crop
+    "pallor_gradient",        # center_cpi - edge_cpi (positive = center paler than edge)
+    "color_temp_proxy",       # (R-B) / (R+B) — warm/cool shift
+    "center_color_temp",      # same for center crop
+    "hue_mean",               # mean hue from HSV (0-1 normalised)
+    "hue_std",                # std of hue — high std = mixed tones
+    "center_hue_mean",        # center crop hue mean
 ]
 
 COLOR_FEATURES = [
@@ -61,6 +70,15 @@ COLOR_FEATURES = [
     "center_saturation",
     "red_green_gap",
     "center_red_green_gap",
+    # v4 additions
+    "redness_ratio",
+    "center_redness_ratio",
+    "pallor_gradient",
+    "color_temp_proxy",
+    "center_color_temp",
+    "hue_mean",
+    "hue_std",
+    "center_hue_mean",
 ]
 
 TEXTURE_FEATURES = [
@@ -144,6 +162,28 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
     # Green-blue ratio: complementary to R/G for pallor detection
     green_blue_ratio = mean_g / max(mean_b, 1e-6)
 
+    # --- v4 new features ---
+
+    # Redness ratio: same formula as CPI but kept as an explicit separate feature
+    # so the model can learn different weights for the two representations
+    redness_ratio = cpi
+    center_redness_ratio = center_cpi
+
+    # Pallor gradient: how much paler the center is vs the periphery
+    # Positive → center is redder than edge (healthy); negative → center paler (anemic)
+    edge_cpi = _edge_cpi(normalized)
+    pallor_gradient = center_cpi - edge_cpi
+
+    # Color temperature proxy: (R-B)/(R+B) — warm shift correlates with healthy perfusion
+    rb_sum = (mean_r + mean_b) or 1e-6
+    color_temp_proxy = (mean_r - mean_b) / rb_sum
+    center_rb_sum = (center_mean_r + center_mean_b) or 1e-6
+    center_color_temp = (center_mean_r - center_mean_b) / center_rb_sum
+
+    # Hue channel statistics from HSV
+    hue_mean, hue_std = _hsv_hue_stats(normalized)
+    center_hue_mean, _ = _hsv_hue_stats(center)
+
     return {
         "mean_r": mean_r,
         "mean_g": mean_g,
@@ -178,6 +218,15 @@ def extract_eye_features(image: Image.Image) -> dict[str, float]:
         "center_cpi": center_cpi,
         "redness_uniformity": redness_uniformity,
         "green_blue_ratio": green_blue_ratio,
+        # v4 new features
+        "redness_ratio": redness_ratio,
+        "center_redness_ratio": center_redness_ratio,
+        "pallor_gradient": pallor_gradient,
+        "color_temp_proxy": color_temp_proxy,
+        "center_color_temp": center_color_temp,
+        "hue_mean": hue_mean,
+        "hue_std": hue_std,
+        "center_hue_mean": center_hue_mean,
     }
 
 
@@ -238,3 +287,37 @@ def _quadrant_red_std(image: Image.Image) -> float:
     std = float(mean([(m - sum(means) / 4) ** 2 for m in means]) ** 0.5)
     # Normalise: typical range 0-0.15 → map to 0-1
     return min(std / 0.15, 1.0)
+
+
+def _edge_cpi(image: Image.Image) -> float:
+    """CPI computed on the peripheral ring (outer 25% border) of the image."""
+    w, h = image.size
+    mx, my = w // 4, h // 4
+    # Collect the four border strips
+    strips = [
+        image.crop((0, 0, w, my)),           # top
+        image.crop((0, h - my, w, h)),        # bottom
+        image.crop((0, my, mx, h - my)),      # left
+        image.crop((w - mx, my, w, h - my)),  # right
+    ]
+    r_vals, g_vals, b_vals = [], [], []
+    for strip in strips:
+        s = ImageStat.Stat(strip)
+        r_vals.append(s.mean[0] / 255.0)
+        g_vals.append(s.mean[1] / 255.0)
+        b_vals.append(s.mean[2] / 255.0)
+    er = mean(r_vals)
+    eg = mean(g_vals)
+    eb = mean(b_vals)
+    denom = (er + eg + eb) or 1e-6
+    return er / denom
+
+
+def _hsv_hue_stats(image: Image.Image) -> tuple[float, float]:
+    """Return (mean_hue, std_hue) normalised to [0, 1] from the HSV hue channel."""
+    hsv = image.resize((64, 64)).convert("HSV")
+    hue_channel = hsv.split()[0]  # H channel, 0-255
+    stat = ImageStat.Stat(hue_channel)
+    hue_mean = stat.mean[0] / 255.0
+    hue_std = stat.stddev[0] / 255.0
+    return hue_mean, hue_std

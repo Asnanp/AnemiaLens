@@ -170,6 +170,13 @@ def predict_with_efficientnet_model(
     probability_std = float(np.std(probabilities))
     hemoglobin_std = float(np.std(hemoglobin_values))
 
+    # Hb spread amplification: EfficientNet also regresses toward mean
+    # Apply same correction as archive model
+    hb_mean_val = float(bundle.get("hb_mean", 12.8))
+    hb_spread_factor = float(bundle.get("hb_spread_factor", 1.30))
+    deviation = mean_hemoglobin - hb_mean_val
+    mean_hemoglobin = float(np.clip(hb_mean_val + deviation * hb_spread_factor, 5.0, 20.0))
+
     # Calibrated uncertainty: margin + MC spread + Hb spread
     margin_uncertainty = 1.0 - min(1.0, abs(mean_probability - 0.5) * 2.5)
     uncertainty = clamp(
