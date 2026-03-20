@@ -39,11 +39,13 @@ ARCHIVE_ROOT = BACKEND_ROOT.parent / "archive" / "dataset anemia"
 SEED = 42
 BATCH_SIZE = 16
 EPOCHS = 60
-PATIENCE = 12
+PATIENCE = 15
 MAX_GRAD_NORM = 1.0
 WARMUP_EPOCHS = 5
 LABEL_SMOOTHING = 0.05
 MIXUP_ALPHA = 0.3
+# Hb spread loss: penalizes predictions that cluster near the mean
+HB_SPREAD_WEIGHT = 0.15
 
 
 @dataclass(frozen=True)
@@ -141,7 +143,7 @@ def main() -> None:
     best_state: dict[str, torch.Tensor] | None = None
     best_metrics: dict[str, float] | None = None
     best_threshold = 0.5
-    best_f1 = -1.0
+    best_score = -1.0
     epochs_without_improvement = 0
     history: list[dict[str, float]] = []
 
@@ -177,7 +179,12 @@ def main() -> None:
                 cls_loss = cls_loss_fn(output[:, 0:1], smooth_labels)
                 hb_loss = hb_loss_fn(output[:, 1:2], normalized_hbs)
 
-            total_loss = (0.65 * cls_loss) + (0.35 * hb_loss)
+            # Hb spread loss: penalize predictions clustering near zero (normalized mean)
+            # Encourages the model to predict a wider range of Hb values
+            hb_pred_norm = output[:, 1:2]
+            spread_loss = torch.clamp(0.5 - hb_pred_norm.std(), min=0.0)
+
+            total_loss = (0.60 * cls_loss) + (0.30 * hb_loss) + (HB_SPREAD_WEIGHT * spread_loss)
             total_loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
             optimizer.step()
@@ -200,8 +207,10 @@ def main() -> None:
             f"val_hb_mae={val_metrics['hb_mae']:.4f}"
         )
 
-        if val_metrics["f1"] > best_f1:
-            best_f1 = val_metrics["f1"]
+        # Use composite score: AUC weighted more heavily than F1 (more stable early on)
+        composite_score = val_metrics["auc"] * 0.55 + val_metrics["f1"] * 0.35 + (1.0 - min(val_metrics["hb_mae"] / 4.0, 1.0)) * 0.10
+        if composite_score > best_score:
+            best_score = composite_score
             best_state = deepcopy(model.state_dict())
             best_metrics = val_metrics
             best_threshold = val_metrics["decision_threshold"]
@@ -223,6 +232,7 @@ def main() -> None:
         "decision_threshold": best_threshold,
         "hb_mean": hb_mean,
         "hb_std": hb_std,
+        "hb_spread_factor": _compute_hb_spread_factor(val_records, hb_mean, hb_std),
         "val_metrics": best_metrics,
     }
     DEFAULT_EFFICIENTNET_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -437,6 +447,18 @@ def _set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def _compute_hb_spread_factor(records: list[ImageRecord], hb_mean: float, hb_std: float) -> float:
+    """
+    Estimate the spread amplification factor needed to correct regression-to-mean.
+    Uses the ratio of true Hb std to the expected model output std (hb_std * 0.75 heuristic).
+    """
+    true_std = float(np.std([r.hb for r in records]))
+    # Models typically predict ~75% of true std due to averaging
+    predicted_std_estimate = max(hb_std * 0.75, 0.5)
+    factor = float(np.clip(true_std / predicted_std_estimate, 1.0, 2.0))
+    return round(factor, 3)
 
 
 if __name__ == "__main__":
