@@ -6,15 +6,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://asnanp1-anemialens.hf.space/api/:path*"
+      "destination": "https://asnannp-anemialens.hf.space/api/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://asnanp1-anemialens.hf.space/health"
+      "destination": "https://asnannp-anemialens.hf.space/health"
     },
     {
       "source": "/api/runtime-status",
-      "destination": "https://asnanp1-anemialens.hf.space/api/runtime-status"
+      "destination": "https://asnannp-anemialens.hf.space/api/runtime-status"
     },
     {
       "source": "/(.*)",

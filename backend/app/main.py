@@ -33,7 +33,7 @@ from typing import Annotated
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Request, UploadFile, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import UnidentifiedImageError
 
 from app.config import BACKEND_ROOT, settings
@@ -352,6 +352,12 @@ async def _persist_screening(
 # ---------------------------------------------------------------------------
 # Routes — Health / Meta
 # ---------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    """Redirect the Space root to Swagger UI so Docker Space routing has a valid landing page."""
+    return RedirectResponse(url="/docs", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
 
 @app.get("/health", tags=["meta"], summary="Liveness probe")
 async def health(request: Request) -> dict[str, object]:
