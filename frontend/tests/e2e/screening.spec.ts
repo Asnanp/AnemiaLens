@@ -1,44 +1,56 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
-test.describe('AnemiaLens Phase 3 e2e Suite', () => {
+async function expectScreeningSectionInView(page: Page) {
+  const screeningSection = page.locator('#screening');
+  await expect(screeningSection).toBeVisible();
 
+  await expect
+    .poll(
+      () =>
+        screeningSection.evaluate((el) => {
+          const rect = el.getBoundingClientRect();
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+          return rect.top < viewportHeight && rect.bottom > 0;
+        }),
+      { timeout: 6000 },
+    )
+    .toBe(true);
+}
+
+async function clickViaDom(page: Page, selector: string) {
+  const locator = page.locator(selector);
+  await expect(locator).toBeVisible();
+  await locator.evaluate((element: HTMLElement) => element.click());
+}
+
+test.describe('AnemiaLens guest screening experience', () => {
   test('Homepage loads correctly', async ({ page }) => {
     await page.goto('/');
+
     await expect(page).toHaveTitle(/AnemiaLens/);
     await expect(page.locator('h1').first()).toBeVisible();
-    await expect(page.getByText('Get Started')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start Screening/i })).toBeVisible();
   });
 
-  test('Authentication modal works', async ({ page }) => {
+  test('Guest users can access screening without an auth modal', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('Sign In').click();
-    
-    // Expect the modal to show Welcome Back or Create Account
-    await expect(page.locator('text=Welcome back').or(page.locator('text=Create account'))).toBeVisible();
 
-    // Toggle to Register mode
-    await page.getByRole('button', { name: 'SIGN UP' }).click();
-    await expect(page.getByPlaceholder('Full name (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Sign In/i })).toHaveCount(0);
+    await page.getByRole('button', { name: /Start Screening/i }).click();
 
-    // Close the modal
-    await page.getByRole('button', { name: 'Continue without account' }).click();
+    await expectScreeningSectionInView(page);
+    await expect(page.locator('#screening')).toContainText('Interactive');
   });
 
-  test('Navbar scrolls screening section into view', async ({ page }) => {
+  test('Navbar get started control scrolls the screening section into view', async ({ page }) => {
     await page.goto('/');
-    
-    // Wait for animation to finish
-    await page.waitForTimeout(1000);
 
-    // Get started button in the nav panel
-    const getStartedBtn = page.locator('.nav-desktop >> text=Get Started');
-    await getStartedBtn.click();
+    const menuToggle = page.getByRole('button', { name: /Toggle menu/i });
+    if (await menuToggle.isVisible()) {
+      await clickViaDom(page, 'button[aria-label="Toggle menu"]');
+    }
 
-    // Wait for the scrolling logic (which is slightly delayed 150ms in code)
-    await page.waitForTimeout(500);
-
-    // Check if screening section is in viewport
-    const screeningSection = page.locator('#screening');
-    await expect(screeningSection).toBeInViewport();
+    await clickViaDom(page, 'header button:visible >> text=Get Started');
+    await expectScreeningSectionInView(page);
   });
 });
