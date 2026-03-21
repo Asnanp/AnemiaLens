@@ -277,7 +277,7 @@ The model was trained on the **India Conjunctiva Dataset** — 710 real clinical
 - Palpebral conjunctiva crop
 - Combined crop
 
-Located in `archive/dataset anemia/India/`
+Located in `(https://www.kaggle.com/datasets/harshwardhanfartale/eyes-defy-anemia)`
 
 ---
 
