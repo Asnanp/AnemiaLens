@@ -145,8 +145,12 @@ export function useScreening() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Screening failed.';
       // Surface scan limit errors clearly
-      if (msg.toLowerCase().includes('limit reached') || msg.toLowerCase().includes('upgrade')) {
-        setError('Free plan limit reached (10 scans). Open your Dashboard to upgrade to Pro for unlimited screenings.');
+      if (
+        msg.toLowerCase().includes('limit reached')
+        || msg.toLowerCase().includes('free plan')
+        || msg.toLowerCase().includes('payment required')
+      ) {
+        setError('Scan limit reached for this account. Please contact the app administrator if you need more screenings.');
       } else if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('aborted')) {
         setError('Analysis timed out. The AI guidance service may be slow — please try again.');
       } else {

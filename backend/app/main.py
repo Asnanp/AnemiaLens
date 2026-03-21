@@ -204,19 +204,33 @@ async def request_id_middleware(request: Request, call_next):
     request.state.request_id = request_id
     request.state.started_at = time.perf_counter()
 
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed_ms = (time.perf_counter() - request.state.started_at) * 1000
+        log.exception(
+            "%s %s -> %d (%.1fms) [%s]",
+            request.method,
+            request.url.path,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            elapsed_ms,
+            request_id,
+            extra={"request_id": request_id},
+        )
+        raise
 
     elapsed_ms = (time.perf_counter() - request.state.started_at) * 1000
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Response-Time"] = f"{elapsed_ms:.1f}ms"
 
     log.info(
-        "%s %s → %d (%.1fms) [%s]",
+        "%s %s -> %d (%.1fms) [%s]",
         request.method,
         request.url.path,
         response.status_code,
         elapsed_ms,
         request_id,
+        extra={"request_id": request_id},
     )
     return response
 

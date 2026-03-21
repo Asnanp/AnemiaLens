@@ -3,7 +3,7 @@
  * Auth-free: screening works without login. No sign-in/sign-up UI.
  */
 
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useScreening } from './hooks/useScreening';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -18,17 +18,75 @@ import {
   STEPS_META, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
 import {
-  Hero, Challenge, WorkflowStepper, TechSection, Footer,
+  Hero, Challenge, DifferentiatorsSection, WorkflowStepper, TechSection, Footer,
 } from './pages/LandingSections';
 import { ArrowRight, ChevronRight, User } from 'lucide-react';
 
-import DashboardPage from './pages/DashboardPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
-import { generatePdfReport } from './utils/pdfExport';
 import { SupabaseTest } from './components/SupabaseTest';
 import { ToastContainer } from './components/Toast';
 
-const NAV_LINKS = ['Technology', 'Workflow', 'Screening'] as const;
+const loadDashboardPage = () => import('./pages/DashboardPage');
+const DashboardPage = lazy(loadDashboardPage);
+const loadAdminDashboardPage = () => import('./pages/AdminDashboardPage');
+const AdminDashboardPage = lazy(loadAdminDashboardPage);
+
+const NAV_LINKS = [
+  { label: 'Proof', id: 'proof' },
+  { label: 'Technology', id: 'technology' },
+  { label: 'Workflow', id: 'workflow' },
+  { label: 'Screening', id: 'screening' },
+] as const;
+
+function OverlayLoader({ title, detail }: { title: string; detail: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(4,4,10,0.92)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        padding: '1.5rem',
+      }}
+    >
+      <div
+        className="glass"
+        style={{
+          width: 'min(420px, 100%)',
+          padding: '1.75rem',
+          borderRadius: '1.5rem',
+          textAlign: 'center',
+          display: 'grid',
+          gap: '0.85rem',
+          background: 'rgba(255,255,255,0.035)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 28px 70px rgba(0,0,0,0.45)',
+        }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            margin: '0 auto',
+            border: '2px solid rgba(200,0,30,0.16)',
+            borderTopColor: 'var(--accent-bright)',
+            animation: 'spin 0.9s linear infinite',
+          }}
+        />
+        <div style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>{title}</div>
+        <div style={{ fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-dim)' }}>{detail}</div>
+      </div>
+    </motion.div>
+  );
+}
 
 function Navbar({ backendUp }: { backendUp: boolean }) {
   const { isAuthenticated, user } = useAuth();
@@ -94,9 +152,9 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
           </div>
 
           <nav className="nav-desktop" style={{ display: 'flex', gap: '2rem' }}>
-            {NAV_LINKS.map(l => (
-              <a key={l} href={`#${l.toLowerCase()}`} className="label-tag nav-link"
-                style={{ color: 'var(--text-muted)' }}>{l}</a>
+            {NAV_LINKS.map(({ label, id }) => (
+              <a key={label} href={`#${id}`} className="label-tag nav-link"
+                style={{ color: 'var(--text-muted)' }}>{label}</a>
             ))}
           </nav>
 
@@ -106,10 +164,14 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 {user?.role === 'admin' && (
                   <button className="btn btn-glass"
                     style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px', color: '#EF4444' }}
+                    onMouseEnter={() => { void loadAdminDashboardPage(); }}
+                    onFocus={() => { void loadAdminDashboardPage(); }}
                     onClick={() => setShowAdmin(true)}>Admin Panel</button>
                 )}
                 <button className="btn btn-glass"
                   style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px', gap: '0.4rem' }}
+                  onMouseEnter={() => { void loadDashboardPage(); }}
+                  onFocus={() => { void loadDashboardPage(); }}
                   onClick={() => setShowDashboard(true)}>
                   <User size={12} />{user?.full_name?.split(' ')[0] || 'Dashboard'}
                 </button>
@@ -140,16 +202,16 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
               style={{ overflow: 'hidden', background: 'rgba(4,4,10,0.92)', backdropFilter: 'blur(32px)',
                 borderTop: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 0 1.5rem 1.5rem' }}>
               <div style={{ padding: '1.25rem 1.75rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {NAV_LINKS.map((l, i) => (
-                  <motion.a key={l} href={`#${l.toLowerCase()}`}
+                {NAV_LINKS.map(({ label, id }, i) => (
+                  <motion.a key={label} href={`#${id}`}
                     initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
-                    onClick={() => scrollTo(l.toLowerCase())}
+                    onClick={() => scrollTo(id)}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '0.875rem 1rem', borderRadius: '0.875rem',
                       fontFamily: 'var(--mono)', fontSize: '0.72rem', textTransform: 'uppercase',
                       letterSpacing: '0.15em', color: 'var(--text-muted)' }}>
-                    {l}<ChevronRight size={14} />
+                    {label}<ChevronRight size={14} />
                   </motion.a>
                 ))}
                 <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0.5rem 0' }} />
@@ -165,8 +227,16 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
       </motion.header>
 
       <AnimatePresence>
-        {showDashboard && <DashboardPage onClose={() => setShowDashboard(false)} />}
-        {showAdmin && <AdminDashboardPage onClose={() => setShowAdmin(false)} />}
+        {showDashboard && (
+          <Suspense fallback={<OverlayLoader title="Preparing Dashboard" detail="Loading your screening intelligence workspace." />}>
+            <DashboardPage onClose={() => setShowDashboard(false)} />
+          </Suspense>
+        )}
+        {showAdmin && (
+          <Suspense fallback={<OverlayLoader title="Opening Admin Console" detail="Fetching platform analytics and operator controls." />}>
+            <AdminDashboardPage onClose={() => setShowAdmin(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
     </>
   );
@@ -181,7 +251,12 @@ function ScreeningSection() {
 
   const handleDownload = async () => {
     if (!analysis) return;
-    try { await generatePdfReport(analysis); } catch (e) { console.error('PDF export failed', e); }
+    try {
+      const { generatePdfReport } = await import('./utils/pdfExport');
+      await generatePdfReport(analysis);
+    } catch (e) {
+      console.error('PDF export failed', e);
+    }
   };
 
   const canStep = (i: number) =>
@@ -313,7 +388,7 @@ function ScreeningSection() {
 
 function AppContent() {
   const { backendUp } = useScreening();
-  const { isAuthenticated, user } = useAuth();
+  const showSupabaseTest = import.meta.env.DEV && import.meta.env.VITE_SHOW_SUPABASE_TEST === 'true';
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -347,6 +422,8 @@ function AppContent() {
         <div className="section-divider" />
         <Challenge />
         <div className="section-divider" />
+        <DifferentiatorsSection />
+        <div className="section-divider" />
         <WorkflowStepper />
         <div className="section-divider" />
         <ScreeningSection />
@@ -354,7 +431,7 @@ function AppContent() {
         <TechSection />
       </main>
       <Footer />
-      <SupabaseTest />
+      {showSupabaseTest && <SupabaseTest />}
       <ToastContainer />
     </div>
   );
