@@ -118,6 +118,73 @@ class Settings(BaseSettings):
     hf_api_key: str = Field(default="", repr=False, validation_alias=AliasChoices("ANEMIALENS_HF_API_KEY", "HF_API_KEY"))
     hf_provider: str = Field(default="", validation_alias=AliasChoices("ANEMIALENS_HF_PROVIDER", "HF_PROVIDER"))
 
+    # --- Email delivery (SMTP) -------------------------------------------
+    smtp_host: str = Field(
+        default="smtp.gmail.com",
+        validation_alias=AliasChoices("ANEMIALENS_SMTP_HOST", "SMTP_HOST"),
+    )
+    smtp_port: int = Field(
+        default=465,
+        ge=1,
+        le=65535,
+        validation_alias=AliasChoices("ANEMIALENS_SMTP_PORT", "SMTP_PORT"),
+    )
+    smtp_username: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "ANEMIALENS_SMTP_USERNAME",
+            "SMTP_USERNAME",
+            "SMTP_USER",
+        ),
+    )
+    smtp_password: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_SMTP_PASSWORD",
+            "SMTP_PASSWORD",
+            "SMTP_PASS",
+        ),
+    )
+    smtp_use_ssl: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("ANEMIALENS_SMTP_USE_SSL", "SMTP_USE_SSL"),
+    )
+    smtp_use_starttls: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_SMTP_USE_STARTTLS",
+            "SMTP_USE_STARTTLS",
+            "SMTP_STARTTLS",
+        ),
+    )
+    smtp_timeout: float = Field(
+        default=20.0,
+        ge=1.0,
+        le=120.0,
+        validation_alias=AliasChoices("ANEMIALENS_SMTP_TIMEOUT", "SMTP_TIMEOUT"),
+    )
+    email_from_name: str = Field(
+        default="AnemiaLens",
+        validation_alias=AliasChoices("ANEMIALENS_EMAIL_FROM_NAME", "EMAIL_FROM_NAME"),
+    )
+    email_from_email: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "ANEMIALENS_EMAIL_FROM_EMAIL",
+            "EMAIL_FROM_EMAIL",
+            "SMTP_FROM",
+        ),
+    )
+    email_reply_to: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "ANEMIALENS_EMAIL_REPLY_TO",
+            "EMAIL_REPLY_TO",
+            "SMTP_REPLY_TO",
+        ),
+    )
+
     # --- Image quality thresholds ----------------------------------------
     min_blur_score: float = Field(default=60.0, ge=0.0, le=200.0)
     min_brightness: float = Field(default=0.20, ge=0.0, le=1.0)
@@ -157,13 +224,47 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator(
+        "smtp_host",
+        "smtp_username",
+        "email_from_name",
+        "email_from_email",
+        "email_reply_to",
+        mode="before",
+    )
+    @classmethod
+    def _strip_text_fields(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
     @model_validator(mode="after")
-    def _warn_missing_api_key(self) -> "Settings":
+    def _smtp_tls_modes_consistent(self) -> "Settings":
+        if self.smtp_use_ssl and self.smtp_use_starttls:
+            raise ValueError("smtp_use_ssl and smtp_use_starttls cannot both be true.")
+        return self
+
+    @model_validator(mode="after")
+    def _warn_missing_optional_integrations(self) -> "Settings":
         if self.mistral_enabled and not self.mistral_api_key:
             import warnings
             warnings.warn(
                 "No Mistral API key is set but Mistral guidance is enabled. "
                 "Guidance calls will fall back to rule-based responses.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        smtp_values = [
+            self.smtp_username,
+            self.smtp_password,
+            self.email_from_email,
+            self.email_reply_to,
+        ]
+        if any(smtp_values) and not (self.smtp_username and self.smtp_password):
+            import warnings
+            warnings.warn(
+                "SMTP settings are partially configured. "
+                "Set both SMTP username and password for email delivery to work.",
                 RuntimeWarning,
                 stacklevel=2,
             )

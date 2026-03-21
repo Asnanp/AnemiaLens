@@ -3,6 +3,7 @@ import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp,
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse, InsightDriver } from '../../types';
 import { sendEmailReport } from '../../api';
+import { useAuth } from '../../hooks/useAuth';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -299,16 +300,28 @@ function MLProofPanel() {
 
 // ── Email Report Modal ────────────────────────────────────────────────────────
 function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; onClose: () => void }) {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
 
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(prev => prev || user.email);
+    }
+  }, [user?.email]);
+
   const handleSend = async () => {
-    if (!email.includes('@')) { setErrMsg('Enter a valid email address'); return; }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
+      setErrMsg('Enter a valid email address');
+      return;
+    }
+    setErrMsg('');
     setStatus('sending');
     try {
       await sendEmailReport(
-        email,
+        normalizedEmail,
         analysis.handoff_summary.share_text,
         analysis.triage.label,
         analysis.prediction?.predicted_hemoglobin ?? null,
@@ -316,6 +329,7 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
       );
       setStatus('sent');
     } catch (e: unknown) {
+      console.error('[FIX] Email report send failed', e);
       setErrMsg(e instanceof Error ? e.message : 'Send failed');
       setStatus('error');
     }
@@ -355,7 +369,7 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Email Address</label>
               <input type="email" placeholder="your@email.com" value={email}
-                onChange={e => { setEmail(e.target.value); setErrMsg(''); }}
+                onChange={e => { setEmail(e.target.value); setErrMsg(''); if (status === 'error') setStatus('idle'); }}
                 style={{ width: '100%', padding: '0.875rem 1.125rem', borderRadius: '0.875rem', fontSize: '0.9rem', background: 'rgba(255,255,255,0.04)', border: errMsg ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box', transition: 'border 0.2s' }}
               />
               {errMsg && <div style={{ fontSize: '0.72rem', color: '#EF4444' }}>{errMsg}</div>}
