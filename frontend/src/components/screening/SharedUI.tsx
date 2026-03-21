@@ -49,7 +49,7 @@ export function WakeBanner() {
             animation: 'spin 0.8s linear infinite', flexShrink: 0,
           }} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Backend waking up — first load takes ~60s on Render free tier{dots}
+            Backend waking up — first load can take ~60s while Hugging Face Spaces spins up{dots}
           </span>
         </>
       ) : (

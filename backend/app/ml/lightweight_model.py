@@ -2,7 +2,7 @@
 Lightweight fallback model for AnemiaLens.
 
 Used when:
-- Available RAM < 512MB (Render free tier)
+- Available RAM < 512MB on constrained free hosts
 - Inference time budget is tight
 - Primary model artifacts are unavailable
 
