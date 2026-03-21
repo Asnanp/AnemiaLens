@@ -145,6 +145,16 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
                 <div>
                   <div style={{ fontWeight:600, fontSize:'0.83rem', marginBottom:'0.2rem' }}>{issue.title}</div>
                   <p style={{ fontSize:'0.73rem', color:'var(--text-muted)', lineHeight:1.55 }}>{issue.message}</p>
+                  {issue.severity === 'blocking' && (
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.65rem', color: '#F59E0B', fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>↺</span>
+                      {issue.code === 'blur_detected' && 'Tip: Rest your phone on a surface and tap the eye to focus before shooting.'}
+                      {issue.code === 'poor_lighting' && 'Tip: Move near a window or turn on room lights. Avoid direct flash.'}
+                      {issue.code === 'bad_framing' && 'Tip: Pull down the lower eyelid gently and fill the frame with just the eye.'}
+                      {issue.code === 'eye_not_visible' && 'Tip: Hold the phone 15–20 cm from the eye and keep the inner eyelid exposed.'}
+                      {issue.code === 'resolution_too_low' && 'Tip: Move closer to the eye and ensure your camera is set to full resolution.'}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}

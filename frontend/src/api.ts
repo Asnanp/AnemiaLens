@@ -191,3 +191,17 @@ export async function exportScreeningsCSV(): Promise<void> {
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
+
+export async function sendEmailReport(email: string, shareText: string, triageLabel: string, hb: number | null, risk: number): Promise<void> {
+  const r = await fetch(endpoint('/api/email-report'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ email, share_text: shareText, triage_label: triageLabel, predicted_hemoglobin: hb, anemia_risk: risk }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) {
+    let msg = 'Failed to send report';
+    try { const b = await r.json(); msg = b.detail || msg; } catch { /* */ }
+    throw new Error(msg);
+  }
+}

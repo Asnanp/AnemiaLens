@@ -1,55 +1,20 @@
 {
-  "dataset_name": "dataset anemia",
-  "record_count": 433,
+  "dataset_name": "dataset anemia (pipeline-aligned)",
+  "record_count": 217,
   "subject_count": 217,
-  "primary_model": "archive-fusion-v3",
-  "selected_mode": "hybrid_dual",
+  "primary_model": "archive-fusion-v4-pipeline",
+  "selected_mode": "pipeline_aligned_roi",
   "metrics": {
-    "accuracy": 0.7114,
-    "precision": 0.5309,
-    "recall": 0.9324,
-    "f1": 0.6753,
-    "auc": 0.8396,
-    "mae_hb": 1.5029,
-    "threshold": 0.264
+    "accuracy": 0.7045,
+    "precision": 0.5222,
+    "recall": 0.8948,
+    "f1": 0.6586,
+    "auc": 0.7983,
+    "mae_hb": 1.6559
   },
   "calibration": {
-    "blend_threshold": 0.264,
+    "blend_threshold": 0.258,
     "risk_scale": 0.22,
     "classifier_weight": 0.55
-  },
-  "top_features": [
-    {
-      "name": "green_blue_ratio",
-      "importance": 0.0758
-    },
-    {
-      "name": "color_temp_proxy",
-      "importance": 0.0658
-    },
-    {
-      "name": "redness_ratio",
-      "importance": 0.0492
-    },
-    {
-      "name": "cpi",
-      "importance": 0.0473
-    },
-    {
-      "name": "red_green_gap",
-      "importance": 0.0424
-    },
-    {
-      "name": "center_red_green_gap",
-      "importance": 0.033
-    },
-    {
-      "name": "center_color_temp",
-      "importance": 0.0319
-    },
-    {
-      "name": "redness_uniformity",
-      "importance": 0.0291
-    }
-  ]
+  }
 }

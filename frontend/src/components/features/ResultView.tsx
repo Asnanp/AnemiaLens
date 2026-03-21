@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from 'react';
-import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera } from 'lucide-react';
+import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse, InsightDriver } from '../../types';
+import { sendEmailReport } from '../../api';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -340,6 +341,171 @@ function InsightPackPanel({ analysis }: { analysis: AnalyzeResponse }) {
   );
 }
 
+// ── ML Proof Panel ────────────────────────────────────────────────────────────
+function MLProofPanel() {
+  const metrics = [
+    { label: 'Accuracy', value: '70.5%', sub: '5-fold CV' },
+    { label: 'Recall', value: '89.5%', sub: 'catches anemia', highlight: true },
+    { label: 'AUC-ROC', value: '0.798', sub: 'discrimination' },
+    { label: 'Hb MAE', value: '1.66', sub: 'g/dL error' },
+  ];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <BarChart2 size={12} style={{ color: 'rgba(0,194,255,0.7)' }} />
+        <span style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)' }}>
+          Model Performance · Validated
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+        {metrics.map(m => (
+          <div key={m.label} style={{
+            padding: '0.75rem', borderRadius: '0.625rem',
+            background: m.highlight ? 'rgba(0,194,255,0.07)' : 'rgba(255,255,255,0.02)',
+            border: m.highlight ? '1px solid rgba(0,194,255,0.2)' : '1px solid rgba(255,255,255,0.05)',
+          }}>
+            <div style={{ fontSize: '0.52rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.25rem' }}>{m.label}</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'var(--mono)', color: m.highlight ? 'rgba(0,194,255,0.9)' : 'var(--text)', lineHeight: 1 }}>{m.value}</div>
+            <div style={{ fontSize: '0.48rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: '0.58rem', color: 'var(--text-dim)', lineHeight: 1.6, padding: '0.625rem 0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+        217 real patient images · India + Italy · ExtraTrees ensemble · pipeline-aligned training
+      </div>
+    </div>
+  );
+}
+
+// ── Email Report Modal ────────────────────────────────────────────────────────
+function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; onClose: () => void }) {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState('');
+
+  const handleSend = async () => {
+    if (!email.includes('@')) { setErrMsg('Enter a valid email'); return; }
+    setStatus('sending');
+    try {
+      await sendEmailReport(
+        email,
+        analysis.handoff_summary.share_text,
+        analysis.triage.label,
+        analysis.prediction?.predicted_hemoglobin ?? null,
+        analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0,
+      );
+      setStatus('sent');
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : 'Send failed');
+      setStatus('error');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 420, borderRadius: '1.25rem', background: 'rgba(13,13,20,0.98)', border: '1px solid rgba(255,255,255,0.1)', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Mail size={16} style={{ color: 'var(--accent-bright)' }} />
+          <span style={{ fontFamily: 'var(--serif)', fontSize: '1.1rem', color: 'var(--text)' }}>Send Report to Email</span>
+        </div>
+
+        {status === 'sent' ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>✓</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '0.8rem', color: 'rgba(0,229,150,0.9)' }}>Report sent successfully</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '0.5rem' }}>Check your inbox (and spam folder)</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+              Sends your screening result — risk level, hemoglobin estimate, and next steps — directly to your email.
+            </div>
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setErrMsg(''); }}
+              style={{
+                width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', fontSize: '0.85rem',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'var(--text)', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            {errMsg && <div style={{ fontSize: '0.7rem', color: '#EF4444' }}>{errMsg}</div>}
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)', lineHeight: 1.5, padding: '0.625rem 0.75rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', fontStyle: 'italic' }}>
+              Disclaimer: This is a screening aid, not a diagnosis. Always confirm with a clinical blood test.
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={onClose} style={{ flex: 1, padding: '0.7rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)', fontSize: '0.75rem', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <motion.button
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                onClick={handleSend}
+                disabled={status === 'sending'}
+                style={{ flex: 2, padding: '0.7rem', borderRadius: '0.75rem', background: 'var(--accent-bright)', border: 'none', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', opacity: status === 'sending' ? 0.6 : 1 }}
+              >
+                {status === 'sending' ? 'Sending…' : 'Send Report'}
+              </motion.button>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Risk Action Suggestion ────────────────────────────────────────────────────
+function RiskActionBadge({ band }: { band: string }) {
+  const config = band === 'high_concern'
+    ? { icon: '🔴', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', action: 'Consult a doctor immediately — seek a CBC blood test within 24–48 hours.' }
+    : band === 'moderate_risk'
+    ? { icon: '🟡', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', action: 'Consider scheduling a blood test soon. Monitor symptoms and maintain iron-rich diet.' }
+    : { icon: '🟢', color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', action: 'Maintain a balanced diet. Rescreen in 3–6 months or if symptoms develop.' };
+
+  return (
+    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.875rem 1rem', borderRadius: '0.75rem', background: config.bg, border: `1px solid ${config.border}` }}>
+      <Zap size={14} style={{ color: config.color, flexShrink: 0, marginTop: 2 }} />
+      <div>
+        <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', color: config.color, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.3rem' }}>Recommended Action</div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>{config.action}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Confidence Gauge ──────────────────────────────────────────────────────────
+function ConfidenceGauge({ confidence, color }: { confidence: number; color: string }) {
+  const pct = Math.round(confidence * 100);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.52rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Confidence</span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--mono)', color }}>{pct}%</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 1.4, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${color}80, ${color})`, boxShadow: `0 0 8px ${color}60` }}
+        />
+      </div>
+      <div style={{ fontSize: '0.48rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
+        {pct >= 70 ? 'High confidence result' : pct >= 45 ? 'Moderate confidence — consider retake' : 'Low confidence — retake recommended'}
+      </div>
+    </div>
+  );
+}
+
 interface ResultViewProps {
   analysis: AnalyzeResponse;
   onReset: () => void;
@@ -363,6 +529,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const [revealed,  setRevealed]  = useState(false);
   const [clinicalMode, setClinicalMode] = useState(false);
   const [shareToast, setShareToast] = useState<string | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setFlashDone(true), 600);
@@ -433,6 +600,13 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           >
             ✓ {shareToast}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── EMAIL MODAL ── */}
+      <AnimatePresence>
+        {showEmailModal && (
+          <EmailReportModal analysis={analysis} onClose={() => setShowEmailModal(false)} />
         )}
       </AnimatePresence>
 
@@ -563,6 +737,19 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             </div>
           )}
 
+          {/* Confidence Gauge + Risk Action */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.75rem' }}>
+            <div style={{ padding: '1rem 1.25rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <ConfidenceGauge confidence={analysis.prediction?.confidence ?? 0} color={bandColor} />
+            </div>
+            <RiskActionBadge band={analysis.triage.band} />
+          </div>
+
+          {/* Branding tagline */}
+          <div style={{ marginBottom: '1.25rem', textAlign: 'center', fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+            No lab · No needle · Just a smartphone
+          </div>
+
           {/* Disclaimer bar */}
           <div style={{ display:'flex', gap:'0.75rem', alignItems:'flex-start', padding:'1rem 1.25rem',
             borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
@@ -635,8 +822,8 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
         </motion.div>
       )}
 
-      {/* ── BOTTOM ROW: 4 cards ── */}
-      <div className="result-bottom-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'1.5rem' }}>
+      {/* ── BOTTOM ROW: 5 cards ── */}
+      <div className="result-bottom-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:'1.5rem' }}>
 
         {/* Clinical Guidance */}
         <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
@@ -749,6 +936,11 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             onClick={handleShare}>
             <Share2 size={13} /> Share with Provider
           </motion.button>
+          <motion.button className="btn btn-glass" whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+            style={{ width:'100%', padding:'0.7rem', fontSize:'0.65rem', cursor:'pointer' }}
+            onClick={() => setShowEmailModal(true)}>
+            <Mail size={13} /> Send Report to Email
+          </motion.button>
           <div style={{ padding:'1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)',
             border:'1px solid rgba(255,255,255,0.05)' }}>
             <p style={{ fontSize:'0.62rem', color:'var(--text-dim)', lineHeight:1.65, fontStyle:'italic', marginBottom:'1rem' }}>
@@ -769,6 +961,15 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             borderLeft:'3px solid rgba(255,165,0,0.4)',
             boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 30px rgba(255,165,0,0.06)' }}>
           <InsightPackPanel analysis={analysis} />
+        </motion.div>
+
+        {/* ML Proof Panel */}
+        <motion.div className="glass" initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+          transition={{ delay:0.46, duration:0.5, ease:E }}
+          style={{ padding:'clamp(1.25rem, 3vw, 2rem)', display:'flex', flexDirection:'column', gap:'1.25rem',
+            borderLeft:'3px solid rgba(0,194,255,0.4)',
+            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.1), -4px 0 30px rgba(0,194,255,0.06)' }}>
+          <MLProofPanel />
         </motion.div>
       </div>
       </motion.div>

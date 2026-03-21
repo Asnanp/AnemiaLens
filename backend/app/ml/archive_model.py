@@ -643,7 +643,7 @@ def _build_regressor(*, random_state: int) -> ExtraTreesRegressor:
         max_features=0.7,
         bootstrap=True,
         random_state=random_state,
-        n_jobs=-1,
+        n_jobs=1,
     )
 
 
@@ -655,7 +655,7 @@ def _build_classifier(*, random_state: int) -> ExtraTreesClassifier:
         bootstrap=True,
         random_state=random_state,
         class_weight="balanced_subsample",
-        n_jobs=-1,
+        n_jobs=1,
     )
 
 
