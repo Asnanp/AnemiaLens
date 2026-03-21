@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from 'react';
-import { Download, Info, Share2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap } from 'lucide-react';
+import { Download, Info, Share2, AlertCircle, RefreshCw, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AnalyzeResponse, InsightDriver } from '../../types';
-import { sendEmailReport } from '../../api';
+import type { AnalyzeResponse, InsightDriver, RuntimeStatusResponse } from '../../types';
+import { getRuntimeStatus, sendEmailReport } from '../../api';
 import { useAuth } from '../../hooks/useAuth';
 
 const E = [0.22, 1, 0.36, 1] as const;
@@ -50,6 +50,221 @@ function RiskArc({ value, color }: { value: number; color: string }) {
   );
 }
 
+const SYMPTOM_LABELS: Record<keyof AnalyzeResponse['symptoms'], string> = {
+  fatigue: 'fatigue',
+  dizziness: 'dizziness',
+  pale_skin: 'pale skin',
+  shortness_of_breath: 'shortness of breath',
+  heavy_menstrual_bleeding: 'heavy menstrual bleeding',
+  poor_diet_low_iron: 'low iron intake',
+};
+
+function activeSymptomLabels(symptoms: AnalyzeResponse['symptoms']): string[] {
+  return (Object.keys(SYMPTOM_LABELS) as Array<keyof AnalyzeResponse['symptoms']>)
+    .filter((key) => symptoms[key] === true)
+    .map((key) => SYMPTOM_LABELS[key]);
+}
+
+function joinHuman(items: string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+type ReliabilityStatus = {
+  label: 'High' | 'Moderate' | 'Low';
+  color: string;
+  detail: string;
+};
+
+function classificationLabel(label: string): string {
+  return label.toLowerCase().replace(/\s+/g, '-');
+}
+
+function formatModelVersion(modelSource?: string | null): string {
+  return (modelSource ?? 'archive-evidence-fusion-v4').replace(/_/g, '-').toLowerCase();
+}
+
+function getReliabilityStatus(analysis: AnalyzeResponse): ReliabilityStatus {
+  const prediction = analysis.prediction;
+  const confidencePct = Math.round((prediction?.confidence ?? 0) * 100);
+  const hasWarnings = analysis.quality.issues.some((issue) => issue.severity === 'warning');
+  const blockedByQuality = !prediction || !analysis.quality.passed || analysis.decision_audit.processing_path === 'quality_blocked';
+
+  if (blockedByQuality) {
+    return {
+      label: 'Low',
+      color: '#EF4444',
+      detail: 'Image quality affected prediction reliability, so the system stayed retake-first instead of giving false reassurance.',
+    };
+  }
+
+  if (
+    prediction.reliability_flag === 'low'
+    || confidencePct < 50
+    || hasWarnings
+    || analysis.decision_audit.processing_path === 'full_frame_rescue'
+  ) {
+    return {
+      label: 'Low',
+      color: '#F97316',
+      detail: 'Image quality affected prediction reliability, so a cleaner retake would improve trust in this result.',
+    };
+  }
+
+  if (prediction.reliability_flag === 'high' && confidencePct >= 80) {
+    return {
+      label: 'High',
+      color: '#10B981',
+      detail: 'Clean image quality and a stable signal support this prediction.',
+    };
+  }
+
+  return {
+    label: 'Moderate',
+    color: '#F59E0B',
+    detail: 'The prediction is usable, but stronger lighting or a cleaner capture would make it more defensible.',
+  };
+}
+
+function buildMandatoryWhySummary(analysis: AnalyzeResponse): string {
+  const activeSymptoms = activeSymptomLabels(analysis.symptoms);
+  const classLabel = classificationLabel(analysis.triage.label);
+
+  if (!analysis.prediction) {
+    return 'The system could not trust the captured image enough to estimate conjunctival pallor. Because image quality affected prediction reliability, this result stays retake-first rather than giving false reassurance.';
+  }
+
+  const imageRisk = analysis.prediction.anemia_risk;
+  if (imageRisk >= 0.55) {
+    return activeSymptoms.length > 0
+      ? `The model detected reduced redness in the conjunctival region, which is a key indicator of low hemoglobin. Combined with the reported symptom severity, this leads to a ${classLabel} classification.`
+      : `The model detected reduced redness in the conjunctival region, which is a key indicator of low hemoglobin. With no additional symptom burden lowering the case, this leads to a ${classLabel} classification.`;
+  }
+
+  if (imageRisk >= 0.35) {
+    return activeSymptoms.length > 0
+      ? `The model detected mildly reduced redness in the conjunctival region, suggesting a borderline low-hemoglobin signal. Combined with the reported symptom severity, this leads to a ${classLabel} classification.`
+      : `The model detected a borderline change in conjunctival redness, but not a strong pallor pattern. With no added symptom burden, this leads to a ${classLabel} classification.`;
+  }
+
+  return activeSymptoms.length > 0
+    ? `The model did not detect strong pallor in the conjunctival region, which lowers concern for low hemoglobin. Symptom input was still considered, and the combined signal leads to a ${classLabel} classification.`
+    : `The model did not detect strong pallor in the conjunctival region, which lowers concern for low hemoglobin. With no additional symptom burden, this leads to a ${classLabel} classification.`;
+}
+
+function buildWhyResultSteps(analysis: AnalyzeResponse): Array<{
+  title: string;
+  detail: string;
+  impact: InsightDriver['impact'];
+}> {
+  const activeSymptoms = activeSymptomLabels(analysis.symptoms);
+  const warningIssues = analysis.quality.issues.filter((issue) => issue.severity === 'warning');
+  const fusedPct = Math.round((analysis.clinical_brief?.signal_breakdown?.fused_score ?? analysis.triage.score ?? 0) * 100);
+
+  if (!analysis.prediction) {
+    const blocker = analysis.quality.issues[0];
+    return [
+      {
+        title: 'Image quality gate stopped inference',
+        detail: 'The backend did not trust this scan enough to make a stronger screening claim.',
+        impact: 'limit',
+      },
+      {
+        title: 'Capture issue needs a retake',
+        detail: blocker
+          ? `${blocker.title}: ${blocker.message}`
+          : 'A clearer image is needed before the model can weigh the eye-image signal.',
+        impact: 'limit',
+      },
+      {
+        title: activeSymptoms.length > 0 ? 'Symptoms still raised follow-up context' : 'No symptom burden was added',
+        detail: activeSymptoms.length > 0
+          ? `Reported symptoms such as ${joinHuman(activeSymptoms)} were still preserved for clinical follow-up context.`
+          : 'No symptoms were reported, so the system did not add extra clinical burden on top of the blocked scan.',
+        impact: activeSymptoms.length > 0 ? 'up' : 'down',
+      },
+      {
+        title: 'Safest result stayed retake-first',
+        detail: `Because the confidence gate failed, the app kept the final call at ${analysis.triage.label.toLowerCase()} instead of over-claiming.`,
+        impact: 'limit',
+      },
+    ];
+  }
+
+  const imageRiskPct = Math.round(analysis.prediction.anemia_risk * 100);
+  const imageStep =
+    imageRiskPct >= 72
+      ? {
+          title: 'Strong pallor-like image signal',
+          detail: `The conjunctiva scan produced a ${imageRiskPct}% anemia-like risk signal, which pushed the case upward.`,
+          impact: 'up' as const,
+        }
+      : imageRiskPct >= 45
+        ? {
+            title: 'Borderline pallor-like image signal',
+            detail: `The eye image showed a ${imageRiskPct}% risk signal, enough to keep the case above a low-risk story but not at the strongest tier.`,
+            impact: 'up' as const,
+          }
+        : {
+            title: 'Image signal reduced concern',
+            detail: `The eye image stayed around ${imageRiskPct}% anemia-like risk, which lowered concern relative to a stronger pallor signal.`,
+            impact: 'down' as const,
+          };
+
+  const confidenceLimited =
+    analysis.decision_audit.processing_path === 'full_frame_rescue'
+    || analysis.decision_audit.calibration_band.startsWith('borderline')
+    || analysis.prediction.reliability_flag === 'low'
+    || (analysis.prediction.uncertainty ?? 0) >= 0.5
+    || warningIssues.length > 0;
+
+  const confidenceStep = confidenceLimited
+    ? {
+        title: 'Confidence was tempered by scan conditions',
+        detail:
+          analysis.decision_audit.processing_path === 'full_frame_rescue'
+            ? 'The backend had to use the fallback rescue path, so the result stayed usable but less ideal than a clean ROI crop.'
+            : warningIssues.length > 0
+              ? `The scan passed, but quality warnings such as ${joinHuman(warningIssues.slice(0, 2).map((issue) => issue.title.toLowerCase()))} reduced confidence in the final call.`
+              : analysis.decision_audit.summary,
+        impact: 'limit' as const,
+      }
+    : {
+        title: 'Clean capture supported the call',
+        detail: `The scan used a direct ROI path with ${Math.round((analysis.prediction.confidence ?? 0) * 100)}% confidence, which made the final story easier to trust.`,
+        impact: 'down' as const,
+      };
+
+  const symptomStep = activeSymptoms.length > 0
+    ? {
+        title: 'Reported symptoms pushed triage upward',
+        detail: `Symptoms such as ${joinHuman(activeSymptoms)} were fused into the triage score instead of relying on the image alone.`,
+        impact: 'up' as const,
+      }
+    : {
+        title: 'No symptoms slightly lowered the story',
+        detail: 'No symptoms were reported, so the system did not add extra symptom burden on top of the eye-image model.',
+        impact: 'down' as const,
+      };
+
+  const finalImpact: InsightDriver['impact'] =
+    analysis.triage.band === 'high_concern' || analysis.triage.band === 'moderate_risk'
+      ? 'up'
+      : analysis.triage.band === 'low_risk'
+        ? 'down'
+        : 'limit';
+
+  const finalStep = {
+    title: `Combined signal landed at ${analysis.triage.label}`,
+    detail: `After image signal, symptom fusion, and threshold auditing were combined, the final fused score settled at ${fusedPct}% and produced a ${analysis.triage.label.toLowerCase()} classification.`,
+    impact: finalImpact,
+  };
+
+  return [imageStep, confidenceStep, symptomStep, finalStep];
+}
+
 function SignalBar({ label, value, color, delay = 0 }: { label: string; value: number; color: string; delay?: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
@@ -65,6 +280,134 @@ function SignalBar({ label, value, color, delay = 0 }: { label: string; value: n
         />
       </div>
     </div>
+  );
+}
+
+function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
+  const steps = buildWhyResultSteps(analysis);
+  const topDrivers = analysis.insight_pack.risk_drivers.slice(0, 3);
+  const reliability = getReliabilityStatus(analysis);
+  const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
+  const modelVersion = formatModelVersion(analysis.prediction?.model_source);
+  const mandatorySummary = buildMandatoryWhySummary(analysis);
+
+  return (
+    <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.08, duration: 0.5, ease: E }}
+      style={{
+        padding: 'clamp(1.25rem,3vw,2rem)',
+        borderLeft: `3px solid ${bandColor}`,
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <div className="section-eyebrow">Why This Result</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.45rem', maxWidth: 760 }}>
+            Transparent AI explanation grounded in the actual image, symptoms, and threshold logic used for this run.
+          </div>
+        </div>
+        <div style={{ padding: '0.35rem 0.85rem', borderRadius: '99px', fontSize: '0.55rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: bandColor, background: `${bandColor}12`, border: `1px solid ${bandColor}30` }}>
+          Transparent AI
+        </div>
+      </div>
+
+      <div style={{ padding: '1rem 1.125rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.75 }}>
+        {mandatorySummary}
+      </div>
+
+      <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7 }}>
+        {analysis.insight_pack.why_this_result}
+      </div>
+
+      {topDrivers.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          {topDrivers.map((driver, index) => (
+            <div key={`${driver.title}-${index}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.45rem 0.75rem', borderRadius: '99px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${DRIVER_COLORS[driver.strength]}22`, color: 'var(--text-muted)', fontSize: '0.68rem' }}>
+              <span style={{ color: DRIVER_COLORS[driver.strength], display: 'inline-flex' }}>{DRIVER_ICONS[driver.impact]}</span>
+              <span>{driver.title}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {steps.map((step, index) => (
+            <motion.div key={step.title} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.12 + index * 0.06, duration: 0.35 }}
+              style={{ display: 'flex', gap: '0.9rem', alignItems: 'flex-start', padding: '0.95rem 1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: `1px solid ${DRIVER_COLORS[step.impact === 'limit' ? 'watch' : step.impact === 'up' ? 'high' : 'medium']}22` }}>
+              <div style={{ width: 30, height: 30, borderRadius: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: '0.72rem', color: bandColor, flexShrink: 0 }}>
+                {index + 1}
+              </div>
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.25rem' }}>{step.title}</div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{step.detail}</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
+              Confidence + Reliability
+            </div>
+            <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Confidence</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
+                <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.6rem' }}>
+              {reliability.detail}
+            </div>
+            <div style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.05em', lineHeight: 1.6 }}>
+              High: 80%+ · Moderate: 50–80% · Low: &lt;50%
+            </div>
+          </div>
+
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,165,0,0.06)', border: '1px solid rgba(255,165,0,0.16)' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.8)', marginBottom: '0.45rem' }}>
+              Retake Boost
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              Retaking under better lighting can significantly improve prediction reliability. {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
+            </div>
+          </div>
+
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
+              Clinical Safety
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.65rem' }}>
+              This system is designed as a screening aid and prioritizes safety by avoiding false reassurance.
+            </div>
+            <div style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+              Model
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              {modelVersion}
+            </div>
+          </div>
+
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
+              Judge Summary
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              {analysis.insight_pack.judge_summary}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -269,13 +612,258 @@ function InsightPackPanel({ analysis }: { analysis: AnalyzeResponse }) {
   );
 }
 
+function formatPercentMetric(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined) return '—';
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+type AudienceMode = 'user' | 'doctor';
+
+function estimateRetakeConfidence(analysis: AnalyzeResponse): number {
+  const current = Math.round((analysis.prediction?.confidence ?? 0) * 100);
+  const warningCount = analysis.quality.issues.filter((issue) => issue.severity === 'warning').length;
+  let lift = 8 + warningCount * 6;
+  if ((analysis.prediction?.reliability_flag ?? 'low') === 'low') lift += 8;
+  if (analysis.decision_audit.processing_path === 'full_frame_rescue') lift += 5;
+  if (!analysis.quality.passed) lift += 10;
+  return Math.min(94, current + lift);
+}
+
+function estimateSymptomLift(analysis: AnalyzeResponse): number {
+  const breakdown = analysis.clinical_brief?.signal_breakdown;
+  if (!breakdown) return 6;
+  return Math.max(4, Math.round(Math.max(0, 1 - breakdown.symptom_score) * breakdown.symptom_weight * 100));
+}
+
+function AudienceModePanel({
+  analysis,
+  mode,
+  onModeChange,
+  bandColor,
+}: {
+  analysis: AnalyzeResponse;
+  mode: AudienceMode;
+  onModeChange: (mode: AudienceMode) => void;
+  bandColor: string;
+}) {
+  const audit = analysis.decision_audit;
+  const meta = analysis.analysis_meta;
+  const items = mode === 'user'
+    ? [
+        {
+          label: 'What this means',
+          value: analysis.triage.summary,
+        },
+        {
+          label: 'Action now',
+          value: analysis.guidance.urgency_guidance,
+        },
+        {
+          label: 'How it is phrased',
+          value: 'Keeps medical language simple, calm, and safety-first for patients or families.',
+        },
+      ]
+    : [
+        {
+          label: 'Threshold + margin',
+          value: audit.threshold_margin !== null && audit.decision_threshold !== null
+            ? `${(audit.threshold_margin * 100).toFixed(1)} pts around a ${(audit.decision_threshold * 100).toFixed(0)}% operating threshold`
+            : 'Threshold data unavailable for this case.',
+        },
+        {
+          label: 'Processing path',
+          value: `${meta.processing_path.replace(/_/g, ' ')} with ${meta.safety_layers.length} active safety layers and ${audit.review_flags.length} review flags.`,
+        },
+        {
+          label: 'Clinical handoff',
+          value: 'Doctor mode is optimized for CBC follow-up, provider sharing, and structured review rather than consumer-only language.',
+        },
+      ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="section-eyebrow">Audience Modes</div>
+        <div style={{ display: 'inline-flex', padding: '0.2rem', borderRadius: '999px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {([
+            { key: 'user', label: 'User View', icon: <Zap size={11} /> },
+            { key: 'doctor', label: 'Doctor View', icon: <Stethoscope size={11} /> },
+          ] as const).map((option) => (
+            <button
+              key={option.key}
+              onClick={() => onModeChange(option.key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.38rem',
+                padding: '0.45rem 0.8rem',
+                borderRadius: '999px',
+                border: 'none',
+                cursor: 'pointer',
+                background: mode === option.key ? `${bandColor}18` : 'transparent',
+                color: mode === option.key ? bandColor : 'var(--text-dim)',
+                fontSize: '0.58rem',
+                fontFamily: 'var(--mono)',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {option.icon}{option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '0.95rem 1rem', borderRadius: '0.9rem', background: `${bandColor}10`, border: `1px solid ${bandColor}20`, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+        {mode === 'user'
+          ? 'User View keeps the narrative simple and action-oriented so the result feels understandable without losing the safety message.'
+          : 'Doctor View foregrounds threshold logic, audit metadata, and handoff readiness so a clinician can review the case faster.'}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+        {items.map((item) => (
+          <div key={item.label} style={{ padding: '0.9rem 1rem', borderRadius: '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-dim)', marginBottom: '0.35rem' }}>
+              {item.label}
+            </div>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScenarioSimulatorPanel({
+  analysis,
+  onRetake,
+  onShare,
+}: {
+  analysis: AnalyzeResponse;
+  onRetake: () => void;
+  onShare: () => void;
+}) {
+  const retakeConfidence = estimateRetakeConfidence(analysis);
+  const symptomLift = estimateSymptomLift(analysis);
+  const thresholdMargin = Math.abs(analysis.decision_audit.threshold_margin ?? 0);
+  const currentConfidence = Math.round((analysis.prediction?.confidence ?? 0) * 100);
+  const activeSymptoms = activeSymptomLabels(analysis.symptoms);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+      <div className="section-eyebrow">What-If Simulator</div>
+      <div style={{ padding: '0.95rem 1rem', borderRadius: '0.9rem', background: 'rgba(0,194,255,0.06)', border: '1px solid rgba(0,194,255,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+        These are forward-looking estimates based on the current confidence, symptom weighting, and threshold margin of this exact case.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ padding: '1rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(0,194,255,0.75)' }}>
+              Better Retake
+            </span>
+            <span style={{ fontSize: '0.8rem', fontFamily: 'var(--mono)', color: 'rgba(0,194,255,0.95)' }}>
+              {currentConfidence}% → ~{retakeConfidence}%
+            </span>
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.75rem' }}>
+            Cleaner lighting and steadier framing would most likely improve confidence first. {thresholdMargin < 0.08 ? 'Because this case sits near threshold, a stronger retake could also stabilize the final band.' : 'The biggest gain here is a more defensible explanation and hemoglobin estimate.'}
+          </div>
+          <button className="btn btn-glass" onClick={onRetake} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
+            <RefreshCw size={13} /> Retake for Stronger Confidence
+          </button>
+        </div>
+
+        <div style={{ padding: '1rem', borderRadius: '0.9rem', background: 'rgba(255,165,0,0.05)', border: '1px solid rgba(255,165,0,0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,165,0,0.8)' }}>
+              Symptom Change
+            </span>
+            <span style={{ fontSize: '0.8rem', fontFamily: 'var(--mono)', color: '#FFA500' }}>
+              ~+{symptomLift} pts possible
+            </span>
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+            {activeSymptoms.length > 0
+              ? `Current symptom burden already includes ${joinHuman(activeSymptoms)}. If symptoms worsen or new ones appear, urgency would move upward faster even with the same image signal.`
+              : 'No symptom burden was added to this case. If real symptoms such as fatigue, dizziness, or shortness of breath are present, the fused triage score would move upward because symptoms are explicitly weighted in the model pipeline.'}
+          </div>
+        </div>
+
+        <div style={{ padding: '1rem', borderRadius: '0.9rem', background: 'rgba(0,229,150,0.05)', border: '1px solid rgba(0,229,150,0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(0,229,150,0.8)' }}>
+              Clinician Review
+            </span>
+            <span style={{ fontSize: '0.8rem', fontFamily: 'var(--mono)', color: 'rgba(0,229,150,0.85)' }}>
+              packet ready
+            </span>
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.75rem' }}>
+            The case already has share text, safety checks, and threshold-aware audit context prepared for a provider. That makes follow-up faster than a generic symptom app.
+          </div>
+          <button className="btn btn-glass" onClick={onShare} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
+            <Share2 size={13} /> Share Clinician Packet
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding: '0.9rem 1rem', borderRadius: '0.9rem', background: 'linear-gradient(135deg, rgba(200,0,30,0.08), rgba(0,194,255,0.06))', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+        <span style={{ color: 'var(--text)', fontWeight: 700 }}>Traditional screening</span> requires lab tests. <span style={{ color: 'var(--text)', fontWeight: 700 }}>AnemiaLens</span> provides instant first-pass screening using only a smartphone, then packages the result for clinical confirmation instead of pretending to replace lab testing.
+      </div>
+    </div>
+  );
+}
+
 function MLProofPanel() {
-  const metrics = [
-    { label: 'Accuracy', value: '70.5%', sub: '5-fold CV' },
-    { label: 'Recall', value: '89.5%', sub: 'catches anemia', highlight: true },
-    { label: 'AUC-ROC', value: '0.798', sub: 'discrimination' },
-    { label: 'Hb MAE', value: '1.66', sub: 'g/dL error' },
-  ];
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatusResponse | null>(null);
+  const [proofLoadFailed, setProofLoadFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getRuntimeStatus()
+      .then((status) => {
+        if (!active) return;
+        setRuntimeStatus(status);
+        setProofLoadFailed(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProofLoadFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const model = runtimeStatus?.model;
+  const hasDeployedMetrics = model?.deployed_accuracy !== null && model?.deployed_accuracy !== undefined;
+  const headlineAccuracy = hasDeployedMetrics ? model?.deployed_accuracy : model?.validation_accuracy;
+  const headlineSubtitle = hasDeployedMetrics
+    ? `deployed ROI screening${model?.deployed_validation_size ? ` · n=${model.deployed_validation_size}` : ''}`
+    : model?.split_strategy ?? 'cross-validation';
+
+  const metrics = hasDeployedMetrics
+    ? [
+        { label: 'Accuracy', value: formatPercentMetric(model?.deployed_accuracy), sub: headlineSubtitle, highlight: true },
+        { label: 'Precision', value: formatPercentMetric(model?.deployed_precision), sub: 'positive-call correctness' },
+        { label: 'Recall', value: formatPercentMetric(model?.deployed_recall), sub: 'captured anemia cases' },
+        { label: 'F1 Score', value: formatPercentMetric(model?.deployed_f1), sub: 'balanced operating score' },
+      ]
+    : [
+        { label: 'Accuracy', value: formatPercentMetric(model?.validation_accuracy), sub: headlineSubtitle, highlight: true },
+        { label: 'F1 Score', value: formatPercentMetric(model?.validation_f1), sub: 'broad validation baseline' },
+        { label: 'Primary Model', value: model?.primary_model ?? 'archive-fusion-v4-pipeline', sub: 'runtime artifact' },
+        { label: 'Dataset', value: model?.record_count ? `${model.record_count}` : '217', sub: 'training records / subjects' },
+      ];
+
+  const footer = hasDeployedMetrics
+    ? `Deployed ROI screening is the headline metric because it matches the exact in-app path. Broad training CV remains ${formatPercentMetric(model?.validation_accuracy)} accuracy${model?.validation_f1 !== null && model?.validation_f1 !== undefined ? ` / ${formatPercentMetric(model.validation_f1)} F1` : ''}.`
+    : 'Showing the broader cross-validation baseline because no deployed screening report is available.';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -291,8 +879,19 @@ function MLProofPanel() {
           </div>
         ))}
       </div>
+      {headlineAccuracy !== null && headlineAccuracy !== undefined && (
+        <div style={{ padding: '0.85rem 1rem', borderRadius: '0.75rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.16)' }}>
+          <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', color: 'rgba(0,194,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.35rem' }}>
+            Headline Proof
+          </div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Current headline accuracy is <span style={{ color: 'rgba(0,194,255,0.95)', fontFamily: 'var(--mono)', fontWeight: 700 }}>{formatPercentMetric(headlineAccuracy)}</span> from {headlineSubtitle}.
+          </div>
+        </div>
+      )}
       <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', lineHeight: 1.7, padding: '0.75rem 1rem', borderRadius: '0.625rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', marginTop: 'auto' }}>
-        217 real patient images · India + Italy · ExtraTrees ensemble · pipeline-aligned training
+        {footer}
+        {proofLoadFailed && ' Runtime status fetch failed, so the panel may be showing fallback values.'}
       </div>
     </div>
   );
@@ -408,8 +1007,9 @@ function RiskActionBadge({ band }: { band: string }) {
   );
 }
 
-function ConfidenceGauge({ confidence, color }: { confidence: number; color: string }) {
-  const pct = Math.round(confidence * 100);
+function ConfidenceGauge({ analysis, color }: { analysis: AnalyzeResponse; color: string }) {
+  const pct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
+  const reliability = getReliabilityStatus(analysis);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -421,8 +1021,15 @@ function ConfidenceGauge({ confidence, color }: { confidence: number; color: str
           style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${color}80, ${color})`, boxShadow: `0 0 8px ${color}60` }}
         />
       </div>
-      <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-        {pct >= 70 ? 'High confidence result' : pct >= 45 ? 'Moderate confidence — consider retake' : 'Low confidence — retake recommended'}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.62rem', fontFamily: 'var(--mono)' }}>
+        <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
+        <span style={{ color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
+      </div>
+      <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
+        {reliability.detail}
+      </div>
+      <div style={{ fontSize: '0.58rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.04em' }}>
+        High: 80%+ · Moderate: 50–80% · Low: &lt;50%
       </div>
     </div>
   );
@@ -445,12 +1052,19 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const hbRaw  = analysis.prediction?.predicted_hemoglobin ?? 0;
   const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
+  const reliability = getReliabilityStatus(analysis);
+  const modelVersion = formatModelVersion(analysis.prediction?.model_source);
 
   const [flashDone,     setFlashDone]     = useState(false);
   const [revealed,      setRevealed]      = useState(false);
-  const [clinicalMode,  setClinicalMode]  = useState(false);
+  const [viewMode,      setViewMode]      = useState<AudienceMode>('user');
   const [shareToast,    setShareToast]    = useState<string | null>(null);
   const [showEmailModal,setShowEmailModal]= useState(false);
+  const clinicalMode = viewMode === 'doctor';
+  const retakeRecommended =
+    analysis.triage.band === 'uncertain_retake_needed'
+    || (analysis.prediction?.confidence ?? 0) < 0.55
+    || analysis.quality.issues.some((issue) => issue.severity === 'warning');
 
   useEffect(() => {
     const t1 = setTimeout(() => setFlashDone(true), 600);
@@ -546,12 +1160,43 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                   Mistral AI
                 </span>
               )}
+              {analysis.prediction?.model_source && (
+                <span style={{ padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)' }}>
+                  Model · {modelVersion}
+                </span>
+              )}
               <span style={{ marginLeft: 'auto', fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
                 No lab · No needle · Just a smartphone
               </span>
-              <button onClick={() => setClinicalMode(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', background: clinicalMode ? 'rgba(0,229,150,0.12)' : 'rgba(255,255,255,0.04)', border: clinicalMode ? '1px solid rgba(0,229,150,0.35)' : '1px solid rgba(255,255,255,0.1)', color: clinicalMode ? 'rgba(0,229,150,0.9)' : 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s' }}>
-                <Stethoscope size={11} />{clinicalMode ? 'Clinical ON' : 'Clinical Mode'}{clinicalMode ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-              </button>
+              <div style={{ display: 'inline-flex', padding: '0.2rem', borderRadius: '99px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                {([
+                  { key: 'user', label: 'User', icon: <Zap size={11} /> },
+                  { key: 'doctor', label: 'Doctor', icon: <Stethoscope size={11} /> },
+                ] as const).map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setViewMode(option.key)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '99px',
+                      fontSize: '0.58rem',
+                      fontFamily: 'var(--mono)',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      background: viewMode === option.key ? 'rgba(0,229,150,0.12)' : 'transparent',
+                      border: 'none',
+                      color: viewMode === option.key ? 'rgba(0,229,150,0.9)' : 'var(--text-dim)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {option.icon}{option.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Metrics row */}
@@ -569,7 +1214,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 {[
                   { label: 'Triage Score', val: `${Math.round((analysis.triage.score ?? 0) * 100)}%` },
                   { label: 'Confidence', val: `${Math.round((analysis.prediction?.confidence ?? 0) * 100)}%` },
-                  { label: 'Reliability', val: analysis.prediction?.reliability_flag ?? 'N/A' },
+                  { label: 'Reliability', val: reliability.label },
                 ].map(s => (
                   <div key={s.label}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.3rem' }}>{s.label}</div>
@@ -591,7 +1236,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
                 </div>
               )}
               <div style={{ padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <ConfidenceGauge confidence={analysis.prediction?.confidence ?? 0} color={bandColor} />
+                <ConfidenceGauge analysis={analysis} color={bandColor} />
               </div>
               <RiskActionBadge band={analysis.triage.band} />
             </div>
@@ -599,10 +1244,29 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             {/* Disclaimer */}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '1rem 1.25rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <Info size={14} style={{ color: 'var(--accent-bright)', flexShrink: 0, marginTop: 2 }} />
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{analysis.triage.disclaimer}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65, fontWeight: 600 }}>
+                  This system is designed as a screening aid and prioritizes safety by avoiding false reassurance.
+                </p>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{analysis.triage.disclaimer}</p>
+              </div>
             </div>
           </div>
         </motion.div>
+
+        <WhyThisResultPanel analysis={analysis} bandColor={bandColor} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: '1.5rem' }}>
+          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, ease: E }}
+            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: `3px solid ${bandColor}` }}>
+            <AudienceModePanel analysis={analysis} mode={viewMode} onModeChange={setViewMode} bandColor={bandColor} />
+          </motion.div>
+
+          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14, ease: E }}
+            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
+            <ScenarioSimulatorPanel analysis={analysis} onRetake={onReset} onShare={handleShare} />
+          </motion.div>
+        </div>
 
         {/* ── ROW 2: MISTRAL GUIDANCE (full width, only if mistral) ── */}
         {analysis.guidance.source === 'mistral' && (
@@ -735,7 +1399,7 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               <motion.button className="btn btn-glass" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 style={{ width: '100%', padding: '0.7rem', fontSize: '0.68rem', borderRadius: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 onClick={onReset}>
-                <RefreshCw size={13} /> New Screening
+                <RefreshCw size={13} /> {retakeRecommended ? 'Retake Image' : 'New Screening'}
               </motion.button>
             </div>
           </motion.div>

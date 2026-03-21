@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import torch
 from PIL import Image
-from torch import nn
-from torchvision import transforms
-from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
+
+if TYPE_CHECKING:
+    import torch
+    from torch import nn
 
 
 EFFICIENTNET_VERSION = "efficientnet-b0-ft-v2"
@@ -21,35 +21,33 @@ def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     return max(lower, min(upper, value))
 
 
-class SpatialAttention(nn.Module):
-    """
-    Focuses the model on the most informative spatial regions (like the conjunctiva area).
-    """
-    def __init__(self, kernel_size: int = 7) -> None:
-        super().__init__()
-        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
-        self.sigmoid = nn.Sigmoid()
+def build_efficientnet_model(*, pretrained: bool = True) -> "nn.Module":
+    from torch import nn
+    from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        avg_out = torch.mean(x, dim=1, keepdim=True)
-        max_out, _ = torch.max(x, dim=1, keepdim=True)
-        combined = torch.cat([avg_out, max_out], dim=1)
-        scale = self.sigmoid(self.conv(combined))
-        return x * scale
+    class SpatialAttention(nn.Module):
+        """
+        Focuses the model on the most informative spatial regions (like the conjunctiva area).
+        """
 
+        def __init__(self, kernel_size: int = 7) -> None:
+            super().__init__()
+            self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+            self.sigmoid = nn.Sigmoid()
 
-def build_efficientnet_model(*, pretrained: bool = True) -> nn.Module:
+        def forward(self, x):
+            import torch
+
+            avg_out = torch.mean(x, dim=1, keepdim=True)
+            max_out, _ = torch.max(x, dim=1, keepdim=True)
+            combined = torch.cat([avg_out, max_out], dim=1)
+            scale = self.sigmoid(self.conv(combined))
+            return x * scale
+
     weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
     model = efficientnet_b0(weights=weights)
-    
-    # Inject Spatial Attention before the final pooling
-    model.features.add_module("spatial_attention", SpatialAttention())
 
-    # Deeper, multi-pool head: (AvgPool + MaxPool) -> 1280*2 -> 512 -> 128 -> 2
-    # We'll handle the pooling manually by hijacking the model behavior slightly
-    # or just replace the classifier and handle concat in forward? 
-    # To keep it simple for the existing loading code, we'll keep the 1280 input 
-    # but use a more expressive GELU-based MLP.
+    model.features.add_module("spatial_attention", SpatialAttention())
     model.classifier = nn.Sequential(
         nn.Dropout(0.35),
         nn.Linear(1280, 512),
@@ -63,22 +61,22 @@ def build_efficientnet_model(*, pretrained: bool = True) -> nn.Module:
         nn.Linear(128, 2),
     )
 
-    # Freeze early layers 0-3, fine-tune 4-8 for richer feature adaptation
-    # We also keep our new attention module unfrozen
     for param in model.features.parameters():
         param.requires_grad = False
-    
+
     for name, param in model.features.named_parameters():
         if name.startswith(("4", "5", "6", "7", "8", "spatial_attention")):
             param.requires_grad = True
-    
+
     for param in model.classifier.parameters():
         param.requires_grad = True
-        
+
     return model
 
 
-def build_train_transform() -> transforms.Compose:
+def build_train_transform():
+    from torchvision import transforms
+
     return transforms.Compose(
         [
             transforms.RandomHorizontalFlip(),
@@ -95,7 +93,9 @@ def build_train_transform() -> transforms.Compose:
     )
 
 
-def build_val_transform() -> transforms.Compose:
+def build_val_transform():
+    from torchvision import transforms
+
     return transforms.Compose(
         [
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
@@ -108,8 +108,10 @@ def build_val_transform() -> transforms.Compose:
 def load_efficientnet_checkpoint(
     path: str | Path,
     *,
-    map_location: str | torch.device = "cpu",
+    map_location: str | "torch.device" = "cpu",
 ) -> dict[str, Any]:
+    import torch
+
     checkpoint = torch.load(path, map_location=map_location)
     model = build_efficientnet_model(pretrained=False)
     state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
@@ -136,16 +138,15 @@ def predict_with_efficientnet_model(
     *,
     mc_passes: int = 10,
 ) -> dict[str, float]:
-    model: nn.Module = bundle["model"]
-    device: torch.device = bundle["device"]
+    import torch
+
+    model = bundle["model"]
+    device = bundle["device"]
     transform = bundle["transform"]
     hb_mean = float(bundle.get("hb_mean", 0.0))
     hb_std_scale = max(float(bundle.get("hb_std", 1.0)), 1e-6)
 
     rgb = image.convert("RGB")
-
-    # Build TTA variants: original + horizontal flip only (reduced for low-RAM deployment)
-    from PIL import ImageEnhance
     tta_images = [
         rgb,
         rgb.transpose(Image.FLIP_LEFT_RIGHT),
@@ -157,7 +158,7 @@ def predict_with_efficientnet_model(
     with torch.no_grad():
         for tta_img in tta_images:
             tensor = transform(tta_img).unsqueeze(0).to(device)
-            for pass_idx in range(max(mc_passes, 1)):
+            for _ in range(max(mc_passes, 1)):
                 model.eval()
                 if mc_passes > 1:
                     _enable_dropout(model)
@@ -170,14 +171,11 @@ def predict_with_efficientnet_model(
     probability_std = float(np.std(probabilities))
     hemoglobin_std = float(np.std(hemoglobin_values))
 
-    # Hb spread amplification: EfficientNet also regresses toward mean
-    # Apply same correction as archive model
     hb_mean_val = float(bundle.get("hb_mean", 12.8))
     hb_spread_factor = float(bundle.get("hb_spread_factor", 1.30))
     deviation = mean_hemoglobin - hb_mean_val
     mean_hemoglobin = float(np.clip(hb_mean_val + deviation * hb_spread_factor, 5.0, 20.0))
 
-    # Calibrated uncertainty: margin + MC spread + Hb spread
     margin_uncertainty = 1.0 - min(1.0, abs(mean_probability - 0.5) * 2.5)
     uncertainty = clamp(
         (probability_std * 2.2)
@@ -198,7 +196,9 @@ def predict_with_efficientnet_model(
     }
 
 
-def _enable_dropout(model: nn.Module) -> None:
+def _enable_dropout(model: "nn.Module") -> None:
+    from torch import nn
+
     for module in model.modules():
         if isinstance(module, nn.Dropout):
             module.train()

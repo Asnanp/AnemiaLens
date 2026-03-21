@@ -77,6 +77,20 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    preload_models_on_startup: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_PRELOAD_MODELS_ON_STARTUP",
+            "PRELOAD_MODELS_ON_STARTUP",
+        ),
+    )
+    warmup_models_on_startup: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_WARMUP_MODELS_ON_STARTUP",
+            "WARMUP_MODELS_ON_STARTUP",
+        ),
+    )
     cors_origins: list[str] = Field(
         default=[
             "http://localhost:5173",

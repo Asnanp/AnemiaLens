@@ -115,6 +115,48 @@ def test_screening_decision_rescues_clarity_exception_borderline_positive() -> N
     assert "likely anemia" in text.lower()
 
 
+def test_screening_decision_high_threshold_low_reliability_positive_requires_extra_evidence() -> None:
+    predictor = ScreeningPredictor.__new__(ScreeningPredictor)
+
+    label, text = predictor._screening_decision(
+        risk=0.708,
+        uncertainty=0.582,
+        threshold=0.65,
+        predicted_hemoglobin=11.62,
+    )
+
+    assert label == "uncertain"
+    assert "confidence level" in text.lower()
+
+
+def test_screening_decision_keeps_strong_low_reliability_positive_with_clear_margin() -> None:
+    predictor = ScreeningPredictor.__new__(ScreeningPredictor)
+
+    label, text = predictor._screening_decision(
+        risk=0.761,
+        uncertainty=0.617,
+        threshold=0.65,
+        predicted_hemoglobin=11.46,
+    )
+
+    assert label == "anemia_likely"
+    assert "likely anemia" in text.lower()
+
+
+def test_screening_decision_skips_below_threshold_rescue_for_strict_runtime_threshold() -> None:
+    predictor = ScreeningPredictor.__new__(ScreeningPredictor)
+
+    label, text = predictor._screening_decision(
+        risk=0.646,
+        uncertainty=0.602,
+        threshold=0.65,
+        predicted_hemoglobin=11.56,
+    )
+
+    assert label == "uncertain"
+    assert "uncertain" in text.lower()
+
+
 def test_screening_decision_keeps_high_uncertainty_borderline_case_uncertain() -> None:
     predictor = ScreeningPredictor.__new__(ScreeningPredictor)
 

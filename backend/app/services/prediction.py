@@ -7,27 +7,85 @@ import numpy as np
 from PIL import Image
 
 from app.config import DEFAULT_ARCHIVE_MODEL_PATH, DEFAULT_EFFICIENTNET_MODEL_PATH
-from app.ml.archive_model import (
-    clamp,
-    load_archive_model,
-    predict_with_archive_model,
-)
 from app.ml.calibration import CompositeCalibrator
-from app.ml.efficientnet_model import (
-    EFFICIENTNET_VERSION,
-    load_efficientnet_checkpoint,
-    predict_with_efficientnet_model,
-)
 from app.ml.features import extract_eye_features
-from app.ml.roi_confidence import RoiConfidenceScorer, blend_roi_fullframe
-from app.ml.runtime_stack import (
-    RUNTIME_STACK_VERSION,
-    build_runtime_stack_prediction,
-    decision_threshold_for_source,
-)
+from app.ml.roi_confidence import RoiConfidenceScorer
 from app.schemas import ModelRuntimeStatus, PredictionResult, QualityAssessment
 
 _CALIBRATOR_PATH = Path(__file__).parent.parent / "artifacts" / "calibrator.pkl"
+
+
+def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    return max(lower, min(upper, value))
+
+
+def _runtime_stack_version() -> str:
+    from app.ml.runtime_stack import RUNTIME_STACK_VERSION
+
+    return RUNTIME_STACK_VERSION
+
+
+def _efficientnet_version() -> str:
+    from app.ml.efficientnet_model import EFFICIENTNET_VERSION
+
+    return EFFICIENTNET_VERSION
+
+
+def _decision_threshold_for_source(
+    source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
+) -> float:
+    from app.ml.runtime_stack import decision_threshold_for_source
+
+    return float(decision_threshold_for_source(source_hint))
+
+
+def _load_archive_model_artifact(path: str | Path) -> dict[str, object]:
+    from app.ml.archive_model import load_archive_model
+
+    return load_archive_model(path)
+
+
+def _predict_archive_model(
+    artifact: dict[str, object],
+    feature_map: dict[str, float],
+    *,
+    source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
+) -> dict[str, float]:
+    from app.ml.archive_model import predict_with_archive_model
+
+    return predict_with_archive_model(artifact, feature_map, source_hint=source_hint)
+
+
+def _load_efficientnet_checkpoint_bundle(path: str | Path) -> dict[str, object]:
+    from app.ml.efficientnet_model import load_efficientnet_checkpoint
+
+    return load_efficientnet_checkpoint(path)
+
+
+def _predict_efficientnet_bundle(
+    bundle: dict[str, object],
+    image: Image.Image,
+    *,
+    mc_passes: int,
+) -> dict[str, float]:
+    from app.ml.efficientnet_model import predict_with_efficientnet_model
+
+    return predict_with_efficientnet_model(bundle, image, mc_passes=mc_passes)
+
+
+def _build_runtime_stack(
+    archive_prediction: dict[str, float],
+    *,
+    efficientnet_prediction: dict[str, float] | None = None,
+    source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
+) -> dict[str, float]:
+    from app.ml.runtime_stack import build_runtime_stack_prediction
+
+    return build_runtime_stack_prediction(
+        archive_prediction,
+        efficientnet_prediction=efficientnet_prediction,
+        source_hint=source_hint,
+    )
 
 
 class ScreeningPredictor:
@@ -35,10 +93,17 @@ class ScreeningPredictor:
         self.efficientnet_path = Path(DEFAULT_EFFICIENTNET_MODEL_PATH)
         self.model_path = Path(model_path or DEFAULT_ARCHIVE_MODEL_PATH)
         self.load_error: str | None = None
-        self.efficientnet_bundle = self._load_efficientnet_model()
-        self.archive_model = self._load_archive_model()
+        self.efficientnet_bundle: dict[str, object] | None = None
+        self.archive_model: dict[str, object] | None = None
+        self._archive_model_load_attempted = False
+        self._efficientnet_model_load_attempted = False
         self._calibrator = self._load_calibrator()
         self._roi_scorer = RoiConfidenceScorer()
+
+    def preload(self) -> None:
+        self._ensure_archive_model_loaded()
+        if self.archive_model is None:
+            self._ensure_efficientnet_model_loaded()
 
     def predict(self, image: Image.Image, quality: QualityAssessment, symptom_score: float = 0.0) -> PredictionResult:
         prediction: dict[str, float] | None = None
@@ -47,6 +112,7 @@ class ScreeningPredictor:
         feature_map = extract_eye_features(image)
         source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original"
 
+        self._ensure_archive_model_loaded()
         if self.archive_model is not None:
             try:
                 # EfficientNet was trained for only 1 epoch (AUC ~0.56 = near-random).
@@ -54,29 +120,31 @@ class ScreeningPredictor:
                 # Skip it until a properly trained checkpoint is available.
                 efficientnet_secondary: dict[str, float] | None = None
 
-                archive_prediction = predict_with_archive_model(
+                archive_prediction = _predict_archive_model(
                     self.archive_model,
                     feature_map,
                     source_hint=source_hint,
                 )
-                prediction = build_runtime_stack_prediction(
+                prediction = _build_runtime_stack(
                     archive_prediction,
                     efficientnet_prediction=efficientnet_secondary,
                     source_hint=source_hint,
                 )
-                model_source = RUNTIME_STACK_VERSION
-                decision_threshold = float(prediction.get("decision_threshold", decision_threshold_for_source(source_hint)))
+                model_source = _runtime_stack_version()
+                decision_threshold = float(prediction.get("decision_threshold", _decision_threshold_for_source(source_hint)))
             except Exception as exc:
                 self.load_error = f"Archive inference failed: {type(exc).__name__}: {exc}"
 
+        if prediction is None:
+            self._ensure_efficientnet_model_loaded()
         if prediction is None and self.efficientnet_bundle is not None:
             try:
-                prediction = predict_with_efficientnet_model(
+                prediction = _predict_efficientnet_bundle(
                     self.efficientnet_bundle,
                     image,
                     mc_passes=4,  # reduced from 16 to lower peak RAM on Render
                 )
-                model_source = str(self.efficientnet_bundle.get("version", EFFICIENTNET_VERSION))
+                model_source = str(self.efficientnet_bundle.get("version", _efficientnet_version()))
                 decision_threshold = float(prediction.get("decision_threshold", 0.5))
             except Exception as exc:
                 self.load_error = f"EfficientNet inference failed: {type(exc).__name__}: {exc}"
@@ -185,11 +253,23 @@ class ScreeningPredictor:
             pass
         return CompositeCalibrator(method="none")  # identity — no-op until trained
 
+    def _ensure_archive_model_loaded(self) -> None:
+        if self._archive_model_load_attempted:
+            return
+        self._archive_model_load_attempted = True
+        self.archive_model = self._load_archive_model()
+
+    def _ensure_efficientnet_model_loaded(self) -> None:
+        if self._efficientnet_model_load_attempted:
+            return
+        self._efficientnet_model_load_attempted = True
+        self.efficientnet_bundle = self._load_efficientnet_model()
+
     def _load_efficientnet_model(self) -> dict[str, object] | None:
         if not self.efficientnet_path.exists():
             return None
         try:
-            return load_efficientnet_checkpoint(self.efficientnet_path)
+            return _load_efficientnet_checkpoint_bundle(self.efficientnet_path)
         except Exception as exc:
             self.load_error = f"EfficientNet load failed: {type(exc).__name__}: {exc}"
             return None
@@ -200,24 +280,33 @@ class ScreeningPredictor:
                 self.load_error = f"Model artifact not found at {self.model_path}"
             return None
         try:
-            if self.efficientnet_bundle is None:
-                self.load_error = None
-            return load_archive_model(self.model_path)
+            self.load_error = None
+            return _load_archive_model_artifact(self.model_path)
         except Exception as exc:
             if self.efficientnet_bundle is None:
                 self.load_error = f"{type(exc).__name__}: {exc}"
             return None
 
     def is_ready(self) -> bool:
-        return self.efficientnet_bundle is not None or self.archive_model is not None
+        return (
+            self.archive_model is not None
+            or self.efficientnet_bundle is not None
+            or self.model_path.exists()
+            or self.efficientnet_path.exists()
+        )
+
+    def is_loaded(self) -> bool:
+        return self.archive_model is not None or self.efficientnet_bundle is not None
 
     def runtime_status(self) -> ModelRuntimeStatus:
+        archive_available = self.model_path.exists()
+        efficientnet_available = self.efficientnet_path.exists()
         return ModelRuntimeStatus(
             primary_model=(
-                RUNTIME_STACK_VERSION
-                if self.archive_model is not None
-                else str(self.efficientnet_bundle.get("version", EFFICIENTNET_VERSION))
-                if self.efficientnet_bundle is not None
+                _runtime_stack_version()
+                if archive_available or self.archive_model is not None
+                else str(self.efficientnet_bundle.get("version", _efficientnet_version()))
+                if efficientnet_available or self.efficientnet_bundle is not None
                 else "missing-model"
             ),
             deep_stack_loaded=False,
@@ -225,8 +314,10 @@ class ScreeningPredictor:
             artifact_ready=self.is_ready(),
             artifact_path=(
                 str(self.model_path)
-                if self.archive_model is not None
+                if archive_available or self.archive_model is not None
                 else str(self.efficientnet_path)
+                if efficientnet_available or self.efficientnet_bundle is not None
+                else None
             ),
             load_error=self.load_error,
         )
@@ -291,15 +382,27 @@ class ScreeningPredictor:
         margin = abs(risk - threshold)
         mild_positive_conflict = (
             predicted_hemoglobin is not None
-            and threshold <= risk < (threshold + 0.12)
-            and predicted_hemoglobin > 13.0
-            and uncertainty >= 0.65
+            and (
+                (
+                    threshold <= risk < (threshold + 0.12)
+                    and predicted_hemoglobin > 13.0
+                    and uncertainty >= 0.65
+                )
+                or (
+                    threshold < 0.6
+                    and threshold <= risk < (threshold + 0.13)
+                    and predicted_hemoglobin >= 12.3
+                    and uncertainty >= 0.52
+                )
+            )
         )
         if mild_positive_conflict:
             return (
                 "uncertain",
                 "The screening signal is only mildly positive while the hemoglobin estimate stays near normal, so the safest interpretation is uncertain.",
             )
+        strict_runtime_threshold = threshold >= 0.6
+        allow_below_threshold_rescue = not strict_runtime_threshold
         high_suspicion_positive = (
             predicted_hemoglobin is not None
             and (
@@ -309,17 +412,32 @@ class ScreeningPredictor:
                     and uncertainty < 0.62
                 )
                 or (
-                    (threshold - 0.02) <= risk < threshold
+                    allow_below_threshold_rescue
+                    and (threshold - 0.02) <= risk < threshold
                     and predicted_hemoglobin <= 12.4
                     and uncertainty < 0.57
                 )
                 or (
-                    (threshold - 0.05) <= risk < threshold
+                    allow_below_threshold_rescue
+                    and (threshold - 0.05) <= risk < threshold
                     and predicted_hemoglobin <= 12.25
                     and uncertainty < 0.63
                 )
             )
         )
+        low_reliability_positive_requires_extra_evidence = (
+            strict_runtime_threshold
+            and predicted_hemoglobin is not None
+            and risk >= threshold
+            and uncertainty >= 0.55
+            and risk < (threshold + 0.11)
+            and predicted_hemoglobin > 11.4
+        )
+        if low_reliability_positive_requires_extra_evidence:
+            return (
+                "uncertain",
+                "The scan trends positive, but at this confidence level the model only upgrades to likely anemia when the risk margin is stronger or the hemoglobin estimate is more clearly low.",
+            )
         if high_suspicion_positive:
             return (
                 "anemia_likely",

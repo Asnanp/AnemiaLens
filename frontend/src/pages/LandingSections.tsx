@@ -236,6 +236,175 @@ export function Challenge() {
   );
 }
 
+const DIFFERENCE_PILLARS = [
+  {
+    icon: <Brain size={18} />,
+    title: 'Transparent AI Reasoning',
+    eyebrow: 'No black box',
+    detail: 'Every result is broken into image signal, symptom burden, confidence limits, and threshold logic so judges and clinicians can audit the decision path instantly.',
+  },
+  {
+    icon: <Stethoscope size={18} />,
+    title: 'Dual Audience Experience',
+    eyebrow: 'Patient + clinician',
+    detail: 'The same case can switch from a calm patient summary to a doctor-facing view with signal breakdown, review flags, and handoff-ready wording.',
+  },
+  {
+    icon: <Zap size={18} />,
+    title: 'What-If Simulation',
+    eyebrow: 'Decision support',
+    detail: 'The app does not stop at prediction. It simulates what a better retake, stronger symptom burden, or clinician review would change in the confidence story.',
+  },
+  {
+    icon: <Camera size={18} />,
+    title: 'Quality-Gated Capture',
+    eyebrow: 'Safety first',
+    detail: 'Weak scans are blocked or downgraded before inference instead of forcing a confident result from noisy input.',
+  },
+  {
+    icon: <Share2 size={18} />,
+    title: 'Instant Handoff',
+    eyebrow: 'Provider-ready',
+    detail: 'Email, PDF export, share text, and structured follow-up next steps make the screening outcome immediately useful beyond the demo screen.',
+  },
+  {
+    icon: <ScanEye size={18} />,
+    title: 'Smartphone-Native Screening',
+    eyebrow: 'Access advantage',
+    detail: 'No lab machine, no separate sensor, no special hardware. The product is designed for fast first-pass screening from the device people already have.',
+  },
+] as const;
+
+const COMPETITIVE_ROWS = [
+  {
+    label: 'Traditional screening',
+    value: 'Lab draw + waiting period',
+    detail: 'High-confidence confirmation, but it needs a clinic visit, bloodwork, and turnaround time.',
+  },
+  {
+    label: 'Generic symptom checker',
+    value: 'Text-only estimate',
+    detail: 'Accessible, but it misses conjunctival pallor and usually lacks image quality gating.',
+  },
+  {
+    label: 'AnemiaLens',
+    value: 'Smartphone first-pass screening',
+    detail: 'Combines image evidence, symptoms, safety gating, transparent explanations, and clinician handoff in one flow.',
+  },
+] as const;
+
+export function DifferentiatorsSection() {
+  const [active, setActive] = useState(0);
+  const activePillar = DIFFERENCE_PILLARS[active];
+
+  return (
+    <section id="proof" style={{ position: 'relative', zIndex: 1, padding: '10rem 4rem' }} className="section-pad">
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 20% 30%, rgba(0,194,255,0.08), transparent 32%), radial-gradient(circle at 80% 60%, rgba(200,0,30,0.08), transparent 34%)' }} />
+      <div style={{ maxWidth: 1240, margin: '0 auto', position: 'relative' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: E }}
+          style={{ textAlign: 'center', marginBottom: '4rem' }}
+        >
+          <div className="section-eyebrow" style={{ marginBottom: '1.25rem' }}>Why It Wins</div>
+          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2.4rem,5vw,4.4rem)', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-0.03em' }}>
+            Built to feel like a{' '}
+            <span style={{ fontStyle: 'italic', fontWeight: 300 }} className="text-gold">real clinical product</span>, not a demo.
+          </h2>
+          <p style={{ margin: '1.3rem auto 0', maxWidth: 720, color: 'var(--text-dim)', fontSize: '0.92rem', lineHeight: 1.8 }}>
+            The difference is not one more model card. It is the combination of transparency, safety gating, clinician handoff, and a smartphone-first experience that feels deployable.
+          </p>
+        </motion.div>
+
+        <div className="challenge-grid" style={{ display: 'grid', gridTemplateColumns: '1.02fr 0.98fr', gap: '1.5rem', alignItems: 'start' }}>
+          <motion.div
+            className="glass glass-shimmer"
+            initial={{ opacity: 0, x: -24 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, ease: E }}
+            style={{ padding: 'clamp(1.75rem,3vw,2.5rem)', borderLeft: '3px solid rgba(0,194,255,0.45)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
+          >
+            <div>
+              <div className="section-eyebrow" style={{ marginBottom: '0.9rem' }}>Product Edge</div>
+              <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem,3vw,2.7rem)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', marginBottom: '0.85rem' }}>
+                {activePillar.title}
+              </div>
+              <div style={{ fontSize: '0.84rem', color: 'rgba(0,194,255,0.8)', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                {activePillar.eyebrow}
+              </div>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.75 }}>
+                {activePillar.detail}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
+              {['Explainable results', 'Doctor mode', 'Retake simulator', 'Email + PDF handoff', 'Quality gate'].map((chip) => (
+                <span key={chip} style={{ padding: '0.38rem 0.8rem', borderRadius: '99px', fontSize: '0.58rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.11em', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {chip}
+                </span>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>
+                Competitive Framing
+              </div>
+              {COMPETITIVE_ROWS.map((row, index) => (
+                <div key={row.label} style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: index === 2 ? 'linear-gradient(135deg, rgba(200,0,30,0.12), rgba(0,194,255,0.08))' : 'rgba(255,255,255,0.02)', border: index === 2 ? '1px solid rgba(200,0,30,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: index === 2 ? 'var(--text)' : 'var(--text-muted)' }}>{row.label}</span>
+                    <span style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: index === 2 ? 'var(--accent-bright)' : 'var(--text-dim)' }}>
+                      {row.value}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{row.detail}</div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
+            {DIFFERENCE_PILLARS.map((pillar, index) => (
+              <motion.button
+                key={pillar.title}
+                type="button"
+                className="glass glass-hover"
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.06, duration: 0.55, ease: E }}
+                onClick={() => setActive(index)}
+                style={{
+                  padding: '1.35rem 1.2rem',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  border: active === index ? '1px solid rgba(0,194,255,0.26)' : '1px solid rgba(255,255,255,0.06)',
+                  background: active === index ? 'linear-gradient(135deg, rgba(0,194,255,0.08), rgba(255,255,255,0.03))' : 'rgba(255,255,255,0.02)',
+                  boxShadow: active === index ? '0 18px 60px rgba(0,194,255,0.08)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem',
+                }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: active === index ? 'rgba(0,194,255,0.12)' : 'rgba(255,255,255,0.04)', border: active === index ? '1px solid rgba(0,194,255,0.2)' : '1px solid rgba(255,255,255,0.08)', color: active === index ? 'rgba(0,194,255,0.9)' : 'var(--accent-bright)' }}>
+                  {pillar.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.25rem' }}>{pillar.title}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{pillar.detail}</div>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── WORKFLOW STEPPER ──────────────────────────────────────────────────────────
 const WORKFLOW = [
   { icon: <Camera size={20} />,       title: 'Capture Image',    desc: 'High-res macro of the inner lower eyelid conjunctiva.' },
