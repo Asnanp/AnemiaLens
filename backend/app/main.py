@@ -582,10 +582,10 @@ async def analyze(
 
 
 # ── Email Report Endpoint ────────────────────────────────────────────────────
-from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr
+from pydantic import BaseModel as _BaseModel
 
 class EmailReportRequest(_BaseModel):
-    email: _EmailStr
+    email: str  # plain str — no email-validator dependency needed
     share_text: str
     triage_label: str
     predicted_hemoglobin: float | None = None
