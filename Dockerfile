@@ -19,12 +19,14 @@ ENV OMP_NUM_THREADS=1
 ENV MKL_NUM_THREADS=1
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 5000
+EXPOSE 7860
 
 # Production: uvicorn with FastAPI (single worker — memory constrained)
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", \
-     "--port", "5000", \
+     "--port", "7860", \
      "--workers", "1", \
      "--timeout-keep-alive", "30", \
-     "--limit-concurrency", "4"]
+     "--limit-concurrency", "4", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips=*"]
