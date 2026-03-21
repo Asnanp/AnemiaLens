@@ -142,7 +142,7 @@ class ScreeningPredictor:
                 prediction = _predict_efficientnet_bundle(
                     self.efficientnet_bundle,
                     image,
-                    mc_passes=4,  # reduced from 16 to lower peak RAM on Render
+                    mc_passes=4,  # reduced from 16 to lower peak RAM on constrained hosts
                 )
                 model_source = str(self.efficientnet_bundle.get("version", _efficientnet_version()))
                 decision_threshold = float(prediction.get("decision_threshold", 0.5))

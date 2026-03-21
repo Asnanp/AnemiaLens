@@ -5,7 +5,7 @@ import type {
   SymptomInput
 } from './types';
 
-// In production (Vercel), we use relative paths so Vercel's rewrites proxy requests to Render.
+// In production (Vercel), we use relative paths so Vercel's rewrites proxy requests to the Hugging Face backend.
 const IS_PROD = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
 
 const API_BASE = IS_PROD
@@ -42,7 +42,7 @@ function _setWake(s: WakeStatus) {
 }
 
 // ── SILENT WAKE — retry with backoff until backend responds ──────────────────
-// Render free tier cold start ~50-90s. Poll aggressively, give up after 150s.
+// Hugging Face Spaces can cold-start on the first request. Poll aggressively, give up after 150s.
 (function silentWake() {
   const url = endpoint('/health');
   const INTERVALS = [500, 1000, 2000, 5000, 8000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000];

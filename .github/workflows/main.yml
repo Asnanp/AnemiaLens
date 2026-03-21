@@ -54,19 +54,4 @@ jobs:
           cd frontend
           npx playwright test
 
-  # Example deployment job for Render
-  deploy-render:
-    needs: [test-backend, test-frontend]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Render
-        env:
-          deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: |
-          # Only run if the deploy hook is set
-          if [ ! -z "$deploy_url" ]; then
-            curl "$deploy_url"
-          else
-            echo "RENDER_DEPLOY_HOOK secret is not set, skipping trigger."
-          fi
+  # Deployment is handled separately through Vercel + Hugging Face Spaces.

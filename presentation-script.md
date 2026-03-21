@@ -102,7 +102,7 @@ Thank you."
 "Images are processed server-side but not stored permanently. We don't collect PHI. The system is designed to be deployed on-premise in clinics if needed."
 
 **If asked about cost:**
-"The app is free. The backend runs on Render's free tier for now. In production, server costs would be minimal — under $50/month for thousands of screenings."
+"The app is free. The backend is hosted on Hugging Face Spaces right now. In production, server costs would still be minimal for a large number of screenings."
 
 **If asked about next steps:**
 "We're looking to partner with NGOs or health organizations for field validation. We also want to expand the dataset and add support for more languages."

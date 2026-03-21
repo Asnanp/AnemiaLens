@@ -13,7 +13,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./anemialens.db").strip()
 
-# For PostgreSQL on Render, the URL starts with postgres:// but SQLAlchemy needs postgresql+asyncpg://
+# For managed PostgreSQL providers, postgres:// must be normalized to postgresql+asyncpg://
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
