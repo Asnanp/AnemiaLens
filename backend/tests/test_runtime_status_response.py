@@ -25,10 +25,10 @@ class _DummyGuidance:
     def runtime_status(self) -> GuidanceRuntimeStatus:
         return GuidanceRuntimeStatus(
             active_strategy="fallback",
-            qwen_enabled=True,
+            mistral_enabled=True,
             client_ready=False,
             api_key_configured=False,
-            qwen_model="Qwen/Qwen2.5-7B-Instruct",
+            mistral_model="mistral-small-latest",
             fallback_reason="Fallback active.",
         )
 

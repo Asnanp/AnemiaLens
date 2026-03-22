@@ -2,7 +2,7 @@
 Central configuration for AnemiaLens backend.
 
 All tuneable knobs live here. Override any setting via environment variables
-(e.g. ANEMIALENS_QWEN_MODEL=Qwen/Qwen2.5-7B-Instruct). Pydantic-settings
+(e.g. ANEMIALENS_MISTRAL_MODEL=mistral-small-latest). Pydantic-settings
 performs automatic type coercion and validation at startup so misconfigured
 deployments fail fast with a clear error rather than silently misbehaving at
 runtime.
@@ -57,10 +57,9 @@ class Settings(BaseSettings):
     Prefix all env vars with ANEMIALENS_ (case-insensitive).
     Example .env file::
 
-        ANEMIALENS_QWEN_ENABLED=true
-        ANEMIALENS_QWEN_MODEL=Qwen/Qwen2.5-7B-Instruct
-        ANEMIALENS_HF_API_KEY=your_key_here
-        ANEMIALENS_HF_PROVIDER=hf-inference
+        ANEMIALENS_MISTRAL_ENABLED=true
+        ANEMIALENS_MISTRAL_MODEL=mistral-small-latest
+        ANEMIALENS_MISTRAL_API_KEY=your_key_here
         ANEMIALENS_GUIDANCE_TIMEOUT=20
         ANEMIALENS_LOG_LEVEL=DEBUG
     """

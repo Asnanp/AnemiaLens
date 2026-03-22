@@ -24,8 +24,9 @@ _FIELD_LIMITS = {
     "food_advice": 300,
 }
 _UNSAFE_CLAIM_PATTERN = re.compile(
-    r"\b(definitely\s+(?:have|has|anemic|anaemic)|confirmed\s+(?:anemia|anaemia)|"
+    r"\b(definitely\s+(?:confirms?|have|has|anemic|anaemic)|confirm(?:ed|s)?\s+(?:anemia|anaemia)|"
     r"you\s+(?:have|are)\s+(?:anemia|anaemia|anemic|anaemic)|"
+    r"diagnoses?\s+(?:anemia|anaemia|iron deficiency)|"
     r"proves?\s+(?:anemia|anaemia)|proof\s+of\s+anemia)\b",
     flags=re.IGNORECASE,
 )
@@ -220,6 +221,76 @@ class GuidanceService:
             "This is screening guidance, not a diagnosis."
         )
 
+    def _mistral_system_prompt(self) -> str:
+        return (
+            "You are Mistral, writing the guidance section for AnemiaLens, a smartphone anemia screening tool. "
+            "The system analyzes the inner lower eyelid, combines that signal with symptom input, and returns a screening band: low_risk, moderate_risk, high_concern, or uncertain_retake_needed. "
+            "This is screening only, never a diagnosis, and every answer must stay medically cautious.\n\n"
+            "Write like a calm clinician or health educator speaking to one person right after their screening. "
+            "Sound natural, specific, and grounded in the payload. "
+            "Do not sound like a marketing blurb, a lab report template, or a generic wellness article. "
+            "Use the hemoglobin estimate, risk score, symptom pattern, and reliability limits to explain what this case means.\n\n"
+            "STYLE RULES:\n"
+            "- Never say 'you have anemia', 'you are anemic', or any other diagnostic claim\n"
+            "- Prefer phrases like 'this screening leans toward', 'this result suggests', or 'this pattern points to'\n"
+            "- Mention uncertainty when confidence is limited or reliability is low\n"
+            "- Avoid stock phrases like 'calls for closer attention', 'maintain a balanced diet', or 'monitor symptoms' unless you also say why or when\n"
+            "- Never invent symptoms, treatments, lab values, or medical history not present in the payload\n"
+            "- Keep the tone human, direct, and reassuring without sounding casual\n\n"
+            "Return ONLY valid JSON with exactly these keys: explanation, urgency_guidance, food_advice, next_steps.\n"
+            "explanation: 2 or 3 sentences. Sentence 1 says what the screening leans toward. Sentence 2 explains why using the actual signal, symptoms, or risk. Sentence 3 is optional and should only be used to explain uncertainty or reassurance.\n"
+            "urgency_guidance: 1 or 2 sentences with a concrete follow-up window tied to the triage band.\n"
+            "food_advice: 1 sentence with concrete iron-supportive foods, adapted to the region when possible.\n"
+            "next_steps: array of 3 or 4 short actions that are specific, non-repetitive, and realistic.\n"
+            "No markdown, no extra keys, no preamble."
+        )
+
+    def _mistral_user_prompt(self, payload: dict[str, object]) -> str:
+        hb = payload.get("predicted_hemoglobin")
+        risk_pct = payload.get("prediction_risk_percent")
+        conf_pct = payload.get("confidence_percent")
+        uncertainty_pct = payload.get("uncertainty_percent")
+        reliability_flag = payload.get("reliability_flag") or "unknown"
+        band = payload.get("triage_band", "unknown")
+        label = payload.get("triage_label", "")
+        active_symptoms = payload.get("active_symptoms") or []
+        region = payload.get("region") or "not specified"
+        screening_text = payload.get("screening_text") or ""
+        screening_label = payload.get("screening_label") or "unknown"
+
+        hb_str = f"{hb} g/dL" if hb is not None else "not available"
+        if hb is not None:
+            if hb >= 12.0:
+                hb_context = "within normal range"
+            elif hb >= 10.0:
+                hb_context = "mildly below normal"
+            elif hb >= 8.0:
+                hb_context = "moderately below normal"
+            else:
+                hb_context = "severely below normal"
+        else:
+            hb_context = "unknown"
+
+        symptom_str = ", ".join(active_symptoms) if active_symptoms else "none reported"
+
+        return (
+            f"AnemiaLens Screening Result:\n"
+            f"- Hemoglobin estimate: {hb_str} ({hb_context})\n"
+            f"- Anemia risk score: {risk_pct}%\n"
+            f"- Screening label: {screening_label}\n"
+            f"- Model confidence: {conf_pct}%\n"
+            f"- Uncertainty: {uncertainty_pct}%\n"
+            f"- Reliability flag: {reliability_flag}\n"
+            f"- Triage band: {band} ({label})\n"
+            f"- Active symptoms: {symptom_str}\n"
+            f"- Region: {region}\n"
+            f"- Model screening text: {screening_text}\n\n"
+            "Write personalized guidance for this person based on the above. "
+            "Interpret what these findings mean instead of repeating them. "
+            "If reliability is limited, say that clearly in plain language. "
+            "Make it sound like a real clinician explaining a screening result, not a report template."
+        )
+
     def _generate_mistral(
         self,
         payload: dict[str, object],
@@ -257,11 +328,11 @@ class GuidanceService:
         body = {
             "model": self.mistral_model,
             "messages": [
-                {"role": "system", "content": self._system_prompt()},
-                {"role": "user", "content": self._user_prompt(payload)},
+                {"role": "system", "content": self._mistral_system_prompt()},
+                {"role": "user", "content": self._mistral_user_prompt(payload)},
             ],
             "max_tokens": self.guidance_max_tokens,
-            "temperature": 0.4,
+            "temperature": 0.55,
             "response_format": {"type": "json_object"},
         }
         log.info("POST %s model=%s max_tokens=%s", _MISTRAL_API_URL, self.mistral_model, self.guidance_max_tokens)
@@ -476,10 +547,9 @@ class GuidanceService:
         return GuidanceRuntimeStatus(
             active_strategy=active_strategy,
             mistral_enabled=self.mistral_enabled,
-            qwen_enabled=self.mistral_enabled,
             client_ready=self._mistral_ready(),
             api_key_configured=self.api_key_configured,
-            qwen_model=self.mistral_model if self.mistral_enabled else None,
+            mistral_model=self.mistral_model if self.mistral_enabled else None,
             provider="mistral" if self.mistral_enabled else None,
             fallback_reason=self._fallback_reason or (self._last_provider_error if not provider_healthy else None),
             last_provider_error=self._last_provider_error,

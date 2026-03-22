@@ -160,11 +160,10 @@ export type RecentScreening = {
 
 export type GuidanceRuntimeStatus = {
   active_strategy: 'mistral' | 'fallback';
-  qwen_enabled: boolean;
-  mistral_enabled?: boolean;
+  mistral_enabled: boolean;
   client_ready: boolean;
   api_key_configured: boolean;
-  qwen_model?: string | null;
+  mistral_model?: string | null;
   provider?: string | null;
   fallback_reason?: string | null;
   last_provider_error?: string | null;
