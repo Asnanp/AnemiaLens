@@ -76,6 +76,8 @@ class _HTTPResponseStub:
 
 class _HTTPSConnectionStub:
     last_instance: "_HTTPSConnectionStub | None" = None
+    response_status: int = 200
+    response_body: str = '{"id":"email_123"}'
 
     def __init__(self, host: str, timeout: float | None = None) -> None:
         self.host = host
@@ -88,7 +90,7 @@ class _HTTPSConnectionStub:
         self.request_args = (method, path, body, headers or {})
 
     def getresponse(self) -> _HTTPResponseStub:
-        return _HTTPResponseStub()
+        return _HTTPResponseStub(body=self.response_body, status=self.response_status)
 
     def close(self) -> None:
         self.closed = True
@@ -246,6 +248,8 @@ def test_email_report_service_sends_email_via_ssl(monkeypatch: pytest.MonkeyPatc
 
 
 def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyPatch) -> None:
+    _HTTPSConnectionStub.response_status = 200
+    _HTTPSConnectionStub.response_body = '{"id":"email_123"}'
     monkeypatch.setattr(settings, "email_provider", "resend")
     monkeypatch.setattr(settings, "resend_api_key", "re_test_123")
     monkeypatch.setattr(settings, "resend_api_base", "https://api.resend.test")
@@ -287,3 +291,50 @@ def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyP
     assert body["reply_to"] == "support@example.com"
     assert body["subject"] == "AnemiaLens Screening Report - Moderate Risk"
     assert "CBC test" in body["text"]
+
+
+def test_email_report_service_sends_email_via_sendgrid(monkeypatch: pytest.MonkeyPatch) -> None:
+    _HTTPSConnectionStub.response_status = 202
+    _HTTPSConnectionStub.response_body = ""
+    monkeypatch.setattr(settings, "email_provider", "sendgrid")
+    monkeypatch.setattr(settings, "sendgrid_api_key", "SG.test-key")
+    monkeypatch.setattr(settings, "sendgrid_api_base", "https://api.sendgrid.test/v3")
+    monkeypatch.setattr(settings, "email_from_name", "AnemiaLens")
+    monkeypatch.setattr(settings, "email_from_email", "asnanp875@gmail.com")
+    monkeypatch.setattr(settings, "email_reply_to", "asnanp875@gmail.com")
+    monkeypatch.setattr(settings, "smtp_username", "")
+    monkeypatch.setattr(settings, "smtp_password", "")
+    monkeypatch.setattr(settings, "smtp_timeout", 12.0)
+    monkeypatch.setattr(email_report_module.http.client, "HTTPSConnection", _HTTPSConnectionStub)
+
+    service = EmailReportService()
+    service.send_report(
+        EmailReportContent(
+            recipient="patient@example.com",
+            share_text="Moderate risk summary.\nPlease follow up with a CBC test.",
+            triage_label="Moderate Risk",
+            predicted_hemoglobin=10.6,
+            anemia_risk=0.54,
+        )
+    )
+
+    connection = _HTTPSConnectionStub.last_instance
+    assert connection is not None
+    assert connection.host == "api.sendgrid.test"
+    assert connection.timeout == 12.0
+    assert connection.closed is True
+    assert connection.request_args is not None
+    method, path, raw_body, headers = connection.request_args
+    body = json.loads(raw_body.decode("utf-8"))
+    assert method == "POST"
+    assert path == "/v3/mail/send"
+    assert headers["Authorization"] == "Bearer SG.test-key"
+    assert headers["Content-Type"] == "application/json"
+    assert headers["User-Agent"] == "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)"
+    assert body["from"] == {"email": "asnanp875@gmail.com", "name": "AnemiaLens"}
+    assert body["reply_to"] == {"email": "asnanp875@gmail.com"}
+    assert body["personalizations"][0]["to"] == [{"email": "patient@example.com"}]
+    assert body["personalizations"][0]["subject"] == "AnemiaLens Screening Report - Moderate Risk"
+    assert body["content"][0]["type"] == "text/plain"
+    assert body["content"][1]["type"] == "text/html"
+    assert "CBC test" in body["content"][0]["value"]

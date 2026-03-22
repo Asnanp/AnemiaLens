@@ -27,7 +27,7 @@ class EmailReportNotConfiguredError(EmailReportError):
 
 
 class EmailReportDeliveryError(EmailReportError):
-    """Raised when the SMTP server rejects or fails a delivery."""
+    """Raised when the selected email provider rejects or fails a delivery."""
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,8 @@ class EmailReportService:
     def is_configured(self) -> bool:
         if self._provider == "resend":
             return bool(settings.resend_api_key and self._from_email)
+        if self._provider == "sendgrid":
+            return bool(settings.sendgrid_api_key and self._from_email)
         return bool(
             settings.smtp_host
             and settings.smtp_username
@@ -70,6 +72,8 @@ class EmailReportService:
         try:
             if self._provider == "resend":
                 self._send_via_resend(payload)
+            elif self._provider == "sendgrid":
+                self._send_via_sendgrid(payload)
             else:
                 self._send_via_smtp(payload)
         except smtplib.SMTPAuthenticationError as exc:
@@ -154,6 +158,39 @@ class EmailReportService:
                 f"Email provider rejected the request: {detail or f'HTTP {response.status}'}"
             )
 
+    def _send_via_sendgrid(self, payload: EmailReportContent) -> None:
+        parsed = urlsplit(f"{settings.sendgrid_api_base.rstrip('/')}/mail/send")
+        path = parsed.path or "/mail/send"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        body = json.dumps(self._build_sendgrid_payload(payload)).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {settings.sendgrid_api_key}",
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+            "User-Agent": "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)",
+        }
+        connection_factory = (
+            http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        )
+        try:
+            connection = connection_factory(parsed.netloc, timeout=settings.smtp_timeout)
+            try:
+                connection.request("POST", path, body=body, headers=headers)
+                response = connection.getresponse()
+                raw = response.read().decode("utf-8", errors="replace")
+            finally:
+                connection.close()
+        except OSError as exc:
+            raise EmailReportDeliveryError(
+                "Could not reach the configured email provider."
+            ) from exc
+        if response.status >= 400:
+            detail = self._extract_provider_error(raw)
+            raise EmailReportDeliveryError(
+                f"Email provider rejected the request: {detail or f'HTTP {response.status}'}"
+            )
+
     def _build_resend_payload(self, payload: EmailReportContent) -> dict[str, object]:
         body: dict[str, object] = {
             "from": formataddr((settings.email_from_name, self._from_email)),
@@ -164,6 +201,27 @@ class EmailReportService:
         }
         if settings.email_reply_to:
             body["reply_to"] = settings.email_reply_to
+        return body
+
+    def _build_sendgrid_payload(self, payload: EmailReportContent) -> dict[str, object]:
+        body: dict[str, object] = {
+            "personalizations": [
+                {
+                    "to": [{"email": payload.recipient}],
+                    "subject": self._subject(payload),
+                }
+            ],
+            "from": {
+                "email": self._from_email,
+                "name": settings.email_from_name,
+            },
+            "content": [
+                {"type": "text/plain", "value": self._build_plain_text(payload)},
+                {"type": "text/html", "value": self._build_html(payload)},
+            ],
+        }
+        if settings.email_reply_to:
+            body["reply_to"] = {"email": settings.email_reply_to}
         return body
 
     def _idempotency_key(self, payload: EmailReportContent) -> str:
@@ -280,6 +338,13 @@ class EmailReportService:
         except json.JSONDecodeError:
             body = None
         if isinstance(body, dict):
+            errors = body.get("errors")
+            if isinstance(errors, list):
+                for item in errors:
+                    if isinstance(item, dict):
+                        value = item.get("message")
+                        if isinstance(value, str) and value.strip():
+                            return value.strip()
             for key in ("message", "error", "name"):
                 value = body.get(key)
                 if isinstance(value, str) and value.strip():
