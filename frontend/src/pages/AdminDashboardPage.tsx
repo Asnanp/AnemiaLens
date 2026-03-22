@@ -108,8 +108,8 @@ function ms(value: number): string {
   return `${Math.round(value)}ms`;
 }
 
-function labelise(value: string): string {
-  return value.replace(/_/g, ' ');
+function labelise(value?: string | null): string {
+  return (value ?? 'unknown').replace(/_/g, ' ');
 }
 
 function age(value: string): string {
