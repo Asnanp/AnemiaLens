@@ -284,11 +284,8 @@ function SignalBar({ label, value, color, delay = 0 }: { label: string; value: n
 }
 
 function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
-  const steps = buildWhyResultSteps(analysis);
-  const topDrivers = analysis.insight_pack.risk_drivers.slice(0, 3);
   const reliability = getReliabilityStatus(analysis);
   const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
-  const modelVersion = formatModelVersion(analysis.prediction?.model_source);
   const mandatorySummary = buildMandatoryWhySummary(analysis);
 
   return (
@@ -306,7 +303,7 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         <div>
           <div className="section-eyebrow">Why This Result</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.45rem', maxWidth: 760 }}>
-            Transparent AI explanation grounded in the actual image, symptoms, and threshold logic used for this run.
+            The one explanation the user actually needs.
           </div>
         </div>
         <div style={{ padding: '0.35rem 0.85rem', borderRadius: '99px', fontSize: '0.55rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: bandColor, background: `${bandColor}12`, border: `1px solid ${bandColor}30` }}>
@@ -318,64 +315,30 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         {mandatorySummary}
       </div>
 
-      <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7 }}>
-        {analysis.insight_pack.why_this_result}
-      </div>
-
-      {topDrivers.length > 0 && (
-        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          {topDrivers.map((driver, index) => (
-            <div key={`${driver.title}-${index}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.45rem 0.75rem', borderRadius: '99px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${DRIVER_COLORS[driver.strength]}22`, color: 'var(--text-muted)', fontSize: '0.68rem' }}>
-              <span style={{ color: DRIVER_COLORS[driver.strength], display: 'inline-flex' }}>{DRIVER_ICONS[driver.impact]}</span>
-              <span>{driver.title}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+        <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+          <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
+            Confidence + Reliability
+          </div>
+          <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Confidence</span>
+              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
             </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {steps.map((step, index) => (
-            <motion.div key={step.title} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.12 + index * 0.06, duration: 0.35 }}
-              style={{ display: 'flex', gap: '0.9rem', alignItems: 'flex-start', padding: '0.95rem 1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: `1px solid ${DRIVER_COLORS[step.impact === 'limit' ? 'watch' : step.impact === 'up' ? 'high' : 'medium']}22` }}>
-              <div style={{ width: 30, height: 30, borderRadius: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: '0.72rem', color: bandColor, flexShrink: 0 }}>
-                {index + 1}
-              </div>
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.25rem' }}>{step.title}</div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{step.detail}</div>
-              </div>
-            </motion.div>
-          ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
+              <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+            {reliability.detail}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
-            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
-              Confidence + Reliability
-            </div>
-            <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Confidence</span>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
-                <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
-              </div>
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.6rem' }}>
-              {reliability.detail}
-            </div>
-            <div style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.05em', lineHeight: 1.6 }}>
-              High: 80%+ · Moderate: 50–80% · Low: &lt;50%
-            </div>
-          </div>
-
-          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,165,0,0.06)', border: '1px solid rgba(255,165,0,0.16)' }}>
             <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.8)', marginBottom: '0.45rem' }}>
-              Retake Boost
+              Best next move
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
               Retaking under better lighting can significantly improve prediction reliability. {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
@@ -384,25 +347,10 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
 
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
-              Clinical Safety
+              Safety
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.65rem' }}>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
               This system is designed as a screening aid and prioritizes safety by avoiding false reassurance.
-            </div>
-            <div style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-              Model
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              {modelVersion}
-            </div>
-          </div>
-
-          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
-              Judge Summary
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              {analysis.insight_pack.judge_summary}
             </div>
           </div>
         </div>
@@ -1053,19 +1001,15 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
   const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
   const reliability = getReliabilityStatus(analysis);
-  const modelVersion = formatModelVersion(analysis.prediction?.model_source);
-
   const [flashDone,     setFlashDone]     = useState(false);
   const [revealed,      setRevealed]      = useState(false);
-  const [viewMode,      setViewMode]      = useState<AudienceMode>('user');
   const [shareToast,    setShareToast]    = useState<string | null>(null);
   const [showEmailModal,setShowEmailModal]= useState(false);
-  const clinicalMode = viewMode === 'doctor';
+  const [showAdvanced,  setShowAdvanced]  = useState(false);
   const retakeRecommended =
     analysis.triage.band === 'uncertain_retake_needed'
     || (analysis.prediction?.confidence ?? 0) < 0.55
     || analysis.quality.issues.some((issue) => issue.severity === 'warning');
-
   useEffect(() => {
     const t1 = setTimeout(() => setFlashDone(true), 600);
     const t2 = setTimeout(() => setRevealed(true), 700);
@@ -1154,49 +1098,6 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
               <span style={{ padding: '0.4rem 1.125rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', background: bandBg, border: `1px solid ${bandBorder}`, color: bandColor }}>
                 {analysis.triage.label}
               </span>
-              {analysis.guidance.source === 'mistral' && (
-                <span style={{ padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(0,194,255,0.07)', border: '1px solid rgba(0,194,255,0.25)', color: 'rgba(0,194,255,0.9)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(0,194,255,0.9)', display: 'inline-block' }} />
-                  Mistral AI
-                </span>
-              )}
-              {analysis.prediction?.model_source && (
-                <span style={{ padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)' }}>
-                  Model · {modelVersion}
-                </span>
-              )}
-              <span style={{ marginLeft: 'auto', fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                No lab · No needle · Just a smartphone
-              </span>
-              <div style={{ display: 'inline-flex', padding: '0.2rem', borderRadius: '99px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                {([
-                  { key: 'user', label: 'User', icon: <Zap size={11} /> },
-                  { key: 'doctor', label: 'Doctor', icon: <Stethoscope size={11} /> },
-                ] as const).map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => setViewMode(option.key)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '99px',
-                      fontSize: '0.58rem',
-                      fontFamily: 'var(--mono)',
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      background: viewMode === option.key ? 'rgba(0,229,150,0.12)' : 'transparent',
-                      border: 'none',
-                      color: viewMode === option.key ? 'rgba(0,229,150,0.9)' : 'var(--text-dim)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {option.icon}{option.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Metrics row */}
@@ -1256,166 +1157,111 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
 
         <WhyThisResultPanel analysis={analysis} bandColor={bandColor} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: '1.5rem' }}>
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: `3px solid ${bandColor}` }}>
-            <AudienceModePanel analysis={analysis} mode={viewMode} onModeChange={setViewMode} bandColor={bandColor} />
-          </motion.div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.5rem' }}>
+          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
+            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
+            <div className="section-eyebrow">Next steps</div>
 
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
-            <ScenarioSimulatorPanel analysis={analysis} onRetake={onReset} onShare={handleShare} />
-          </motion.div>
-        </div>
-
-        {/* ── ROW 2: MISTRAL GUIDANCE (full width, only if mistral) ── */}
-        {analysis.guidance.source === 'mistral' && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5, ease: E }}
-            style={{ borderRadius: '1.25rem', overflow: 'hidden', border: '1px solid rgba(0,194,255,0.25)', boxShadow: '0 0 80px rgba(0,194,255,0.07)' }}>
-            <div style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,194,255,0.08)', borderBottom: '1px solid rgba(0,194,255,0.15)' }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(0,194,255,1)', boxShadow: '0 0 8px rgba(0,194,255,0.8)' }} />
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.9)' }}>
-                Mistral AI · {analysis.guidance.model_used ?? 'mistral-small-latest'}
-              </span>
-              <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: '0.52rem', color: 'rgba(0,194,255,0.5)', letterSpacing: '0.1em' }}>AI-GENERATED CLINICAL GUIDANCE</span>
-            </div>
-            <div style={{ padding: 'clamp(1.25rem,4vw,2rem) clamp(1.25rem,4vw,2.5rem)', background: 'rgba(0,10,30,0.6)' }}>
-              <div style={{ marginBottom: '1.5rem', padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.12)', borderLeft: '3px solid rgba(0,194,255,0.6)' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.5)', marginBottom: '0.6rem' }}>Assessment</div>
-                <p style={{ fontSize: '1rem', color: 'var(--text)', lineHeight: 1.8 }}>{analysis.guidance.explanation}</p>
+            <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.16)' }}>
+              <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)', marginBottom: '0.45rem' }}>
+                Action now
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px,1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ padding: '1rem 1.25rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderLeft: '3px solid rgba(239,68,68,0.6)' }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)', marginBottom: '0.5rem' }}>Urgency</div>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text)', lineHeight: 1.65 }}>{analysis.guidance.urgency_guidance}</p>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                {analysis.guidance.urgency_guidance}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+                Next steps
+              </div>
+              {analysis.guidance.next_steps.slice(0, 3).map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.8rem 0.95rem', borderRadius: '0.8rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', color: bandColor, fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>{step}</span>
                 </div>
-                <div style={{ padding: '1rem 1.25rem', borderRadius: '0.875rem', background: 'rgba(0,229,150,0.06)', border: '1px solid rgba(0,229,150,0.2)', borderLeft: '3px solid rgba(0,229,150,0.6)' }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,229,150,0.8)', marginBottom: '0.5rem' }}>Dietary Advice</div>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text)', lineHeight: 1.65 }}>{analysis.guidance.food_advice || 'Maintain a balanced, iron-rich diet.'}</p>
-                </div>
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.6)', marginBottom: '0.75rem' }}>Recommended Next Steps</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {analysis.guidance.next_steps.map((step, i) => (
-                  <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.08, ease: E }}
-                    style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.75rem 1rem', borderRadius: '0.625rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', color: 'rgba(0,194,255,0.7)', fontWeight: 700, flexShrink: 0, minWidth: 24 }}>{i + 1}.</span>
-                    <span style={{ fontSize: '0.88rem', color: 'var(--text)', lineHeight: 1.5 }}>{step}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── ROW 3: 2-col top + 3-col bottom grid ── */}
-        {/* Top 2: Clinical Guidance + Signal Analysis */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px,1fr))', gap: '1.5rem' }}>
-
-          {/* Clinical Guidance */}
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <div className="section-eyebrow">Clinical Guidance</div>
-              <span style={{ padding: '0.3rem 0.75rem', borderRadius: '99px', fontSize: '0.55rem', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', background: analysis.guidance.source === 'mistral' ? 'rgba(0,194,255,0.08)' : 'rgba(255,255,255,0.04)', border: analysis.guidance.source === 'mistral' ? '1px solid rgba(0,194,255,0.25)' : '1px solid rgba(255,255,255,0.08)', color: analysis.guidance.source === 'mistral' ? 'rgba(0,194,255,0.9)' : 'var(--text-dim)' }}>
-                {analysis.guidance.source === 'mistral' ? 'Mistral AI' : 'Rule-based'}
-              </span>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.7, padding: '1rem 1.125rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              {analysis.guidance.explanation}
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '0.625rem', flexShrink: 0, background: 'rgba(200,0,30,0.12)', border: '1px solid rgba(200,0,30,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlertCircle size={14} style={{ color: 'var(--accent-bright)' }} />
-              </div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: '0.3rem' }}>{analysis.guidance.urgency_guidance}</p>
-            </div>
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {analysis.guidance.next_steps.slice(0, 4).map((step, i) => (
-                <li key={i} style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-start' }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 3 }}>
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent-bright)' }} />
-                  </div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>{step}</span>
-                </li>
               ))}
-            </ul>
+            </div>
+
             {analysis.guidance.food_advice && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.6, padding: '0.875rem 1rem', borderRadius: '0.75rem', background: 'rgba(0,229,150,0.04)', border: '1px solid rgba(0,229,150,0.12)', display: 'flex', gap: '0.625rem', alignItems: 'flex-start' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(0,229,150,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
-                  <path d="M2 22c1.25-1.25 2.5-2.5 3.75-3.75"/><path d="M22 2s-7 0-11 4c-2.5 2.5-3 6-3 6s3.5-.5 6-3c4-4 4-11 4-11z"/>
-                </svg>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.6, padding: '0.9rem 1rem', borderRadius: '0.8rem', background: 'rgba(0,229,150,0.04)', border: '1px solid rgba(0,229,150,0.12)' }}>
                 {analysis.guidance.food_advice}
               </div>
             )}
           </motion.div>
 
-          {/* Signal Analysis */}
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div className="section-eyebrow">Signal Analysis</div>
-            <ExplainabilityPanel analysis={analysis} bandColor={bandColor} />
-            <AnimatePresence>
-              {clinicalMode && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }} style={{ overflow: 'hidden' }}>
-                  <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <ClinicalModePanel analysis={analysis} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <motion.button className="btn btn-glass" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              style={{ marginTop: 'auto', width: '100%', padding: '0.75rem', fontSize: '0.7rem', borderRadius: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-              onClick={onDownload}>
-              <Download size={14} /> Export PDF Report
-            </motion.button>
-          </motion.div>
-        </div>
-
-        {/* Bottom 3: Handoff + Insight Pack + ML Proof */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: '1.5rem' }}>
-
-          {/* Handoff + Actions */}
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(200,0,30,0.4)' }}>
-            <div className="section-eyebrow">Handoff Summary</div>
-            <div style={{ padding: '1.25rem', borderRadius: '0.875rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.05)', fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.9, flex: 1, maxHeight: 200, overflowY: 'auto' }}>
-              {analysis.handoff_summary.share_text}
-            </div>
-            <motion.button className="btn btn-primary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              style={{ width: '100%', padding: '0.8rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-              onClick={handleShare}>
-              <Share2 size={14} /> Share with Provider
-            </motion.button>
-            <motion.button className="btn btn-glass" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              style={{ width: '100%', padding: '0.8rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px solid rgba(200,0,30,0.35)', color: 'var(--accent-bright)' }}
-              onClick={() => setShowEmailModal(true)}>
-              <Mail size={14} /> Send Report to Email
-            </motion.button>
-            <div style={{ padding: '1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', lineHeight: 1.65, fontStyle: 'italic', marginBottom: '0.875rem' }}>
-                Not a diagnostic device. Confirm results with clinical blood testing.
-              </p>
-              <motion.button className="btn btn-glass" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                style={{ width: '100%', padding: '0.7rem', fontSize: '0.68rem', borderRadius: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
+            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: `3px solid ${bandColor}` }}>
+            <div className="section-eyebrow">Case tools</div>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <motion.button className="btn btn-primary" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={handleShare}>
+                <Share2 size={14} /> Share with Provider
+              </motion.button>
+              <motion.button className="btn btn-glass" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px solid rgba(200,0,30,0.3)', color: 'var(--accent-bright)' }}
+                onClick={() => setShowEmailModal(true)}>
+                <Mail size={14} /> Send Report to Email
+              </motion.button>
+              <motion.button className="btn btn-glass" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={onDownload}>
+                <Download size={14} /> Export PDF Report
+              </motion.button>
+              <motion.button className="btn btn-glass" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 onClick={onReset}>
-                <RefreshCw size={13} /> {retakeRecommended ? 'Retake Image' : 'New Screening'}
+                <RefreshCw size={13} /> {retakeRecommended ? 'Retake Image' : 'Start New Screening'}
               </motion.button>
             </div>
-          </motion.div>
-
-          {/* Insight Pack */}
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: '3px solid rgba(255,165,0,0.4)' }}>
-            <InsightPackPanel analysis={analysis} />
-          </motion.div>
-
-          {/* ML Proof */}
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42, ease: E }}
-            style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
-            <MLProofPanel />
+            <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
+                Safety
+              </div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
+                Not a diagnostic device. Confirm results with clinical blood testing.
+              </div>
+            </div>
           </motion.div>
         </div>
+
+        <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, ease: E }}
+          style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button
+            onClick={() => setShowAdvanced((current) => !current)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+          >
+            <div>
+              <div className="section-eyebrow">Advanced details</div>
+              <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                Signal breakdown, scenario tools, and model proof are still here if you want them.
+              </div>
+            </div>
+            <span style={{ padding: '0.35rem 0.8rem', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              {showAdvanced ? 'Hide' : 'Show'}
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {showAdvanced && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.28 }} style={{ overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: '1rem', paddingTop: '0.5rem' }}>
+                  <div style={{ padding: '1.1rem', borderRadius: '0.95rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <ScenarioSimulatorPanel analysis={analysis} onRetake={onReset} onShare={handleShare} />
+                  </div>
+                  <div style={{ padding: '1.1rem', borderRadius: '0.95rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="section-eyebrow" style={{ marginBottom: '1rem' }}>Signal analysis</div>
+                    <ExplainabilityPanel analysis={analysis} bandColor={bandColor} />
+                  </div>
+                  <div style={{ padding: '1.1rem', borderRadius: '0.95rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <MLProofPanel />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
       </motion.div>
     </div>
