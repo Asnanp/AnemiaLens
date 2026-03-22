@@ -66,17 +66,32 @@ class _SMTPStub:
 
 
 class _HTTPResponseStub:
-    def __init__(self, body: str = '{"id":"email_123"}') -> None:
+    def __init__(self, body: str = '{"id":"email_123"}', status: int = 200) -> None:
         self._body = body.encode("utf-8")
-
-    def __enter__(self) -> "_HTTPResponseStub":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None
+        self.status = status
 
     def read(self) -> bytes:
         return self._body
+
+
+class _HTTPSConnectionStub:
+    last_instance: "_HTTPSConnectionStub | None" = None
+
+    def __init__(self, host: str, timeout: float | None = None) -> None:
+        self.host = host
+        self.timeout = timeout
+        self.request_args: tuple[str, str, bytes, dict[str, str]] | None = None
+        self.closed = False
+        _HTTPSConnectionStub.last_instance = self
+
+    def request(self, method: str, path: str, body=None, headers=None) -> None:
+        self.request_args = (method, path, body, headers or {})
+
+    def getresponse(self) -> _HTTPResponseStub:
+        return _HTTPResponseStub()
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def _client_with_service(service: _StubRouterService) -> TestClient:
@@ -231,15 +246,6 @@ def test_email_report_service_sends_email_via_ssl(monkeypatch: pytest.MonkeyPatc
 
 
 def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, object] = {}
-
-    def _fake_urlopen(request, timeout=None):
-        captured["url"] = request.full_url
-        captured["timeout"] = timeout
-        captured["headers"] = dict(request.header_items())
-        captured["body"] = json.loads(request.data.decode("utf-8"))
-        return _HTTPResponseStub()
-
     monkeypatch.setattr(settings, "email_provider", "resend")
     monkeypatch.setattr(settings, "resend_api_key", "re_test_123")
     monkeypatch.setattr(settings, "resend_api_base", "https://api.resend.test")
@@ -249,7 +255,7 @@ def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(settings, "smtp_username", "")
     monkeypatch.setattr(settings, "smtp_password", "")
     monkeypatch.setattr(settings, "smtp_timeout", 12.0)
-    monkeypatch.setattr(email_report_module.urllib_request, "urlopen", _fake_urlopen)
+    monkeypatch.setattr(email_report_module.http.client, "HTTPSConnection", _HTTPSConnectionStub)
 
     service = EmailReportService()
     service.send_report(
@@ -262,12 +268,19 @@ def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyP
         )
     )
 
-    assert captured["url"] == "https://api.resend.test/emails"
-    assert captured["timeout"] == 12.0
-    headers = captured["headers"]
-    body = captured["body"]
+    connection = _HTTPSConnectionStub.last_instance
+    assert connection is not None
+    assert connection.host == "api.resend.test"
+    assert connection.timeout == 12.0
+    assert connection.closed is True
+    assert connection.request_args is not None
+    method, path, raw_body, headers = connection.request_args
+    body = json.loads(raw_body.decode("utf-8"))
+    assert method == "POST"
+    assert path == "/emails"
     assert headers["Authorization"] == "Bearer re_test_123"
-    assert headers["Content-type"] == "application/json"
+    assert headers["Content-Type"] == "application/json"
+    assert headers["User-Agent"] == "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)"
     assert body["from"] == "AnemiaLens <onboarding@resend.dev>"
     assert body["to"] == ["patient@example.com"]
     assert body["reply_to"] == "support@example.com"

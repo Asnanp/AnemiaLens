@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import http.client
 import logging
 import smtplib
 import ssl
@@ -9,7 +10,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
 from urllib import error as urllib_error
-from urllib import request as urllib_request
+from urllib.parse import urlsplit
 
 from app.config import SCREENING_DISCLAIMER, settings
 
@@ -119,28 +120,38 @@ class EmailReportService:
                 self._deliver(server, message)
 
     def _send_via_resend(self, payload: EmailReportContent) -> None:
-        request = urllib_request.Request(
-            url=f"{settings.resend_api_base.rstrip('/')}/emails",
-            data=json.dumps(self._build_resend_payload(payload)).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {settings.resend_api_key}",
-                "Content-Type": "application/json",
-                "Idempotency-Key": self._idempotency_key(payload),
-            },
-            method="POST",
+        parsed = urlsplit(f"{settings.resend_api_base.rstrip('/')}/emails")
+        path = parsed.path or "/emails"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        body = json.dumps(self._build_resend_payload(payload)).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {settings.resend_api_key}",
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+            "Idempotency-Key": self._idempotency_key(payload),
+            "User-Agent": "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)",
+        }
+        connection_factory = (
+            http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
         )
         try:
-            with urllib_request.urlopen(request, timeout=settings.smtp_timeout) as response:
-                response.read()
-        except urllib_error.HTTPError as exc:
-            detail = self._extract_provider_error(exc.read().decode("utf-8", errors="replace"))
-            raise EmailReportDeliveryError(
-                f"Email provider rejected the request: {detail or f'HTTP {exc.code}'}"
-            ) from exc
-        except urllib_error.URLError as exc:
+            connection = connection_factory(parsed.netloc, timeout=settings.smtp_timeout)
+            try:
+                connection.request("POST", path, body=body, headers=headers)
+                response = connection.getresponse()
+                raw = response.read().decode("utf-8", errors="replace")
+            finally:
+                connection.close()
+        except OSError as exc:
             raise EmailReportDeliveryError(
                 "Could not reach the configured email provider."
             ) from exc
+        if response.status >= 400:
+            detail = self._extract_provider_error(raw)
+            raise EmailReportDeliveryError(
+                f"Email provider rejected the request: {detail or f'HTTP {response.status}'}"
+            )
 
     def _build_resend_payload(self, payload: EmailReportContent) -> dict[str, object]:
         body: dict[str, object] = {
