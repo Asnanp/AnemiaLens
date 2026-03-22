@@ -1,5 +1,6 @@
 import type {
   AnalyzeResponse,
+  PatientProfileInput,
   QualityAssessment,
   RuntimeStatusResponse,
   SymptomInput
@@ -133,6 +134,7 @@ export async function checkImageQuality(file: File): Promise<QualityAssessment> 
 export async function analyzeScreening(
   file: File,
   symptoms: SymptomInput,
+  patientProfile?: PatientProfileInput,
   language?: string,
   region?: string,
   symptomSeverity?: Record<string, number>
@@ -145,6 +147,7 @@ export async function analyzeScreening(
     ? { ...symptoms, symptom_severity: symptomSeverity }
     : symptoms;
   form.append('symptoms', JSON.stringify(symptomsPayload));
+  if (patientProfile) form.append('patient_profile', JSON.stringify(patientProfile));
   if (language) form.append('language', language);
   if (region) form.append('region', region);
   const r = await fetch(endpoint('/api/analyze'), {
@@ -207,5 +210,35 @@ export async function sendEmailReport(email: string, shareText: string, triageLa
     } catch { /* */ }
     throw new Error(msg);
   }
+  return await r.json();
+}
+
+export async function saveScreeningToAccount(
+  analysis: AnalyzeResponse,
+): Promise<{ saved: boolean; uid: string; message: string }> {
+  const token = _getToken?.();
+  if (!token) throw new Error('Sign in required to save screenings.');
+
+  const r = await fetch(endpoint('/api/screenings/save-current'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ analysis }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!r.ok) {
+    let msg = 'Failed to save screening to account';
+    try {
+      const b = await r.json();
+      msg = b.detail || b.message || msg;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+
   return await r.json();
 }

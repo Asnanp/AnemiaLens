@@ -216,9 +216,9 @@ class ClinicalBriefService:
             checks.append("The fallback rescue path was labeled transparently in the audit trail.")
         if decision_audit.review_flags:
             checks.append("Structured review flags were generated for follow-up and UI display.")
-        if guidance.source == "qwen":
+        if guidance.source == "mistral":
             checks.append(
-                "Qwen guidance was constrained to the screening result, uncertainty, symptoms, and locale context."
+                "Mistral guidance was constrained to the screening result, uncertainty, symptoms, and locale context."
             )
         else:
             checks.append("Rule-based fallback guidance stayed grounded to the current result and symptoms.")

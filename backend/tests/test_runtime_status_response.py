@@ -50,21 +50,47 @@ def test_runtime_status_includes_deployed_metrics(monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_status_module,
         "_load_json_report",
-        lambda path: {
-            "evaluation_scope": "deployed_roi_screening",
-            "validation_size": 44,
-            "metrics": {
-                "accuracy": 0.9091,
-                "precision": 1.0,
-                "recall": 0.7143,
-                "f1": 0.8333,
-            },
-            "operating_counts": {
-                "blocked_total": 0,
-                "likely_count": 10,
-                "uncertain_count": 3,
-            },
-        },
+        lambda path: (
+            {
+                "version": "runtime-risk-calibrator-v1",
+                "method": "temperature",
+                "selected_thresholds": {"roi_original": 0.58},
+                "diagnostics": {
+                    "ece_before": 0.121,
+                    "ece_after": 0.072,
+                    "brier_before": 0.164,
+                    "brier_after": 0.133,
+                },
+            }
+            if str(path).endswith("runtime_calibration_report.json")
+            else {
+                "version": "runtime-screening-refiner-v1",
+                "method": "logistic-regression",
+                "selected_threshold": 0.53,
+                "metrics_after": {
+                    "accuracy": 0.8636,
+                    "precision": 0.7857,
+                    "recall": 0.7857,
+                    "f1": 0.7857,
+                },
+            }
+            if str(path).endswith("runtime_refinement_report.json")
+            else {
+                "evaluation_scope": "deployed_roi_screening",
+                "validation_size": 44,
+                "metrics": {
+                    "accuracy": 0.9091,
+                    "precision": 1.0,
+                    "recall": 0.7143,
+                    "f1": 0.8333,
+                },
+                "operating_counts": {
+                    "blocked_total": 0,
+                    "likely_count": 10,
+                    "uncertain_count": 3,
+                },
+            }
+        ),
     )
 
     status = runtime_status_module.build_runtime_status(_DummyPredictor(), _DummyGuidance())
@@ -74,3 +100,11 @@ def test_runtime_status_includes_deployed_metrics(monkeypatch) -> None:
     assert status.model.deployed_f1 == 0.8333
     assert status.model.deployed_blocked_total == 0
     assert status.model.deployed_uncertain_count == 3
+    assert status.model.runtime_calibration_ready is True
+    assert status.model.runtime_calibration_method == "temperature"
+    assert status.model.runtime_calibrated_threshold == 0.58
+    assert status.model.runtime_calibration_ece_after == 0.072
+    assert status.model.runtime_refiner_ready is True
+    assert status.model.runtime_refiner_method == "logistic-regression"
+    assert status.model.runtime_refined_threshold == 0.53
+    assert status.model.runtime_refined_f1 == 0.7857

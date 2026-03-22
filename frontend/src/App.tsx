@@ -1,6 +1,6 @@
 ﻿/**
  * AnemiaLens - Main App Shell
- * Auth-free: screening works without login. No sign-in/sign-up UI.
+ * Guest-first screening with account save, history, and dashboard flows.
  */
 
 import { Suspense, lazy, useEffect, useState } from 'react';
@@ -10,9 +10,10 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UploadZone } from './components/features/UploadZone';
 import { QualityView } from './components/features/QualityView';
-import { SymptomView } from './components/features/SymptomView';
+import { IntakeView } from './components/features/IntakeView';
 import { ResultView } from './components/features/ResultView';
 import { ThreeBackground, AuroraCanvas } from './components/features/VisualSystem';
+import AuthPage from './pages/AuthPage';
 import {
   WakeBanner, LuxuryParticles, Cursor, MarqueeTicker,
   STEPS_META, QwenLoadingOverlay, E,
@@ -23,7 +24,9 @@ import {
 import { ArrowRight, ChevronRight, User } from 'lucide-react';
 
 import { SupabaseTest } from './components/SupabaseTest';
-import { ToastContainer } from './components/Toast';
+import { toast, ToastContainer } from './components/Toast';
+import { saveScreeningToAccount } from './api';
+import type { AnalyzeResponse } from './types';
 
 const loadDashboardPage = () => import('./pages/DashboardPage');
 const DashboardPage = lazy(loadDashboardPage);
@@ -94,6 +97,8 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 50);
@@ -104,6 +109,12 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   const scrollTo = (id: string) => {
     setMenuOpen(false);
     setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 150);
+  };
+
+  const openAuth = (mode: 'login' | 'register') => {
+    setMenuOpen(false);
+    setAuthMode(mode);
+    setShowAuth(true);
   };
 
   return (
@@ -159,6 +170,30 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
           </nav>
 
           <div className="nav-desktop" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {!isAuthenticated && (
+              <>
+                <button
+                  className="btn btn-glass"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px' }}
+                  onClick={() => openAuth('login')}
+                >
+                  Sign In
+                </button>
+                <button
+                  className="btn btn-glass"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.65rem',
+                    borderRadius: '99px',
+                    border: '1px solid rgba(200,0,30,0.3)',
+                    color: 'var(--accent-bright)',
+                  }}
+                  onClick={() => openAuth('register')}
+                >
+                  Create Account
+                </button>
+              </>
+            )}
             {isAuthenticated && (
               <>
                 {user?.role === 'admin' && (
@@ -215,6 +250,24 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                   </motion.a>
                 ))}
                 <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0.5rem 0' }} />
+                {!isAuthenticated && (
+                  <>
+                    <button
+                      className="btn btn-glass"
+                      style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem' }}
+                      onClick={() => openAuth('login')}
+                    >
+                      Sign In
+                    </button>
+                    <button
+                      className="btn btn-glass"
+                      style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem', border: '1px solid rgba(200,0,30,0.25)', color: 'var(--accent-bright)' }}
+                      onClick={() => openAuth('register')}
+                    >
+                      Create Account
+                    </button>
+                  </>
+                )}
                 <button className="btn btn-primary"
                   style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem' }}
                   onClick={() => { setMenuOpen(false); scrollTo('screening'); }}>
@@ -227,6 +280,12 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
       </motion.header>
 
       <AnimatePresence>
+        {showAuth && (
+          <AuthPage
+            initialMode={authMode}
+            onClose={() => setShowAuth(false)}
+          />
+        )}
         {showDashboard && (
           <Suspense fallback={<OverlayLoader title="Preparing Dashboard" detail="Loading your screening intelligence workspace." />}>
             <DashboardPage onClose={() => setShowDashboard(false)} />
@@ -243,11 +302,17 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
 }
 
 function ScreeningSection() {
+  const { isAuthenticated } = useAuth();
   const {
     step, setStep, file, previewUrl, symptoms, toggleSymptom,
+    patientProfile, updatePatientProfile,
     quality, analysis, loading, error, backendUp,
     pickFile, runQuality, runAnalysis, loadSample, reset, symptomOnlyAssess, symptomLabels,
   } = useScreening();
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [pendingSave, setPendingSave] = useState<AnalyzeResponse | null>(null);
+  const [savingResult, setSavingResult] = useState(false);
 
   const handleDownload = async () => {
     if (!analysis) return;
@@ -262,13 +327,55 @@ function ScreeningSection() {
   const canStep = (i: number) =>
     i === 0 || (i === 1 && !!file) || (i === 2 && !!quality) || (i === 3 && !!analysis);
 
+  const openAuth = (mode: 'login' | 'register', saveCurrent = false) => {
+    setAuthMode(mode);
+    if (saveCurrent && analysis) {
+      setPendingSave(analysis);
+    }
+    setShowAuth(true);
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !pendingSave || savingResult) return;
+
+    let active = true;
+    setSavingResult(true);
+
+    saveScreeningToAccount(pendingSave)
+      .then(() => {
+        if (!active) return;
+        toast.success('Current screening saved to your account history.');
+        setPendingSave(null);
+      })
+      .catch((err) => {
+        if (!active) return;
+        toast.error(err instanceof Error ? err.message : 'Could not save this screening to your account.');
+      })
+      .finally(() => {
+        if (active) setSavingResult(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, pendingSave, savingResult]);
+
   return (
-    <section id="screening" style={{ position: 'relative', zIndex: 1, padding: '10rem 4rem', overflow: 'hidden' }} className="section-pad">
+    <section
+      id="screening"
+      style={{
+        position: 'relative',
+        zIndex: 1,
+        padding: 'clamp(5rem, 10vw, 10rem) clamp(1rem, 4vw, 4rem)',
+        overflow: 'hidden',
+      }}
+      className="section-pad"
+    >
       <div className="screening-ambient" />
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }} transition={{ duration: 0.7 }}
-          style={{ textAlign: 'center', marginBottom: '5rem' }}>
+          style={{ textAlign: 'center', marginBottom: 'clamp(2.5rem, 6vw, 5rem)' }}>
           <div className="section-eyebrow" style={{ marginBottom: '1.25rem' }}>Diagnostic Hub</div>
           <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2.5rem,5vw,4.5rem)', fontWeight: 700, lineHeight: 1.0, letterSpacing: '-0.03em' }}>
             Interactive<br />
@@ -276,10 +383,10 @@ function ScreeningSection() {
           </h2>
         </motion.div>
 
-        <div className="screening-progress" style={{ marginBottom: '4rem' }}>
+        <div className="screening-progress" style={{ marginBottom: 'clamp(2rem, 5vw, 4rem)' }}>
           {STEPS_META.map((s, i) => (
-            <>
-              <div key={s.label}
+            <div key={s.label} style={{ display: 'contents' }}>
+              <div
                 className={`screening-step-node ${step === i ? 'active' : ''} ${step > i ? 'done' : ''}`}
                 onClick={() => canStep(i) && setStep(i)}
                 style={{ opacity: canStep(i) ? 1 : 0.45, cursor: canStep(i) ? 'pointer' : 'default' }}>
@@ -291,11 +398,22 @@ function ScreeningSection() {
                 <span className="screening-step-label">{s.label}</span>
               </div>
               {i < STEPS_META.length - 1 && <div className={`screening-step-line ${step > i ? 'done' : ''}`} />}
-            </>
+            </div>
           ))}
         </div>
 
         <AnimatePresence>
+          {showAuth && (
+            <AuthPage
+              initialMode={authMode}
+              onClose={() => setShowAuth(false)}
+              onSuccess={() => {
+                if (pendingSave) {
+                  toast.info('Signing in complete. Saving this screening to your account.');
+                }
+              }}
+            />
+          )}
           {!backendUp && step < 3 && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ padding: '0.875rem 1.5rem', marginBottom: '1.5rem', borderRadius: '0.875rem',
@@ -334,7 +452,15 @@ function ScreeningSection() {
           <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.45, ease: E }}>
             {step === 0 && (
-              <div className="capture-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'start' }}>
+              <div
+                className="capture-grid"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                  gap: 'clamp(1.5rem, 4vw, 4rem)',
+                  alignItems: 'start',
+                }}
+              >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                   <div>
                     <div className="section-eyebrow" style={{ marginBottom: '0.75rem' }}>Phase 01</div>
@@ -371,14 +497,43 @@ function ScreeningSection() {
                       ))}
                     </div>
                   </div>
+                  {!isAuthenticated && (
+                    <div style={{ padding: '1rem 1.1rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'grid', gap: '0.8rem' }}>
+                      <div>
+                        <div className="label-tag" style={{ marginBottom: '0.6rem' }}>Account layer</div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                          Screen as a guest if you want, then create an account to save results, open your dashboard, and build a real screening history over time.
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+                        <button className="btn btn-glass" style={{ padding: '0.6rem 1rem', fontSize: '0.65rem', borderRadius: '0.8rem' }} onClick={() => openAuth('login')}>
+                          Sign In
+                        </button>
+                        <button className="btn btn-glass" style={{ padding: '0.6rem 1rem', fontSize: '0.65rem', borderRadius: '0.8rem', border: '1px solid rgba(200,0,30,0.25)', color: 'var(--accent-bright)' }} onClick={() => openAuth('register')}>
+                          Create Account
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <UploadZone onFileSelect={pickFile} previewUrl={previewUrl} onClear={reset} onRunQuality={runQuality} loading={loading} disabled={!file} />
               </div>
             )}
             {step === 1 && quality && <QualityView quality={quality} onContinue={() => setStep(2)} onBack={() => setStep(0)} loading={loading} />}
-            {step === 2 && !loading && <SymptomView symptoms={symptoms} toggleSymptom={toggleSymptom} onContinue={runAnalysis} onBack={() => setStep(1)} loading={loading} symptomLabels={symptomLabels} />}
+            {step === 2 && !loading && (
+              <IntakeView
+                symptoms={symptoms}
+                patientProfile={patientProfile}
+                toggleSymptom={toggleSymptom}
+                updatePatientProfile={updatePatientProfile}
+                onContinue={runAnalysis}
+                onBack={() => setStep(1)}
+                loading={loading}
+                symptomLabels={symptomLabels}
+              />
+            )}
             {step === 2 && loading && <QwenLoadingOverlay />}
-            {step === 3 && analysis && <ResultView analysis={analysis} onReset={reset} onDownload={handleDownload} />}
+            {step === 3 && analysis && <ResultView analysis={analysis} onReset={reset} onDownload={handleDownload} onOpenAuth={(mode = 'login') => openAuth(mode, true)} />}
           </motion.div>
         </AnimatePresence>
       </div>

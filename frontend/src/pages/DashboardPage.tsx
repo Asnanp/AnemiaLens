@@ -4,12 +4,13 @@
 import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Activity, AlertTriangle, BarChart2, ChevronRight, Clock, Crown,
-  Gauge, HeartPulse, History, RefreshCw, Shield, Sparkles, Stethoscope,
-  Trash2,
+  Activity, AlertTriangle, BarChart2, CheckCircle2, ChevronRight, Clock,
+  Gauge, HeartPulse, History, RefreshCw, ShieldCheck, Sparkles, Stethoscope,
+  Trash2, UserCircle2,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useHistory } from '../hooks/useHistory';
+import { useStats } from '../hooks/useStats';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -54,6 +55,11 @@ function formatDateTime(date: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatMaybeDateTime(date: string | null | undefined): string {
+  if (!date) return 'Not recorded yet';
+  return formatDateTime(date);
 }
 
 function TrendSparkline({ values, color }: { values: number[]; color: string }) {
@@ -180,6 +186,7 @@ function DistributionBars({ counts, total }: { counts: Record<string, number>; t
 export default function DashboardPage({ onClose }: { onClose: () => void }) {
   const { user, logout } = useAuth();
   const { screenings, total, isLoading, error, refresh, deleteScreening, loadMore } = useHistory();
+  const { stats, isLoading: statsLoading, refresh: refreshStats } = useStats();
 
   if (!user) return null;
 
@@ -207,6 +214,20 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
   const trendLabel = trendDelta > 0.04 ? 'rising attention' : trendDelta < -0.04 ? 'improving trend' : 'stable pattern';
   const trendColor = trendDelta > 0.04 ? '#EF4444' : trendDelta < -0.04 ? '#10B981' : '#00C2FF';
   const plan = planLabel(user.role, user.subscription_tier);
+  const totalScans = stats?.total_scans ?? total;
+  const scansThisMonth = stats?.scans_this_month ?? 0;
+  const dashboardAvgRisk = stats?.avg_risk ?? avgRisk;
+  const lastScanAt = stats?.last_scan_at ?? latest?.created_at ?? null;
+  const accountTrustStatus = isLoading || statsLoading
+    ? 'Syncing account'
+    : totalScans > 0
+      ? 'History secured'
+      : 'Ready for first save';
+
+  const handleRefresh = () => {
+    refresh();
+    refreshStats();
+  };
 
   return (
     <motion.div
@@ -244,7 +265,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
         }}
       >
         <div style={{
-          padding: '2rem 2.5rem',
+          padding: 'clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2.5rem)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -284,8 +305,8 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <button onClick={refresh} disabled={isLoading} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <RefreshCw size={12} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+            <button onClick={handleRefresh} disabled={isLoading || statsLoading} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <RefreshCw size={12} style={{ animation: isLoading || statsLoading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
             </button>
             <button onClick={onClose} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem' }}>
               Close
@@ -296,8 +317,8 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div style={{ padding: '1.75rem 2.5rem 2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.95fr)', gap: '1rem' }}>
+        <div style={{ padding: 'clamp(1.25rem, 3vw, 1.75rem) clamp(1rem, 3vw, 2.5rem) clamp(1.5rem, 4vw, 2.5rem)', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -328,12 +349,12 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                   </div>
                   <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>{trendLabel}</div>
                   <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>
-                    {screeningsWithRisk.length > 0 ? `${Math.round(avgRisk * 100)}% average risk across saved scans` : 'Run a scan to start tracking'}
+                    {screeningsWithRisk.length > 0 ? `${Math.round(dashboardAvgRisk * 100)}% average risk across saved scans` : 'Run a scan to start tracking'}
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', alignItems: 'center' }}>
                 <div style={{ padding: '0.9rem 1rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.55rem' }}>
                     <span style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
@@ -363,15 +384,15 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
               </div>
             </motion.div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.85rem' }}>
-              <StatCard icon={<Activity size={15} />} label="Total Scans" value={String(total)} tint="#00C2FF" sub="Saved screening records" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+              <StatCard icon={<Activity size={15} />} label="Total Scans" value={String(totalScans)} tint="#00C2FF" sub="Saved screening records" />
+              <StatCard icon={<Clock size={15} />} label="This Month" value={String(scansThisMonth)} tint="#A855F7" sub={lastScanAt ? `Last scan ${formatDateTime(lastScanAt)}` : 'No completed screenings yet'} />
               <StatCard icon={<Gauge size={15} />} label="Avg Confidence" value={`${Math.round(avgConfidence * 100)}%`} tint="#10B981" sub="Mean confidence across stored runs" />
               <StatCard icon={<AlertTriangle size={15} />} label="Flagged Cases" value={String(flaggedCount)} tint="#EF4444" sub="High concern + retake-needed cases" />
-              <StatCard icon={plan === 'Pro' ? <Crown size={15} /> : <Shield size={15} />} label="Plan" value={plan} tint={plan === 'Pro' ? '#FFD700' : plan === 'Admin' ? '#EF4444' : '#94A3B8'} sub={plan === 'Pro' ? 'Expanded screening access enabled' : plan === 'Admin' ? 'Administrative control access' : 'Standard screening access'} />
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -415,7 +436,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                       : 'Once screening data exists, this panel will summarize the most actionable next step automatically.'}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
                 {[
                   { icon: <HeartPulse size={13} />, label: 'Avg risk', value: `${Math.round(avgRisk * 100)}%`, tint: '#F59E0B' },
                   { icon: <Stethoscope size={13} />, label: 'Latest band', value: latest ? bandLabel(latest.triage_band) : '—', tint: latest ? bandColor(latest.triage_band) : '#64748B' },
@@ -430,6 +451,68 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
               </div>
             </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: E }}
+            style={{
+              padding: '1.25rem 1.35rem',
+              borderRadius: '1.15rem',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.95rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <UserCircle2 size={14} style={{ color: '#8B5CF6' }} />
+              <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#8B5CF6' }}>
+                Account Status
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+              {[
+                {
+                  label: 'Plan',
+                  value: plan,
+                  helper: user.role === 'admin' ? 'Operator access enabled' : 'Personal screening workspace',
+                  icon: <ShieldCheck size={13} />,
+                  tint: plan === 'Admin' ? '#EF4444' : plan === 'Pro' ? '#FFD700' : '#8B5CF6',
+                },
+                {
+                  label: 'Account sync',
+                  value: accountTrustStatus,
+                  helper: totalScans > 0 ? `${totalScans} results already secured in history` : 'New results can be saved right after screening',
+                  icon: <CheckCircle2 size={13} />,
+                  tint: '#10B981',
+                },
+                {
+                  label: 'Member since',
+                  value: formatShortDate(user.created_at),
+                  helper: 'Profile is ready for repeat screening and follow-up tracking',
+                  icon: <Clock size={13} />,
+                  tint: '#00C2FF',
+                },
+                {
+                  label: 'Last login',
+                  value: formatMaybeDateTime(user.last_login_at),
+                  helper: 'Secure auth is active for dashboard, history, and save-to-account actions',
+                  icon: <UserCircle2 size={13} />,
+                  tint: '#F59E0B',
+                },
+              ].map((item) => (
+                <div key={item.label} style={{ padding: '0.85rem 0.9rem', borderRadius: '0.95rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: item.tint }}>{item.icon}</div>
+                  <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>{item.label}</div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>{item.value}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>{item.helper}</div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', paddingTop: '0.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>

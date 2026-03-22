@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 from PIL import Image
-
-if TYPE_CHECKING:
-    import torch
-    from torch import nn
 
 
 EFFICIENTNET_VERSION = "efficientnet-b0-ft-v2"
@@ -21,56 +17,30 @@ def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     return max(lower, min(upper, value))
 
 
-def build_efficientnet_model(*, pretrained: bool = True) -> "nn.Module":
+def build_efficientnet_model(*, pretrained: bool = True):
     from torch import nn
     from torchvision.models import EfficientNet_B0_Weights, efficientnet_b0
 
-    class SpatialAttention(nn.Module):
-        """
-        Focuses the model on the most informative spatial regions (like the conjunctiva area).
-        """
-
-        def __init__(self, kernel_size: int = 7) -> None:
-            super().__init__()
-            self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
-            self.sigmoid = nn.Sigmoid()
-
-        def forward(self, x):
-            import torch
-
-            avg_out = torch.mean(x, dim=1, keepdim=True)
-            max_out, _ = torch.max(x, dim=1, keepdim=True)
-            combined = torch.cat([avg_out, max_out], dim=1)
-            scale = self.sigmoid(self.conv(combined))
-            return x * scale
-
     weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
     model = efficientnet_b0(weights=weights)
-
-    model.features.add_module("spatial_attention", SpatialAttention())
     model.classifier = nn.Sequential(
         nn.Dropout(0.35),
         nn.Linear(1280, 512),
         nn.GELU(),
-        nn.BatchNorm1d(512),
         nn.Dropout(0.25),
         nn.Linear(512, 128),
         nn.GELU(),
-        nn.BatchNorm1d(128),
         nn.Dropout(0.15),
         nn.Linear(128, 2),
     )
 
     for param in model.features.parameters():
         param.requires_grad = False
-
     for name, param in model.features.named_parameters():
-        if name.startswith(("4", "5", "6", "7", "8", "spatial_attention")):
+        if name.startswith(("4", "5", "6", "7", "8")):
             param.requires_grad = True
-
     for param in model.classifier.parameters():
         param.requires_grad = True
-
     return model
 
 
@@ -81,14 +51,27 @@ def build_train_transform():
         [
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(p=0.15),
-            transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.05),
+            transforms.ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.3,
+                hue=0.05,
+            ),
             transforms.RandomRotation(20),
-            transforms.RandomAffine(degrees=0, translate=(0.12, 0.12), scale=(0.88, 1.12)),
+            transforms.RandomAffine(
+                degrees=0,
+                translate=(0.12, 0.12),
+                scale=(0.88, 1.12),
+            ),
             transforms.RandomPerspective(distortion_scale=0.15, p=0.3),
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ToTensor(),
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
-            transforms.RandomErasing(p=0.25, scale=(0.02, 0.12), ratio=(0.3, 3.3)),
+            transforms.RandomErasing(
+                p=0.25,
+                scale=(0.02, 0.12),
+                ratio=(0.3, 3.3),
+            ),
         ]
     )
 
@@ -108,14 +91,14 @@ def build_val_transform():
 def load_efficientnet_checkpoint(
     path: str | Path,
     *,
-    map_location: str | "torch.device" = "cpu",
+    map_location: str = "cpu",
 ) -> dict[str, Any]:
     import torch
 
     checkpoint = torch.load(path, map_location=map_location)
     model = build_efficientnet_model(pretrained=False)
     state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict)
     device = torch.device(map_location)
     model.to(device)
     model.eval()
@@ -164,17 +147,14 @@ def predict_with_efficientnet_model(
                     _enable_dropout(model)
                 output = model(tensor)
                 probabilities.append(float(torch.sigmoid(output[:, 0]).item()))
-                hemoglobin_values.append(float((output[:, 1].item() * hb_std_scale) + hb_mean))
+                hemoglobin_values.append(
+                    float((output[:, 1].item() * hb_std_scale) + hb_mean)
+                )
 
     mean_probability = float(np.mean(probabilities))
     mean_hemoglobin = float(np.mean(hemoglobin_values))
     probability_std = float(np.std(probabilities))
     hemoglobin_std = float(np.std(hemoglobin_values))
-
-    hb_mean_val = float(bundle.get("hb_mean", 12.8))
-    hb_spread_factor = float(bundle.get("hb_spread_factor", 1.30))
-    deviation = mean_hemoglobin - hb_mean_val
-    mean_hemoglobin = float(np.clip(hb_mean_val + deviation * hb_spread_factor, 5.0, 20.0))
 
     margin_uncertainty = 1.0 - min(1.0, abs(mean_probability - 0.5) * 2.5)
     uncertainty = clamp(
@@ -196,7 +176,7 @@ def predict_with_efficientnet_model(
     }
 
 
-def _enable_dropout(model: "nn.Module") -> None:
+def _enable_dropout(model) -> None:
     from torch import nn
 
     for module in model.modules():

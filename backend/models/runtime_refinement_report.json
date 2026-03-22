@@ -1,0 +1,24 @@
+{
+  "version": "runtime-screening-refiner-v1",
+  "method": "logistic-regression",
+  "validation_size": 44,
+  "selected_threshold": 0.54,
+  "metrics_before": {
+    "accuracy": 0.8636,
+    "precision": 0.75,
+    "recall": 0.8571,
+    "f1": 0.8
+  },
+  "metrics_after": {
+    "accuracy": 0.8864,
+    "precision": 0.8462,
+    "recall": 0.7857,
+    "f1": 0.8148
+  },
+  "stage_metrics_after": {
+    "accuracy": 0.9091,
+    "precision": 0.8571,
+    "recall": 0.8571,
+    "f1": 0.8571
+  }
+}

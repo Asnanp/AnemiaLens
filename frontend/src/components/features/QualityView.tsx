@@ -257,7 +257,7 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
         <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.12)', marginBottom: '1.2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.72)' }}>
-              Lighting Intelligence
+              Lighting Check
             </span>
             <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: ringColor((quality.lighting_score ?? 0) * 100) }}>
               {lightingConditionLabel}
@@ -266,6 +266,16 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.8rem' }}>
             {quality.lighting_summary ?? 'Lighting analysis is unavailable for this scan.'}
           </p>
+          <div style={{ display: 'grid', gap: '0.45rem', marginBottom: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.66rem' }}>
+              <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Condition</span>
+              <span style={{ color: 'var(--text)', fontFamily: 'var(--mono)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{lightingConditionLabel}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.66rem' }}>
+              <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Lighting score</span>
+              <span style={{ color: ringColor((quality.lighting_score ?? 0) * 100), fontFamily: 'var(--mono)', fontWeight: 700 }}>{Math.round((quality.lighting_score ?? 0) * 100)}%</span>
+            </div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
             {[
               { label: 'Glare Risk', value: (quality.glare_risk ?? 0) * 100, accent: '#F59E0B' },

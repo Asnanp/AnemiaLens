@@ -49,12 +49,12 @@ export function WakeBanner() {
             animation: 'spin 0.8s linear infinite', flexShrink: 0,
           }} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Backend waking up — first load can take ~60s while Hugging Face Spaces spins up{dots}
+            Backend waking up - first load can take ~60s while Hugging Face Spaces spins up{dots}
           </span>
         </>
       ) : (
         <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)' }}>
-          Backend unreachable — please refresh or try again shortly
+          Backend unreachable - please refresh or try again shortly
         </span>
       )}
     </motion.div>
@@ -100,7 +100,7 @@ const TICKER_ITEMS = [
   'EfficientNet-B0 vision backbone',
   'Mistral AI grounded GenAI guidance',
   'Four-band safety triage system',
-  'Smartphone-first — no hardware required',
+  'Smartphone-first - no hardware required',
 ];
 
 export function MarqueeTicker() {
@@ -118,7 +118,17 @@ export function MarqueeTicker() {
       <div className="marquee-track">
         {items.map((item, i) => (
           <span key={i} className="marquee-item">
-            <span style={{ color:'var(--accent-bright)', marginRight:'0.5rem' }}>◆</span>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--accent-bright)',
+                marginRight: '0.55rem',
+                boxShadow: '0 0 10px rgba(232,41,74,0.45)',
+              }}
+            />
             {item}
           </span>
         ))}
@@ -214,17 +224,17 @@ export const GlassCard = ({ children, className = '', style = {}, ...props }: Re
 export const STEPS_META = [
   { label: 'Capture',  icon: <Camera size={13} /> },
   { label: 'Quality',  icon: <ShieldCheck size={13} /> },
-  { label: 'Symptoms', icon: <HeartPulse size={13} /> },
+  { label: 'Intake', icon: <HeartPulse size={13} /> },
   { label: 'Result',   icon: <Brain size={13} /> },
 ] as const;
 
 // ── LOADING OVERLAY ───────────────────────────────────────────────────────────
 export function QwenLoadingOverlay() {
   const stages = [
-    { label: 'Running vision model', done: true },
-    { label: 'Analyzing conjunctival pallor', done: true },
-    { label: 'Calculating triage band', done: true },
-    { label: 'Mistral AI generating guidance...', done: false },
+    { label: 'Image Quality Agent validated capture', done: true },
+    { label: 'Screening Agent analyzed conjunctival pallor', done: true },
+    { label: 'Triage Agent fused intake + image signal', done: true },
+    { label: 'Guidance Agent is preparing next steps...', done: false },
   ];
   return (
     <motion.div

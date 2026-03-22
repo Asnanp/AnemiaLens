@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.services.image_quality import ImageQualityService
 from app.services.conjunctiva_roi import ConjunctivaRoiExtractor
-from app.schemas import QualityIssue
+from app.schemas import QualityAssessment, QualityIssue
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +202,37 @@ def test_large_image_triggers_roi_crop_and_passes() -> None:
     assert "roi_cropped" in quality.issue_codes
     assert roi_image.size[0] < 500
     assert roi_image.size[1] < 260
+
+
+def test_raw_frame_rescue_allows_combined_framing_and_lighting_blocks() -> None:
+    assessment = QualityAssessment(
+        passed=False,
+        blur_score=220.0,
+        brightness_score=0.56,
+        contrast_score=0.11,
+        framing_score=2.2,
+        lighting_score=0.32,
+        lighting_condition="overexposed",
+        lighting_summary="Lighting is brighter than ideal.",
+        glare_risk=0.22,
+        shadow_risk=0.0,
+        issues=[
+            QualityIssue(
+                code="bad_framing",
+                severity="blocking",
+                title="Framing is weak",
+                message="Retake closer.",
+            ),
+            QualityIssue(
+                code="poor_lighting",
+                severity="warning",
+                title="Lighting is bright",
+                message="Move to softer light.",
+            ),
+        ],
+    )
+
+    assert SERVICE.allows_raw_frame_rescue(assessment) is True
 
 
 def test_roi_extractor_falls_back_to_conjunctiva_band_when_iris_detection_misses() -> None:

@@ -85,10 +85,13 @@ The current live product is built around four trust signals:
 
 ### Product
 - Guest-first screening flow
+- Supabase-backed account login and registration
+- Guest-to-account save flow for the current screening
 - Auth, history, and admin surfaces
 - Export and share actions
 - Doctor view and user view result modes
 - Dashboard and admin analytics
+- Saved case history with account-level trend tracking
 
 ---
 
@@ -150,6 +153,9 @@ Open [http://localhost:5173](http://localhost:5173).
 | `ANEMIALENS_EMAIL_FROM_EMAIL` | Your verified Gmail address |
 | `ANEMIALENS_EMAIL_REPLY_TO` | Your verified Gmail address |
 | `PORT` | `5000` |
+
+5. Apply the SQL schema from `backend/supabase_schema.sql` to the target Supabase database before first login
+6. Auth, history, and save-to-account flows depend on the Supabase Postgres database being available at startup
 
 ### Frontend -> Vercel
 

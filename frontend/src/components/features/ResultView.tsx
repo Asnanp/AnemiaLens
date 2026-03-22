@@ -78,6 +78,17 @@ type ReliabilityStatus = {
   detail: string;
 };
 
+function isSevereLightingCase(analysis: AnalyzeResponse): boolean {
+  const breakdown = analysis.prediction?.confidence_breakdown;
+  return (
+    analysis.quality.lighting_condition === 'glare_heavy'
+    || analysis.quality.lighting_condition === 'shadow_heavy'
+    || analysis.quality.lighting_condition === 'overexposed'
+    || (breakdown?.glare_risk ?? analysis.quality.glare_risk ?? 0) > 0.65
+    || (breakdown?.shadow_risk ?? analysis.quality.shadow_risk ?? 0) > 0.65
+  );
+}
+
 function classificationLabel(label: string): string {
   return (label ?? 'screening result').toLowerCase().replace(/\s+/g, '-');
 }
@@ -96,6 +107,10 @@ function getReliabilityStatus(analysis: AnalyzeResponse): ReliabilityStatus {
   const confidencePct = Math.round((prediction?.confidence ?? 0) * 100);
   const hasWarnings = analysis.quality.issues.some((issue) => issue.severity === 'warning');
   const blockedByQuality = !prediction || !analysis.quality.passed || analysis.decision_audit.processing_path === 'quality_blocked';
+  const severeLighting = isSevereLightingCase(analysis);
+  const captureQuality = prediction?.confidence_breakdown?.capture_quality ?? 0;
+  const thresholdStability = prediction?.confidence_breakdown?.threshold_stability ?? 0;
+  const modelStability = prediction?.confidence_breakdown?.model_stability ?? 0;
 
   if (blockedByQuality) {
     return {
@@ -106,15 +121,43 @@ function getReliabilityStatus(analysis: AnalyzeResponse): ReliabilityStatus {
   }
 
   if (
-    prediction.reliability_flag === 'low'
-    || confidencePct < 50
-    || hasWarnings
+    severeLighting
+    || confidencePct < 45
     || analysis.decision_audit.processing_path === 'full_frame_rescue'
   ) {
     return {
       label: 'Low',
       color: '#F97316',
       detail: 'Image quality affected prediction reliability, so a cleaner retake would improve trust in this result.',
+    };
+  }
+
+  if (
+    prediction.reliability_flag === 'low'
+    && analysis.quality.passed
+    && confidencePct >= 65
+    && captureQuality >= 0.7
+    && thresholdStability >= 0.72
+    && !severeLighting
+  ) {
+    return {
+      label: 'Moderate',
+      color: '#F59E0B',
+      detail: modelStability < 0.45
+        ? 'The result is leaning one way, but repeat model passes varied more than ideal. A cleaner retake would make it more defensible.'
+        : 'The capture is usable and the result is leaning one way, but it still benefits from a cleaner retake for stronger trust.',
+    };
+  }
+
+  if (
+    prediction.reliability_flag === 'low'
+    || confidencePct < 50
+    || hasWarnings
+  ) {
+    return {
+      label: 'Low',
+      color: '#F97316',
+      detail: 'Image quality or model spread reduced trust in this result, so a cleaner retake would improve confidence.',
     };
   }
 
@@ -296,12 +339,10 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
   const confidenceRows = confidenceBreakdown
     ? [
         { label: 'Capture quality', value: `${Math.round(confidenceBreakdown.capture_quality * 100)}%` },
-        { label: 'Model stability', value: `${Math.round(confidenceBreakdown.model_stability * 100)}%` },
-        { label: 'Decision margin', value: `${Math.round(confidenceBreakdown.threshold_stability * 100)}%` },
+        { label: 'Lighting', value: humanizeToken(confidenceBreakdown.lighting_condition, 'balanced') },
       ]
     : [];
   const nextMoveSummary = analysis.quality.lighting_summary;
-
   return (
     <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08, duration: 0.5, ease: E }}
@@ -329,23 +370,23 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         {mandatorySummary}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
-        <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
-          <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
-            Confidence + Reliability
-          </div>
-          <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Confidence</span>
-              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
+              Prediction trust
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
-              <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
-            </div>
-            {confidenceRows.map((row) => (
-              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
+            <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
+                <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
+              </div>
+              {confidenceRows.map((row) => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
                 <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{row.value}</span>
               </div>
             ))}
@@ -356,7 +397,7 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,165,0,0.05)', border: '1px solid rgba(255,165,0,0.14)' }}>
             <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.8)', marginBottom: '0.45rem' }}>
               Best next move
             </div>
@@ -838,7 +879,7 @@ function MLProofPanel() {
         <BarChart2 size={14} style={{ color: 'rgba(0,194,255,0.8)' }} />
         <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>Model Performance · Validated</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.625rem' }}>
         {metrics.map(m => (
           <div key={m.label} style={{ padding: '1rem', borderRadius: '0.75rem', background: m.highlight ? 'rgba(0,194,255,0.07)' : 'rgba(255,255,255,0.02)', border: m.highlight ? '1px solid rgba(0,194,255,0.25)' : '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.3rem' }}>{m.label}</div>
@@ -961,7 +1002,7 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
               <div style={{ fontSize: '0.92rem', color: 'var(--text)', lineHeight: 1.65, fontWeight: 500 }}>
                 {summaryPreview}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
                 <div style={{ padding: '0.9rem 1rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Risk score</div>
                   <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>{riskPct}%</div>
@@ -1038,14 +1079,14 @@ function ConfidenceGauge({ analysis, color }: { analysis: AnalyzeResponse; color
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.62rem', fontFamily: 'var(--mono)' }}>
-        <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
+        <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
         <span style={{ color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
       </div>
       <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
         {reliability.detail}
       </div>
       <div style={{ fontSize: '0.58rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.04em' }}>
-        High: 80%+ · Moderate: 50–80% · Low: &lt;50%
+        Confidence shows direction. Trust level shows how clean and repeatable the capture was.
       </div>
     </div>
   );
@@ -1055,9 +1096,11 @@ interface ResultViewProps {
   analysis: AnalyzeResponse;
   onReset: () => void;
   onDownload: () => void;
+  onOpenAuth?: (mode?: 'login' | 'register') => void;
 }
 
-export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
+export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: ResultViewProps) {
+  const { isAuthenticated } = useAuth();
   const isHigh     = analysis.triage.band === 'high_concern';
   const isModerate = analysis.triage.band === 'moderate_risk';
   const bandColor  = isHigh ? '#EF4444' : isModerate ? '#F59E0B' : '#10B981';
@@ -1230,6 +1273,20 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
             <div className="section-eyebrow">Next steps</div>
 
+            <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+                <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>
+                  AI guidance
+                </div>
+                <div style={{ padding: '0.28rem 0.72rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.85)' }}>
+                  {analysis.guidance.source === 'mistral' ? `Mistral • ${analysis.guidance.model_used ?? 'live'}` : 'Fallback guidance'}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                {analysis.guidance.explanation}
+              </div>
+            </div>
+
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.16)' }}>
               <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)', marginBottom: '0.45rem' }}>
                 Action now
@@ -1261,6 +1318,44 @@ export function ResultView({ analysis, onReset, onDownload }: ResultViewProps) {
           <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: `3px solid ${bandColor}` }}>
             <div className="section-eyebrow">Case tools</div>
+            {!isAuthenticated && onOpenAuth && (
+              <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(200,0,30,0.05)', border: '1px solid rgba(200,0,30,0.16)', display: 'grid', gap: '0.8rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent-bright)', marginBottom: '0.4rem' }}>
+                    Account save
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                    Save this screening to your account so it shows up in history, dashboard trends, and future follow-up tracking.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-glass"
+                    style={{ padding: '0.7rem 0.95rem', fontSize: '0.65rem', borderRadius: '0.8rem' }}
+                    onClick={() => onOpenAuth('login')}
+                  >
+                    Sign In to Save
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{ padding: '0.7rem 0.95rem', fontSize: '0.65rem', borderRadius: '0.8rem' }}
+                    onClick={() => onOpenAuth('register')}
+                  >
+                    Create Free Account
+                  </button>
+                </div>
+              </div>
+            )}
+            {isAuthenticated && (
+              <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.14)' }}>
+                <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(16,185,129,0.85)', marginBottom: '0.45rem' }}>
+                  Account sync
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                  This run is linked to your signed-in session, so future screenings can build a real history and trend view.
+                </div>
+              </div>
+            )}
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               <motion.button className="btn btn-primary" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
                 style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}

@@ -1,0 +1,28 @@
+{
+  "version": "runtime-risk-calibrator-v1",
+  "method": "temperature",
+  "validation_size": 44,
+  "selected_thresholds": {
+    "roi_original": 0.495,
+    "palpebral": 0.65,
+    "forniceal_palpebral": 0.65
+  },
+  "diagnostics": {
+    "ece_before": 0.262,
+    "ece_after": 0.0909,
+    "brier_before": 0.0906,
+    "brier_after": 0.0501
+  },
+  "roi_metrics_before": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "roi_metrics_after": {
+    "accuracy": 0.9318,
+    "precision": 0.8235,
+    "recall": 1.0,
+    "f1": 0.9032
+  }
+}

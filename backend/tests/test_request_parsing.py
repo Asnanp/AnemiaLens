@@ -20,8 +20,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.schemas import SymptomInput
-from app.services.request_parsing import InvalidRequestPayload, normalize_optional_text, parse_symptoms
+from app.schemas import PatientProfileInput, SymptomInput
+from app.services.request_parsing import (
+    InvalidRequestPayload,
+    normalize_optional_text,
+    parse_patient_profile,
+    parse_symptoms,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +87,22 @@ def test_parse_symptoms_null_payload_returns_defaults() -> None:
 def test_parse_symptoms_empty_object_returns_defaults() -> None:
     result = parse_symptoms("{}")
     assert result == SymptomInput()
+
+
+def test_parse_patient_profile_defaults_when_missing() -> None:
+    assert parse_patient_profile(None) == PatientProfileInput()
+
+
+def test_parse_patient_profile_accepts_string_age_and_normalises_enums() -> None:
+    result = parse_patient_profile(
+        json.dumps({"age": "17", "sex": " Female ", "diet_type": " Vegetarian "})
+    )
+    assert result == PatientProfileInput(age=17, sex="female", diet_type="vegetarian")
+
+
+def test_parse_patient_profile_rejects_non_object_json() -> None:
+    with pytest.raises(InvalidRequestPayload):
+        parse_patient_profile('["not", "an", "object"]')
 
 
 # ---------------------------------------------------------------------------
