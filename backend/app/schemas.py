@@ -585,7 +585,7 @@ class AnalysisMeta(BaseModel):
         description="Which inference path reached the final result."
     )
     guidance_source: GuidanceSource = Field(
-        description="Whether guidance came from Qwen or the rule-based fallback."
+        description="Whether guidance came from Mistral or the rule-based fallback."
     )
     used_raw_frame_rescue: bool = Field(
         description="True when the backend rescued a framing-limited case using the full-frame path."
@@ -603,10 +603,9 @@ class AnalysisMeta(BaseModel):
 class GuidanceRuntimeStatus(BaseModel):
     active_strategy: GuidanceSource
     mistral_enabled: bool = False
-    qwen_enabled: bool = False  # kept for backwards compat
     client_ready: bool = False
     api_key_configured: bool = False
-    qwen_model: str | None = None
+    mistral_model: str | None = None
     provider: str | None = None
     fallback_reason: str | None = None
     last_provider_error: str | None = None

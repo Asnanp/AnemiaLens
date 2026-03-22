@@ -1,5 +1,5 @@
 """
-Tests for GuidanceService, covering both Qwen-backed guidance and the
+Tests for GuidanceService, covering both Mistral-backed guidance and the
 rule-based fallback.
 """
 
@@ -40,12 +40,12 @@ class _PredictorStub:
 class _GuidanceStub:
     def runtime_status(self) -> GuidanceRuntimeStatus:
         return GuidanceRuntimeStatus(
-            active_strategy="qwen",
-            qwen_enabled=True,
+            active_strategy="mistral",
+            mistral_enabled=True,
             client_ready=True,
             api_key_configured=True,
-            qwen_model="Qwen/Qwen2.5-7B-Instruct",
-            provider="hf-inference",
+            mistral_model="mistral-small-latest",
+            provider="mistral",
         )
 
 
@@ -62,11 +62,25 @@ def _triage(band: str = "moderate_risk", score: float = 0.48) -> TriageResult:
 SERVICE = GuidanceService()
 
 
+def _make_mistral_service(*, api_key_configured: bool = True) -> GuidanceService:
+    service = GuidanceService.__new__(GuidanceService)
+    service.mistral_enabled = True
+    service.mistral_model = "mistral-small-latest"
+    service.guidance_timeout = 6.0
+    service.guidance_max_tokens = 256
+    service.api_key_configured = api_key_configured
+    service._fallback_reason = None if api_key_configured else "Mistral API key is missing."
+    service._last_provider_error = None
+    service._response_cache = OrderedDict()
+    service._response_cache_size = 64
+    return service
+
+
 class TestParseGuidanceResponse:
     BASE_KWARGS = dict(
-        source="qwen",
-        model_used="Qwen/Qwen2.5-7B-Instruct",
-        provider_used="hf-inference",
+        source="mistral",
+        model_used="mistral-small-latest",
+        provider_used="mistral",
     )
 
     def test_accepts_code_fenced_json(self) -> None:
@@ -80,9 +94,9 @@ class TestParseGuidanceResponse:
         ```"""
         result = SERVICE._parse_guidance_response(raw, **self.BASE_KWARGS)
 
-        assert result.source == "qwen"
-        assert result.model_used == "Qwen/Qwen2.5-7B-Instruct"
-        assert result.provider_used == "hf-inference"
+        assert result.source == "mistral"
+        assert result.model_used == "mistral-small-latest"
+        assert result.provider_used == "mistral"
         assert len(result.next_steps) == 2
         assert result.next_steps[0] == "Retake if symptoms change"
 
@@ -123,7 +137,7 @@ class TestParseGuidanceResponse:
           "next_steps": ["Book a routine clinic visit", "Monitor symptoms and retake if they change"]
         }"""
         result = SERVICE._parse_guidance_response(raw, **self.BASE_KWARGS)
-        assert result.source == "qwen"
+        assert result.source == "mistral"
         assert "not a diagnosis" in result.explanation.lower()
 
 
@@ -146,46 +160,53 @@ def test_parse_guidance_rejects_unsafe_claims(unsafe_explanation: str) -> None:
     with pytest.raises(ValueError, match="[Uu]nsafe|diagnostic|claim"):
         SERVICE._parse_guidance_response(
             raw,
-            source="qwen",
-            model_used="Qwen/Qwen2.5-7B-Instruct",
-            provider_used="hf-inference",
+            source="mistral",
+            model_used="mistral-small-latest",
+            provider_used="mistral",
         )
 
 
 class TestFallbackGuidance:
+    @staticmethod
+    def _fallback_result(band: str, symptoms: SymptomInput) -> GuidanceResult:
+        predicted_hemoglobin = {
+            "low_risk": 13.2,
+            "moderate_risk": 10.1,
+            "high_concern": 7.8,
+            "uncertain_retake_needed": None,
+        }[band]
+        confidence = None if predicted_hemoglobin is None else 0.72
+        return SERVICE.generate_smart_fallback(
+            band,
+            predicted_hemoglobin,
+            confidence,
+            symptoms,
+            "India",
+        )
+
     @pytest.mark.parametrize("band", ["low_risk", "moderate_risk", "high_concern", "uncertain_retake_needed"])
     def test_fallback_has_next_steps_for_every_band(self, band: str) -> None:
-        result = SERVICE._fallback_guidance(
-            triage=_triage(band=band),
-            symptoms=SymptomInput(fatigue=True),
-            prediction=None,
-        )
+        result = self._fallback_result(band, SymptomInput(fatigue=True))
         assert len(result.next_steps) >= 1
 
     def test_fallback_marks_source_correctly(self) -> None:
-        result = SERVICE._fallback_guidance(
-            triage=_triage(),
-            symptoms=SymptomInput(fatigue=True, poor_diet_low_iron=True),
-            prediction=None,
+        result = self._fallback_result(
+            "moderate_risk",
+            SymptomInput(fatigue=True, poor_diet_low_iron=True),
         )
         assert result.source == "fallback"
         assert result.model_used is None
         assert result.provider_used is None
 
     def test_fallback_result_validates_as_guidance_result(self) -> None:
-        result = SERVICE._fallback_guidance(
-            triage=_triage(band="high_concern", score=0.80),
-            symptoms=SymptomInput(fatigue=True, dizziness=True),
-            prediction=None,
+        result = self._fallback_result(
+            "high_concern",
+            SymptomInput(fatigue=True, dizziness=True),
         )
         GuidanceResult.model_validate(result.model_dump())
 
     def test_fallback_explanation_not_empty(self) -> None:
-        result = SERVICE._fallback_guidance(
-            triage=_triage(),
-            symptoms=SymptomInput(),
-            prediction=None,
-        )
+        result = self._fallback_result("moderate_risk", SymptomInput())
         assert len(result.explanation) > 20
 
     def test_fallback_language_is_non_diagnostic(self) -> None:
@@ -201,43 +222,19 @@ class TestFallbackGuidance:
         assert "you have anemia" not in combined
 
     def test_runtime_status_reports_fallback_reason_without_api_key(self) -> None:
-        service = GuidanceService.__new__(GuidanceService)
-        service.qwen_enabled = True
-        service.qwen_model = "Qwen/Qwen2.5-7B-Instruct"
-        service.hf_provider = "hf-inference"
-        service.guidance_timeout = 6.0
-        service.guidance_max_tokens = 256
-        service.api_key_configured = False
-        service.provider_name = "hf-inference"
-        service._client = None
-        service._fallback_reason = "Hugging Face API key is missing, so rule-based guidance is active."
-        service._last_provider_error = None
-        service._response_cache = OrderedDict()
-        service._response_cache_size = 64
+        service = _make_mistral_service(api_key_configured=False)
 
         status = service.runtime_status()
 
         assert status.active_strategy == "fallback"
-        assert status.qwen_enabled is True
+        assert status.mistral_enabled is True
         assert status.client_ready is False
         assert status.api_key_configured is False
         assert "missing" in (status.fallback_reason or "").lower()
 
     def test_generate_skips_llm_for_uncertain_retake_cases(self) -> None:
-        service = GuidanceService.__new__(GuidanceService)
-        service.qwen_enabled = True
-        service.qwen_model = "Qwen/Qwen2.5-7B-Instruct"
-        service.hf_provider = "hf-inference"
-        service.guidance_timeout = 6.0
-        service.guidance_max_tokens = 256
-        service.api_key_configured = True
-        service.provider_name = "hf-inference"
-        service._client = object()
-        service._fallback_reason = None
-        service._last_provider_error = None
-        service._response_cache = OrderedDict()
-        service._response_cache_size = 64
-        service._call_qwen_api = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Qwen should be skipped"))  # type: ignore[method-assign]
+        service = _make_mistral_service()
+        service._call_mistral_api = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Mistral should be skipped"))  # type: ignore[method-assign]
 
         result = service.generate(
             triage=_triage(band="uncertain_retake_needed"),
@@ -267,22 +264,10 @@ class TestFallbackGuidance:
         assert "Avoid strenuous activity until reviewed by a doctor." in result.next_steps
         assert "Discuss menstrual blood loss with your doctor as a likely contributing factor." in result.next_steps
 
-    def test_generate_qwen_returns_smart_fallback_when_provider_fails(self) -> None:
-        service = GuidanceService.__new__(GuidanceService)
-        service.qwen_enabled = True
-        service.qwen_model = "Qwen/Qwen2.5-7B-Instruct"
-        service.hf_provider = "hf-inference"
-        service.guidance_timeout = 6.0
-        service.guidance_max_tokens = 256
-        service.api_key_configured = True
-        service.provider_name = "hf-inference"
-        service._client = object()
-        service._fallback_reason = None
-        service._last_provider_error = None
-        service._response_cache = OrderedDict()
-        service._response_cache_size = 64
-        service._call_qwen_api = lambda *args, **kwargs: (_ for _ in ()).throw(  # type: ignore[method-assign]
-            RuntimeError("403 Forbidden: This authentication method does not have sufficient permissions to call Inference Providers")
+    def test_generate_mistral_returns_smart_fallback_when_provider_fails(self) -> None:
+        service = _make_mistral_service()
+        service._call_mistral_api = lambda *args, **kwargs: (_ for _ in ()).throw(  # type: ignore[method-assign]
+            RuntimeError("429 rate limit")
         )
 
         result = service.generate(
@@ -303,13 +288,13 @@ class TestFallbackGuidance:
 
         assert result.source == "fallback"
         assert "24 to 48 hours" in result.urgency_guidance
-        assert "inference providers" in (service._last_provider_error or "").lower()
+        assert "rate limit" in (service._last_provider_error or "").lower()
 
 
-def test_guidance_result_requires_model_and_provider_when_qwen() -> None:
+def test_guidance_result_requires_model_and_provider_when_mistral() -> None:
     with pytest.raises(Exception):
         GuidanceResult(
-            source="qwen",
+            source="mistral",
             explanation="Looks fine.",
             urgency_guidance="No urgency.",
             food_advice="Eat well.",
@@ -335,7 +320,7 @@ class TestRuntimeStatus(unittest.TestCase):
         status = build_runtime_status(_PredictorStub(), _GuidanceStub())
 
         self.assertEqual(status.api_status, "ok")
-        self.assertEqual(status.guidance.active_strategy, "qwen")
+        self.assertEqual(status.guidance.active_strategy, "mistral")
         self.assertIn(
             status.model.primary_model,
             {"archive-fusion-v2", "efficientnet-b0-ft", "archive-primary-v3", "archive-evidence-fusion-v4"},
@@ -343,11 +328,11 @@ class TestRuntimeStatus(unittest.TestCase):
         self.assertGreaterEqual(status.model.record_count or 0, 200)
         self.assertGreater(status.model.validation_f1 or 0.0, 0.6)
 
-    def test_guidance_qwen_fields_propagated(self) -> None:
+    def test_guidance_mistral_fields_propagated(self) -> None:
         status = build_runtime_status(_PredictorStub(), _GuidanceStub())
-        self.assertEqual(status.guidance.qwen_model, "Qwen/Qwen2.5-7B-Instruct")
-        self.assertEqual(status.guidance.provider, "hf-inference")
-        self.assertTrue(status.guidance.qwen_enabled)
+        self.assertEqual(status.guidance.mistral_model, "mistral-small-latest")
+        self.assertEqual(status.guidance.provider, "mistral")
+        self.assertTrue(status.guidance.mistral_enabled)
         self.assertTrue(status.guidance.client_ready)
 
 
@@ -365,36 +350,24 @@ def test_settings_accept_hf_environment_variable_names(monkeypatch: pytest.Monke
     assert settings_obj.hf_provider == "hf-inference"
 
 
-def test_generate_uses_cached_qwen_result_for_same_payload() -> None:
-    service = GuidanceService.__new__(GuidanceService)
-    service.qwen_enabled = True
-    service.qwen_model = "Qwen/Qwen2.5-7B-Instruct"
-    service.hf_provider = "hf-inference"
-    service.guidance_timeout = 6.0
-    service.guidance_max_tokens = 256
-    service.api_key_configured = True
-    service.provider_name = "hf-inference"
-    service._client = object()
-    service._fallback_reason = None
-    service._last_provider_error = None
-    service._response_cache = OrderedDict()
-    service._response_cache_size = 64
+def test_generate_uses_cached_mistral_result_for_same_payload() -> None:
+    service = _make_mistral_service()
 
     calls = {"count": 0}
 
-    def _fake_generate_qwen(*args, **kwargs) -> GuidanceResult:
+    def _fake_generate_mistral(*args, **kwargs) -> GuidanceResult:
         calls["count"] += 1
         return GuidanceResult(
-            source="qwen",
-            model_used="Qwen/Qwen2.5-7B-Instruct",
-            provider_used="hf-inference",
+            source="mistral",
+            model_used="mistral-small-latest",
+            provider_used="mistral",
             explanation="Screening suggests a mild low-hemoglobin signal.",
             urgency_guidance="Arrange a routine check if symptoms continue.",
             food_advice="Eat lentils, beans, spinach, and vitamin C-rich fruit.",
             next_steps=["Repeat the scan if symptoms change", "Plan a clinic test"],
         )
 
-    service._generate_qwen = _fake_generate_qwen  # type: ignore[method-assign]
+    service._generate_mistral = _fake_generate_mistral  # type: ignore[method-assign]
 
     prediction = PredictionResult(
         anemia_risk=0.58,
@@ -410,46 +383,34 @@ def test_generate_uses_cached_qwen_result_for_same_payload() -> None:
     first = service.generate(_triage(), SymptomInput(fatigue=True), prediction, "English", "India")
     second = service.generate(_triage(), SymptomInput(fatigue=True), prediction, "English", "India")
 
-    assert first.source == "qwen"
-    assert second.source == "qwen"
+    assert first.source == "mistral"
+    assert second.source == "mistral"
     assert calls["count"] == 1
 
 
-def test_summarize_provider_error_flags_hf_permission_problem() -> None:
+def test_summarize_provider_error_flags_provider_permission_problem() -> None:
     service = GuidanceService.__new__(GuidanceService)
-    message = service._summarize_provider_error(
+    message = service._summarize_error(
         RuntimeError("403 Forbidden: This authentication method does not have sufficient permissions to call Inference Providers")
     )
     assert "inference providers" in message.lower()
 
 
-def test_qwen_generates_response() -> None:
-    service = GuidanceService.__new__(GuidanceService)
-    service.qwen_enabled = True
-    service.qwen_model = "Qwen/Qwen2.5-7B-Instruct"
-    service.hf_provider = "hf-inference"
-    service.guidance_timeout = 6.0
-    service.guidance_max_tokens = 256
-    service.api_key_configured = True
-    service.provider_name = "hf-inference"
-    service._client = object()
-    service._fallback_reason = None
-    service._last_provider_error = None
-    service._response_cache = OrderedDict()
-    service._response_cache_size = 64
+def test_mistral_generates_response() -> None:
+    service = _make_mistral_service()
 
-    def _fake_generate_qwen(*args, **kwargs) -> GuidanceResult:
+    def _fake_generate_mistral(*args, **kwargs) -> GuidanceResult:
         return GuidanceResult(
-            source="qwen",
-            model_used="Qwen/Qwen2.5-7B-Instruct",
-            provider_used="hf-inference",
+            source="mistral",
+            model_used="mistral-small-latest",
+            provider_used="mistral",
             explanation="Screening suggests a mild low-hemoglobin signal.",
             urgency_guidance="Arrange a routine check if symptoms continue.",
             food_advice="Eat lentils, beans, spinach, and vitamin C-rich fruit.",
             next_steps=["Repeat the scan if symptoms change", "Plan a clinic test"],
         )
 
-    service._generate_qwen = _fake_generate_qwen  # type: ignore[method-assign]
+    service._generate_mistral = _fake_generate_mistral  # type: ignore[method-assign]
 
     result = service.generate(
         triage=_triage(),
@@ -466,4 +427,4 @@ def test_qwen_generates_response() -> None:
         ),
     )
 
-    assert result.source == "qwen"
+    assert result.source == "mistral"
