@@ -90,6 +90,13 @@ class Settings(BaseSettings):
             "WARMUP_MODELS_ON_STARTUP",
         ),
     )
+    enable_efficientnet_fallback: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_ENABLE_EFFICIENTNET_FALLBACK",
+            "ENABLE_EFFICIENTNET_FALLBACK",
+        ),
+    )
     cors_origins: list[str] = Field(
         default=[
             "http://localhost:5173",

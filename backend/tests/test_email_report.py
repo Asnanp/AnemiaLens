@@ -262,8 +262,10 @@ def test_email_report_service_sends_email_via_ssl(monkeypatch: pytest.MonkeyPatc
     html_part = smtp.sent_message.get_body(preferencelist=("html",))
     assert plain_part is not None
     assert html_part is not None
-    assert "CBC test" in plain_part.get_content()
-    assert "<br />" in html_part.get_content()
+    assert "clinical blood test (CBC)" in plain_part.get_content()
+    assert "Recommended Next Steps" in plain_part.get_content()
+    assert "Why this result" in html_part.get_content()
+    assert "Open AnemiaLens" in html_part.get_content()
 
 
 def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -309,7 +311,7 @@ def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyP
     assert body["to"] == ["patient@example.com"]
     assert body["reply_to"] == "support@example.com"
     assert body["subject"] == "AnemiaLens Screening Report - Moderate Risk"
-    assert "CBC test" in body["text"]
+    assert "clinical blood test (CBC)" in body["text"]
 
 
 def test_email_report_service_sends_email_via_sendgrid(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -356,7 +358,7 @@ def test_email_report_service_sends_email_via_sendgrid(monkeypatch: pytest.Monke
     assert body["personalizations"][0]["subject"] == "AnemiaLens Screening Report - Moderate Risk"
     assert body["content"][0]["type"] == "text/plain"
     assert body["content"][1]["type"] == "text/html"
-    assert "CBC test" in body["content"][0]["value"]
+    assert "clinical blood test (CBC)" in body["content"][0]["value"]
 
 
 def test_email_report_service_sends_email_via_gmail_api(monkeypatch: pytest.MonkeyPatch) -> None:

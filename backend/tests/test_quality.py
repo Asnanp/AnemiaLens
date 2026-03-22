@@ -104,6 +104,10 @@ def test_mild_lighting_warning_is_non_blocking() -> None:
     assert quality.passed is True
     assert "poor_lighting" in quality.issue_codes
     assert len(quality.blocking_issues) == 0
+    assert quality.lighting_condition
+    assert quality.lighting_summary
+    assert 0.0 <= quality.glare_risk <= 1.0
+    assert 0.0 <= quality.shadow_risk <= 1.0
 
 
 def test_bright_detailed_eye_is_not_blocked() -> None:
@@ -114,6 +118,43 @@ def test_bright_detailed_eye_is_not_blocked() -> None:
     assert quality.brightness_score > 0.42
     assert quality.passed is True
     assert len(quality.blocking_issues) == 0
+    assert quality.lighting_score > 0.35
+
+
+def test_lighting_intelligence_detects_glare_heavy() -> None:
+    score, condition, summary, glare_risk, shadow_risk = SERVICE._lighting_intelligence(
+        brightness_score=0.56,
+        contrast_score=0.16,
+        center_brightness=0.62,
+        center_contrast=0.15,
+        bright_region_ratio=0.31,
+        highlight_ratio=0.18,
+        dark_region_ratio=0.05,
+    )
+
+    assert 0.0 <= score <= 1.0
+    assert condition == "glare_heavy"
+    assert glare_risk >= 0.72
+    assert "glare" in summary.lower()
+    assert 0.0 <= shadow_risk <= 1.0
+
+
+def test_lighting_intelligence_marks_balanced_capture() -> None:
+    score, condition, summary, glare_risk, shadow_risk = SERVICE._lighting_intelligence(
+        brightness_score=0.28,
+        contrast_score=0.18,
+        center_brightness=0.29,
+        center_contrast=0.17,
+        bright_region_ratio=0.08,
+        highlight_ratio=0.01,
+        dark_region_ratio=0.12,
+    )
+
+    assert condition == "balanced"
+    assert score > 0.65
+    assert "balanced" in summary.lower()
+    assert glare_risk < 0.3
+    assert shadow_risk < 0.3
 
 
 def test_non_eye_closeup_fails_with_eye_not_visible_first() -> None:

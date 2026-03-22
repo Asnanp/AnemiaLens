@@ -221,6 +221,32 @@ class QualityAssessment(BaseModel):
     brightness_score: float = Field(ge=0.0, le=1.0, description="Mean luminance in [0, 1].")
     contrast_score: float = Field(ge=0.0, le=1.0, description="Normalised RMS contrast.")
     framing_score: float = Field(ge=0.0, description="Eye-region occupancy ratio.")
+    lighting_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Composite lighting quality score, where higher means more usable lighting.",
+    )
+    lighting_condition: str = Field(
+        default="balanced",
+        description="Lighting classification inferred from exposure, glare, shadows, and contrast.",
+    )
+    lighting_summary: str = Field(
+        default="Lighting details unavailable.",
+        description="Plain-language explanation of the current lighting condition and what it means for screening.",
+    )
+    glare_risk: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Estimated risk that glare or clipped highlights are harming the capture.",
+    )
+    shadow_risk: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Estimated risk that shadows or underexposure are hiding useful signal.",
+    )
     issues: list[QualityIssue] = Field(default_factory=list)
 
     @cached_property
@@ -296,6 +322,10 @@ class PredictionResult(BaseModel):
     )
     model_source: ModelSource = Field(
         description="Which model or pipeline produced this prediction."
+    )
+    confidence_breakdown: dict[str, float | bool | str] | None = Field(
+        default=None,
+        description="Decomposed confidence view covering capture quality, model stability, threshold stability, and guardrail effects.",
     )
 
     @model_validator(mode="after")
