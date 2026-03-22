@@ -3,11 +3,82 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from PIL import Image
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app.services.prediction import ScreeningPredictor
-from app.schemas import PredictionResult
+from app.services import prediction as prediction_module
+from app.schemas import PredictionResult, QualityAssessment
+
+
+def test_predictor_init_is_lazy(monkeypatch, tmp_path) -> None:
+    archive_path = tmp_path / "archive.joblib"
+    efficientnet_path = tmp_path / "efficientnet.pth"
+    archive_path.write_bytes(b"archive")
+    efficientnet_path.write_bytes(b"efficientnet")
+
+    calls: list[str] = []
+
+    monkeypatch.setattr(prediction_module, "DEFAULT_ARCHIVE_MODEL_PATH", archive_path)
+    monkeypatch.setattr(
+        prediction_module,
+        "DEFAULT_EFFICIENTNET_MODEL_PATH",
+        efficientnet_path,
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_load_archive_model_artifact",
+        lambda path: calls.append(f"archive:{path.name}") or {"artifact": True},
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_load_efficientnet_checkpoint_bundle",
+        lambda path: calls.append(f"efficientnet:{path.name}") or {"bundle": True},
+    )
+
+    predictor = ScreeningPredictor()
+
+    assert calls == []
+    assert predictor.archive_model is None
+    assert predictor.efficientnet_bundle is None
+    assert predictor.is_ready() is True
+
+
+def test_predictor_preload_loads_models_once(monkeypatch, tmp_path) -> None:
+    archive_path = tmp_path / "archive.joblib"
+    efficientnet_path = tmp_path / "efficientnet.pth"
+    archive_path.write_bytes(b"archive")
+    efficientnet_path.write_bytes(b"efficientnet")
+
+    calls: list[str] = []
+
+    monkeypatch.setattr(prediction_module, "DEFAULT_ARCHIVE_MODEL_PATH", archive_path)
+    monkeypatch.setattr(
+        prediction_module,
+        "DEFAULT_EFFICIENTNET_MODEL_PATH",
+        efficientnet_path,
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_load_archive_model_artifact",
+        lambda path: calls.append(f"archive:{path.name}") or {"artifact": True},
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_load_efficientnet_checkpoint_bundle",
+        lambda path: calls.append(f"efficientnet:{path.name}") or {"bundle": True},
+    )
+    monkeypatch.setattr(prediction_module.settings, "enable_efficientnet_fallback", True)
+
+    predictor = ScreeningPredictor()
+    predictor.preload()
+    predictor.preload()
+
+    assert calls == ["archive:archive.joblib", "efficientnet:efficientnet.pth"]
+    assert predictor.archive_model == {"artifact": True}
+    assert predictor.efficientnet_bundle == {"bundle": True}
 
 
 def test_dark_signal_guardrail_triggers_on_dark_positive_with_near_normal_hb() -> None:
@@ -281,3 +352,71 @@ def test_should_reject_raw_frame_rescue_for_high_risk_uncertain() -> None:
     )
 
     assert predictor.should_accept_raw_frame_rescue(prediction) is False
+
+
+def test_predict_returns_confidence_breakdown(monkeypatch) -> None:
+    predictor = ScreeningPredictor.__new__(ScreeningPredictor)
+    predictor.enable_efficientnet_fallback = False
+    predictor.archive_model = None
+    predictor.efficientnet_bundle = None
+    predictor.load_error = None
+    predictor.model_path = Path("archive.joblib")
+    predictor.efficientnet_path = Path("efficientnet.pth")
+    predictor._archive_model_load_attempted = False
+    predictor._efficientnet_model_load_attempted = False
+
+    monkeypatch.setattr(
+        predictor,
+        "_ensure_archive_model_loaded",
+        lambda: {"artifact": True},
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "extract_eye_features",
+        lambda image: {
+            "brightness": 0.21,
+            "hist_bright": 0.05,
+            "hist_highlight": 0.01,
+        },
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_predict_archive_model",
+        lambda artifact, feature_map, source_hint: {
+            "anemia_risk": 0.58,
+            "uncertainty": 0.22,
+            "predicted_hemoglobin": 11.7,
+        },
+    )
+    monkeypatch.setattr(
+        prediction_module,
+        "_build_runtime_stack",
+        lambda archive_prediction, **kwargs: {
+            "anemia_risk": 0.58,
+            "uncertainty": 0.22,
+            "predicted_hemoglobin": 11.7,
+            "decision_threshold": 0.5,
+        },
+    )
+
+    quality = QualityAssessment(
+        passed=True,
+        blur_score=148.0,
+        brightness_score=0.24,
+        contrast_score=0.16,
+        framing_score=1.7,
+        lighting_score=0.78,
+        lighting_condition="balanced",
+        lighting_summary="Lighting is even enough for a confident conjunctiva read.",
+        glare_risk=0.08,
+        shadow_risk=0.12,
+        issues=[],
+    )
+
+    result = predictor.predict(Image.new("RGB", (80, 80), "white"), quality)
+
+    assert result.confidence_breakdown is not None
+    assert result.confidence_breakdown["capture_quality"] > 0.6
+    assert result.confidence_breakdown["model_stability"] > 0.7
+    assert result.confidence_breakdown["lighting_condition"] == "balanced"
+    assert "capture quality" in str(result.confidence_breakdown["summary"]).lower() or "threshold" in str(result.confidence_breakdown["summary"]).lower() or "support" in str(result.confidence_breakdown["summary"]).lower()

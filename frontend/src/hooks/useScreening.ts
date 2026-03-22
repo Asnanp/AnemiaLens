@@ -221,7 +221,19 @@ export function useScreening() {
 
     const offlineResult: AnalyzeResponse = {
       blocked: false,
-      quality: { passed: false, blur_score: 0, brightness_score: 0, contrast_score: 0, framing_score: 0, issues: [] },
+      quality: {
+        passed: false,
+        blur_score: 0,
+        brightness_score: 0,
+        contrast_score: 0,
+        framing_score: 0,
+        lighting_score: 0,
+        lighting_condition: 'unknown',
+        lighting_summary: 'Lighting analysis unavailable in offline mode.',
+        glare_risk: 0,
+        shadow_risk: 0,
+        issues: [],
+      },
       prediction: null,
       decision_audit: {
         processing_path: 'quality_blocked',

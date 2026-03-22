@@ -353,6 +353,8 @@ class EmailReportService:
     def _build_plain_text(self, payload: EmailReportContent) -> str:
         hb_line = self._hemoglobin_line(payload.predicted_hemoglobin)
         risk_pct = round(payload.anemia_risk * 100)
+        next_steps = "\n".join(f"- {step}" for step in self._recommended_steps(payload))
+        summary_line = self._email_result_story(payload)
         return (
             "AnemiaLens Screening Result Report\n"
             "================================\n\n"
@@ -361,7 +363,10 @@ class EmailReportService:
             f"{hb_line}\n\n"
             "Summary\n"
             "-------\n"
-            f"{payload.share_text.strip()}\n\n"
+            f"{summary_line}\n\n"
+            "Recommended Next Steps\n"
+            "----------------------\n"
+            f"{next_steps}\n\n"
             "Important\n"
             "---------\n"
             f"{SCREENING_DISCLAIMER} Please confirm results with a clinical blood test (CBC).\n\n"
@@ -372,8 +377,26 @@ class EmailReportService:
     def _build_html(self, payload: EmailReportContent) -> str:
         hb_label, hb_value = self._hemoglobin_parts(payload.predicted_hemoglobin)
         risk_pct = round(payload.anemia_risk * 100)
-        share_html = "<br />".join(
-            escape(line) for line in payload.share_text.strip().splitlines() if line.strip()
+        accent, accent_soft, accent_border, status_line = self._triage_theme(payload)
+        summary_line = self._email_result_story(payload)
+        detail_line = self._email_supporting_detail(payload)
+        steps_html = "".join(
+            f"""
+            <tr>
+              <td style="padding:0 0 10px 0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td width="28" valign="top" style="padding-top:2px;">
+                      <div style="width:18px;height:18px;border-radius:999px;background:{accent_soft};border:1px solid {accent_border};font-size:11px;line-height:18px;text-align:center;color:{accent};font-weight:700;">•</div>
+                    </td>
+                    <td style="font-size:14px;line-height:1.6;color:#1e293b;">
+                      {escape(step)}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>"""
+            for step in self._recommended_steps(payload)
         )
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -382,35 +405,200 @@ class EmailReportService:
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AnemiaLens Screening Report</title>
   </head>
-  <body style="margin:0;padding:0;background:#0d0d0d;color:#edede8;font-family:Arial,sans-serif;">
-    <div style="max-width:600px;margin:0 auto;padding:32px 24px;">
-      <div style="border-bottom:2px solid #c8001e;padding-bottom:16px;margin-bottom:24px;">
-        <div style="font-size:22px;font-weight:700;color:#c8001e;letter-spacing:-0.03em;">AnemiaLens</div>
-        <div style="font-size:12px;color:#888;margin-top:4px;">Screening Result Report</div>
-      </div>
-      <div style="display:inline-block;padding:6px 16px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;background:rgba(200,0,30,0.15);border:1px solid rgba(200,0,30,0.4);color:#ff6b7b;">
-        {escape(payload.triage_label)}
-      </div>
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px 20px;margin:12px 0;">
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">Anemia Risk Score</div>
-        <div style="font-size:20px;font-weight:700;color:#edede8;">{risk_pct}%</div>
-      </div>
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px 20px;margin:12px 0;">
-        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">{escape(hb_label)}</div>
-        <div style="font-size:20px;font-weight:700;color:#edede8;">{escape(hb_value)}</div>
-      </div>
-      <div style="background:rgba(255,255,255,0.02);border-left:3px solid #c8001e;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:13px;line-height:1.7;color:#d6d6cf;">
-        {share_html}
-      </div>
-      <div style="font-size:11px;color:#9b9b93;line-height:1.6;margin-top:24px;padding:12px 16px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
-        <strong>Important:</strong> {escape(SCREENING_DISCLAIMER)} Please confirm results with a clinical blood test (CBC).
-      </div>
-      <div style="margin-top:32px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);font-size:11px;color:#777;text-align:center;">
-        AnemiaLens · https://anemia-lens.vercel.app · No lab. No needle. Just a smartphone.
-      </div>
-    </div>
+  <body style="margin:0;padding:0;background:#eef2f7;color:#0f172a;font-family:Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef2f7;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #dbe4ee;border-radius:24px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.08);">
+            <tr>
+              <td style="padding:28px 32px;background:#0f172a;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td align="left">
+                      <div style="font-size:24px;font-weight:700;letter-spacing:-0.03em;color:#ffffff;">AnemiaLens</div>
+                      <div style="margin-top:6px;font-size:13px;line-height:1.6;color:#94a3b8;">Smartphone-first screening summary, ready to review or share.</div>
+                    </td>
+                    <td align="right" valign="top">
+                      <div style="display:inline-block;padding:8px 14px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;background:{accent_soft};border:1px solid {accent_border};color:{accent};">
+                        {escape(payload.triage_label)}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px 12px 32px;">
+                <div style="font-size:18px;font-weight:700;line-height:1.4;color:#0f172a;">{escape(status_line)}</div>
+                <div style="margin-top:8px;font-size:14px;line-height:1.7;color:#475569;">
+                  This email keeps the screening story short: what the result means, the estimated hemoglobin context, and what to do next.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 0 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td width="50%" style="padding-right:8px;padding-bottom:16px;">
+                      <div style="padding:18px;border:1px solid #dbe4ee;border-radius:18px;background:#f8fafc;">
+                        <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">Anemia Risk Score</div>
+                        <div style="font-size:30px;font-weight:700;color:{accent};line-height:1;">{risk_pct}%</div>
+                      </div>
+                    </td>
+                    <td width="50%" style="padding-left:8px;padding-bottom:16px;">
+                      <div style="padding:18px;border:1px solid #dbe4ee;border-radius:18px;background:#f8fafc;">
+                        <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">{escape(hb_label)}</div>
+                        <div style="font-size:24px;font-weight:700;color:#0f172a;line-height:1.2;">{escape(hb_value)}</div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 0 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dbe4ee;border-radius:18px;background:#ffffff;">
+                  <tr>
+                    <td style="padding:20px;">
+                      <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:10px;">Why this result</div>
+                      <div style="font-size:15px;line-height:1.75;color:#1e293b;font-weight:600;margin-bottom:12px;">
+                        {escape(summary_line)}
+                      </div>
+                      <div style="font-size:13px;line-height:1.7;color:#475569;">
+                        {escape(detail_line)}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 0 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #dbe4ee;border-radius:18px;background:#f8fafc;">
+                  <tr>
+                    <td style="padding:20px 20px 8px 20px;">
+                      <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;margin-bottom:10px;">Recommended next steps</div>
+                    </td>
+                  </tr>
+                  {steps_html}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 0 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:18px;">
+                  <tr>
+                    <td style="padding:18px 20px;font-size:13px;line-height:1.7;color:#7c2d12;">
+                      <strong>Important:</strong> {escape(SCREENING_DISCLAIMER)} Please confirm results with a clinical blood test (CBC).
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px 32px 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td align="left" style="font-size:12px;line-height:1.7;color:#64748b;">
+                      Sent by AnemiaLens for quick review and clinician handoff.
+                    </td>
+                    <td align="right">
+                      <a href="https://anemia-lens.vercel.app" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#0f172a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">Open AnemiaLens</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>"""
+
+    def _triage_theme(self, payload: EmailReportContent) -> tuple[str, str, str, str]:
+        triage = payload.triage_label.lower()
+        if "high" in triage:
+            return (
+                "#dc2626",
+                "#fee2e2",
+                "#fecaca",
+                "High concern detected. Please prioritize follow-up quickly.",
+            )
+        if "moderate" in triage:
+            return (
+                "#d97706",
+                "#fef3c7",
+                "#fde68a",
+                "Moderate risk detected. A clinical follow-up is worth arranging soon.",
+            )
+        if "uncertain" in triage:
+            return (
+                "#7c3aed",
+                "#ede9fe",
+                "#ddd6fe",
+                "The scan was not strong enough for a confident call, so a retake is the safest next step.",
+            )
+        return (
+            "#059669",
+            "#dcfce7",
+            "#bbf7d0",
+            "No urgent concern was detected, but routine monitoring is still sensible.",
+        )
+
+    def _email_result_story(self, payload: EmailReportContent) -> str:
+        triage = payload.triage_label.lower()
+        if "high" in triage:
+            return (
+                "The screening found a strong low-hemoglobin pattern, so prompt clinical follow-up is the safest next step."
+            )
+        if "moderate" in triage:
+            return (
+                "The screening found a moderate low-hemoglobin pattern. It is not an emergency alert, but it is worth reviewing with a clinician soon."
+            )
+        if "uncertain" in triage:
+            return (
+                "The current image was not reliable enough for a confident screening call, so a cleaner retake or clinician review is safer than over-interpreting it."
+            )
+        return (
+            "The screening did not show a strong urgent low-hemoglobin pattern, though routine monitoring remains sensible."
+        )
+
+    def _email_supporting_detail(self, payload: EmailReportContent) -> str:
+        risk_pct = round(payload.anemia_risk * 100)
+        if payload.predicted_hemoglobin is None:
+            hb_detail = "The hemoglobin estimate was withheld because confidence was limited."
+        else:
+            hb_detail = f"The estimated hemoglobin for this run was {payload.predicted_hemoglobin:.1f} g/dL."
+        return (
+            f"This run produced a {risk_pct}% anemia-risk score. {hb_detail} Use the next steps below as a simple follow-up guide, not as a diagnosis."
+        )
+
+    def _recommended_steps(self, payload: EmailReportContent) -> list[str]:
+        triage = payload.triage_label.lower()
+        if "high" in triage:
+            return [
+                "Arrange a CBC blood test as soon as possible and avoid delaying clinical review.",
+                "Share this summary with a clinician or family member who can help coordinate care.",
+                "Seek urgent medical attention sooner if symptoms worsen or new warning signs appear.",
+            ]
+        if "moderate" in triage:
+            return [
+                "Book a follow-up with a healthcare provider within 1-2 weeks and discuss confirmatory blood work.",
+                "Keep track of fatigue, dizziness, or shortness of breath if they continue.",
+                "Consider a clearer retake if the original scan had quality warnings.",
+            ]
+        if "uncertain" in triage:
+            return [
+                "Retake the image in brighter, steadier lighting with the lower eyelid fully visible.",
+                "Use this summary only as a retake reminder, not as a final decision.",
+                "If symptoms are present, do not wait for a retake before speaking with a clinician.",
+            ]
+        return [
+            "Maintain a balanced diet and monitor for any new or worsening symptoms.",
+            "Repeat screening in 3-6 months or sooner if your health changes.",
+            "Use this report as a simple summary if you want to discuss the result with a provider later.",
+        ]
 
     def _hemoglobin_parts(self, predicted_hemoglobin: float | None) -> tuple[str, str]:
         if predicted_hemoglobin is None:

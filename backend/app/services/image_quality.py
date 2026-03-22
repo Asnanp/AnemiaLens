@@ -42,8 +42,18 @@ class ImageQualityService:
         center_contrast = float(feature_map["center_contrast"])
         bright_region_ratio = float(feature_map["hist_bright"])
         highlight_ratio = float(feature_map["hist_highlight"])
+        dark_region_ratio = float(feature_map["hist_dark"])
         frame_score = float(framing_score(feature_map))
         edge_blur = edge_blur_baseline(image)
+        lighting_score, lighting_condition, lighting_summary, glare_risk, shadow_risk = self._lighting_intelligence(
+            brightness_score=brightness_score,
+            contrast_score=contrast_score,
+            center_brightness=center_brightness,
+            center_contrast=center_contrast,
+            bright_region_ratio=bright_region_ratio,
+            highlight_ratio=highlight_ratio,
+            dark_region_ratio=dark_region_ratio,
+        )
 
         issues: list[QualityIssue] = []
 
@@ -94,6 +104,11 @@ class ImageQualityService:
                 brightness_score=round(brightness_score, 3),
                 contrast_score=round(contrast_score, 3),
                 framing_score=round(frame_score, 3),
+                lighting_score=round(lighting_score, 3),
+                lighting_condition=lighting_condition,
+                lighting_summary=lighting_summary,
+                glare_risk=round(glare_risk, 3),
+                shadow_risk=round(shadow_risk, 3),
                 issues=issues,
             )
             return assessment, image
@@ -173,8 +188,8 @@ class ImageQualityService:
                 QualityIssue(
                     code="poor_lighting",
                     severity="blocking",
-                    title="Lighting is not usable",
-                    message="Use bright, even light without flash glare or heavy shadows.",
+                    title=self._lighting_issue_title(lighting_condition, blocking=True),
+                    message=self._lighting_issue_message(lighting_condition, blocking=True),
                 )
             )
         elif lighting_warn:
@@ -182,8 +197,8 @@ class ImageQualityService:
                 QualityIssue(
                     code="poor_lighting",
                     severity="warning",
-                    title="Lighting could be better",
-                    message="The model can try this image, but even light will improve reliability.",
+                    title=self._lighting_issue_title(lighting_condition, blocking=False),
+                    message=self._lighting_issue_message(lighting_condition, blocking=False),
                 )
             )
 
@@ -229,9 +244,148 @@ class ImageQualityService:
             brightness_score=round(brightness_score, 3),
             contrast_score=round(contrast_score, 3),
             framing_score=round(frame_score, 3),
+            lighting_score=round(lighting_score, 3),
+            lighting_condition=lighting_condition,
+            lighting_summary=lighting_summary,
+            glare_risk=round(glare_risk, 3),
+            shadow_risk=round(shadow_risk, 3),
             issues=issues,
         )
         return assessment, image
+
+    def _lighting_intelligence(
+        self,
+        *,
+        brightness_score: float,
+        contrast_score: float,
+        center_brightness: float,
+        center_contrast: float,
+        bright_region_ratio: float,
+        highlight_ratio: float,
+        dark_region_ratio: float,
+    ) -> tuple[float, str, str, float, float]:
+        glare_risk = min(
+            1.0,
+            highlight_ratio * 7.5
+            + max(0.0, bright_region_ratio - 0.18) * 1.9
+            + max(0.0, center_brightness - 0.48) * 2.2,
+        )
+        shadow_risk = min(
+            1.0,
+            dark_region_ratio * 1.1
+            + max(0.0, 0.18 - center_brightness) * 3.0
+            + max(0.0, 0.1 - brightness_score) * 2.0,
+        )
+        exposure_balance = max(0.0, 1.0 - (abs(center_brightness - 0.28) / 0.24))
+        contrast_health = max(0.0, min(1.0, self._scaled(center_contrast, 0.06, 0.19)))
+        lighting_score = max(
+            0.0,
+            min(
+                1.0,
+                exposure_balance * 0.38
+                + contrast_health * 0.27
+                + (1.0 - glare_risk) * 0.2
+                + (1.0 - shadow_risk) * 0.15,
+            ),
+        )
+
+        if glare_risk >= 0.72:
+            return (
+                lighting_score,
+                "glare_heavy",
+                "Bright highlights or flash glare are washing out the eyelid surface, so the redness signal is less trustworthy.",
+                glare_risk,
+                shadow_risk,
+            )
+        if shadow_risk >= 0.72:
+            return (
+                lighting_score,
+                "shadow_heavy",
+                "Shadows are covering part of the eyelid, so the model may miss the true pallor signal.",
+                glare_risk,
+                shadow_risk,
+            )
+        if brightness_score < 0.12 or center_brightness < 0.16:
+            return (
+                lighting_score,
+                "dim",
+                "The capture is underexposed, which makes fine color differences harder to measure reliably.",
+                glare_risk,
+                shadow_risk,
+            )
+        if brightness_score > 0.46 or center_brightness > 0.52:
+            return (
+                lighting_score,
+                "overexposed",
+                "The image is brighter than ideal, so the conjunctiva can lose detail even without obvious glare.",
+                glare_risk,
+                shadow_risk,
+            )
+        if contrast_score < 0.12 or center_contrast < 0.08:
+            return (
+                lighting_score,
+                "flat_contrast",
+                "The lighting is too flat, so the conjunctival tissue boundaries are less distinct than ideal.",
+                glare_risk,
+                shadow_risk,
+            )
+        return (
+            lighting_score,
+            "balanced",
+            "Lighting is balanced enough for the model to read color and texture without strong glare or shadows.",
+            glare_risk,
+            shadow_risk,
+        )
+
+    def _lighting_issue_title(self, lighting_condition: str, *, blocking: bool) -> str:
+        if lighting_condition == "glare_heavy":
+            return "Glare is covering the eyelid" if blocking else "Glare is slightly affecting the scan"
+        if lighting_condition == "shadow_heavy":
+            return "Shadows are hiding the eyelid" if blocking else "Shadows are reducing clarity"
+        if lighting_condition == "dim":
+            return "Image is too dim" if blocking else "Lighting is a little dim"
+        if lighting_condition == "overexposed":
+            return "Image is overexposed" if blocking else "Lighting is a little bright"
+        if lighting_condition == "flat_contrast":
+            return "Image lacks contrast" if blocking else "Contrast could be stronger"
+        return "Lighting is not usable" if blocking else "Lighting could be better"
+
+    def _lighting_issue_message(self, lighting_condition: str, *, blocking: bool) -> str:
+        if lighting_condition == "glare_heavy":
+            return (
+                "Turn off flash, tilt away from shiny reflections, and use soft room light or window light."
+                if blocking
+                else "The model can try this image, but removing glare will improve reliability."
+            )
+        if lighting_condition == "shadow_heavy":
+            return (
+                "Face a window or room light so the eyelid is evenly lit without one side falling into shadow."
+                if blocking
+                else "The model can try this image, but even front lighting will improve reliability."
+            )
+        if lighting_condition == "dim":
+            return (
+                "Move to brighter light and keep the phone steady so the inner eyelid stays visible."
+                if blocking
+                else "The model can try this image, but brighter light will improve reliability."
+            )
+        if lighting_condition == "overexposed":
+            return (
+                "Step away from direct flash or strong overhead light so the eyelid texture is not washed out."
+                if blocking
+                else "The model can try this image, but slightly softer light will improve reliability."
+            )
+        if lighting_condition == "flat_contrast":
+            return (
+                "Use clearer side-neutral daylight or room lighting so the eyelid tissue stands out better."
+                if blocking
+                else "The model can try this image, but better contrast will improve reliability."
+            )
+        return (
+            "Use bright, even light without flash glare or heavy shadows."
+            if blocking
+            else "The model can try this image, but even light will improve reliability."
+        )
 
     def _soften_salvageable_roi_blocks(
         self,

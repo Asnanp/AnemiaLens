@@ -20,6 +20,11 @@ export type QualityAssessment = {
   brightness_score: number;
   contrast_score: number;
   framing_score: number;
+  lighting_score: number;
+  lighting_condition: string;
+  lighting_summary: string;
+  glare_risk: number;
+  shadow_risk: number;
   issues: QualityIssue[];
 };
 
@@ -32,6 +37,16 @@ export type PredictionResult = {
   screening_label: 'anemia_likely' | 'anemia_unlikely' | 'uncertain';
   screening_text: string;
   model_source: string;
+  confidence_breakdown?: {
+    capture_quality: number;
+    model_stability: number;
+    threshold_stability: number;
+    guardrail_applied: boolean;
+    lighting_condition: string;
+    glare_risk: number;
+    shadow_risk: number;
+    summary: string;
+  } | null;
 };
 
 export type DecisionAudit = {

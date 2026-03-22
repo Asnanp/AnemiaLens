@@ -287,6 +287,15 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
   const reliability = getReliabilityStatus(analysis);
   const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const mandatorySummary = buildMandatoryWhySummary(analysis);
+  const confidenceBreakdown = analysis.prediction?.confidence_breakdown;
+  const confidenceRows = confidenceBreakdown
+    ? [
+        { label: 'Capture quality', value: `${Math.round(confidenceBreakdown.capture_quality * 100)}%` },
+        { label: 'Model stability', value: `${Math.round(confidenceBreakdown.model_stability * 100)}%` },
+        { label: 'Decision margin', value: `${Math.round(confidenceBreakdown.threshold_stability * 100)}%` },
+      ]
+    : [];
+  const nextMoveSummary = analysis.quality.lighting_summary;
 
   return (
     <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -329,9 +338,15 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
               <span style={{ color: 'var(--text-dim)' }}>Reliability</span>
               <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
             </div>
+            {confidenceRows.map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{row.value}</span>
+              </div>
+            ))}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            {reliability.detail}
+            {confidenceBreakdown?.summary ?? reliability.detail}
           </div>
         </div>
 
@@ -341,7 +356,7 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
               Best next move
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              Retaking under better lighting can significantly improve prediction reliability. {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
+              {nextMoveSummary} {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
             </div>
           </div>
 
@@ -851,6 +866,13 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState('');
+  const riskPct = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
+  const summaryPreview = analysis.handoff_summary.headline || analysis.triage.summary;
+  const nextStepPreview = analysis.guidance.next_steps.slice(0, 2);
+  const hbPreview =
+    analysis.prediction?.predicted_hemoglobin == null
+      ? 'Unavailable'
+      : `${analysis.prediction.predicted_hemoglobin.toFixed(1)} g/dL`;
 
   useEffect(() => {
     if (user?.email) {
@@ -888,41 +910,82 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
       onClick={onClose}>
       <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
         onClick={e => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: 460, borderRadius: '1.5rem', background: 'rgba(10,10,20,0.98)', border: '1px solid rgba(255,255,255,0.12)', padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', boxShadow: '0 40px 120px rgba(0,0,0,0.8)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: '0.875rem', background: 'rgba(200,0,30,0.12)', border: '1px solid rgba(200,0,30,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Mail size={18} style={{ color: 'var(--accent-bright)' }} />
+        style={{ width: '100%', maxWidth: 520, borderRadius: '1.5rem', background: 'rgba(10,10,20,0.98)', border: '1px solid rgba(255,255,255,0.12)', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 40px 120px rgba(0,0,0,0.8)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '1rem', background: 'rgba(200,0,30,0.12)', border: '1px solid rgba(200,0,30,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Mail size={18} style={{ color: 'var(--accent-bright)' }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--serif)', fontSize: '1.25rem', color: 'var(--text)', fontWeight: 600 }}>Email Report</div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', marginTop: '0.2rem', lineHeight: 1.5 }}>
+                Send a clean screening summary that is easy to review or share with a clinician.
+              </div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', color: 'var(--text)', fontWeight: 600 }}>Send Report to Email</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '0.15rem' }}>Receive your screening summary in your inbox</div>
-          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close email dialog"
+            style={{ width: 36, height: 36, borderRadius: '0.9rem', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
+          >
+            ×
+          </button>
         </div>
 
         {status === 'sent' ? (
-          <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+          <div style={{ textAlign: 'center', padding: '1.5rem 0 0.5rem' }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '0.9rem', color: 'rgba(16,185,129,0.9)', marginBottom: '0.5rem' }}>Report sent successfully</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Check your inbox (and spam folder)</div>
-            <button onClick={onClose} style={{ marginTop: '1.5rem', padding: '0.7rem 2rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', fontSize: '0.8rem', cursor: 'pointer' }}>Close</button>
+            <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 320, margin: '0 auto' }}>
+              A structured result summary was sent to <strong style={{ color: 'var(--text)' }}>{email.trim().toLowerCase()}</strong>.
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.55rem' }}>Check your inbox in a moment and review the next steps.</div>
+            <button onClick={onClose} style={{ marginTop: '1.5rem', padding: '0.8rem 2rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', fontSize: '0.82rem', cursor: 'pointer' }}>Done</button>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              Sends your screening result — risk level, hemoglobin estimate, and next steps — directly to your email.
+            <div style={{ display: 'grid', gap: '0.9rem', padding: '1rem', borderRadius: '1.15rem', background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.64rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Email preview</div>
+                <div style={{ padding: '0.35rem 0.8rem', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  {analysis.triage.label}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.92rem', color: 'var(--text)', lineHeight: 1.65, fontWeight: 500 }}>
+                {summaryPreview}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
+                <div style={{ padding: '0.9rem 1rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Risk score</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>{riskPct}%</div>
+                </div>
+                <div style={{ padding: '0.9rem 1rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.4rem' }}>Hemoglobin</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>{hbPreview}</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: '0.55rem' }}>
+                <div style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Included in the email</div>
+                {nextStepPreview.map((step) => (
+                  <div key={step} style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    <span style={{ color: 'var(--accent-bright)', marginTop: 1 }}>•</span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Email Address</label>
-              <input type="email" placeholder="your@email.com" value={email}
+              <label style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Send to</label>
+              <input type="email" placeholder="name@example.com" value={email}
                 onChange={e => { setEmail(e.target.value); setErrMsg(''); if (status === 'error') setStatus('idle'); }}
                 style={{ width: '100%', padding: '0.875rem 1.125rem', borderRadius: '0.875rem', fontSize: '0.9rem', background: 'rgba(255,255,255,0.04)', border: errMsg ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', outline: 'none', boxSizing: 'border-box', transition: 'border 0.2s' }}
               />
               {errMsg && <div style={{ fontSize: '0.72rem', color: '#EF4444' }}>{errMsg}</div>}
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.6, padding: '0.75rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', fontStyle: 'italic' }}>
-              This is a screening aid, not a diagnosis. Always confirm with a clinical blood test (CBC).
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', lineHeight: 1.65, padding: '0.95rem 1rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              The email includes the result, a short explanation, and next-step guidance. It is a screening aid, not a diagnosis, and should still be confirmed with a clinical blood test (CBC).
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button onClick={onClose} style={{ flex: 1, padding: '0.8rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)', fontSize: '0.8rem', cursor: 'pointer' }}>Cancel</button>

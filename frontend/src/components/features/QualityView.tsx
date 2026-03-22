@@ -71,13 +71,16 @@ function ScoreRing({ value, color, label }: { value: number; color: string; labe
 export function QualityView({ quality, onContinue, onBack, loading }: QualityViewProps) {
   const blocking = quality.issues.filter((issue) => issue.severity === 'blocking').length;
   const passed = blocking === 0;
+  const normalizeBlur = (value: number) => Math.max(0, Math.min(100, ((value - 55) / 165) * 100));
+  const normalizeFraming = (value: number) => Math.max(0, Math.min(100, ((value - 0.75) / 1.1) * 100));
+  const lightingConditionLabel = quality.lighting_condition.replace(/_/g, ' ');
 
   const ringColor = (value: number) => (value >= 75 ? '#10B981' : value >= 40 ? '#F59E0B' : '#EF4444');
 
   const metrics = [
-    { label: 'Blur', value: quality.blur_score },
-    { label: 'Brightness', value: Math.min(100, quality.brightness_score * 2) },
-    { label: 'Framing', value: quality.framing_score },
+    { label: 'Sharpness', value: normalizeBlur(quality.blur_score) },
+    { label: 'Lighting', value: quality.lighting_score * 100 },
+    { label: 'Framing', value: normalizeFraming(quality.framing_score) },
   ];
 
   const statusColor = passed ? '#10B981' : '#EF4444';
@@ -250,6 +253,41 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
           ))}
         </div>
 
+        <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.12)', marginBottom: '1.2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.72)' }}>
+              Lighting Intelligence
+            </span>
+            <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: ringColor(quality.lighting_score * 100) }}>
+              {lightingConditionLabel}
+            </span>
+          </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.8rem' }}>
+            {quality.lighting_summary}
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+            {[
+              { label: 'Glare Risk', value: quality.glare_risk * 100, accent: '#F59E0B' },
+              { label: 'Shadow Risk', value: quality.shadow_risk * 100, accent: '#EF4444' },
+            ].map((metric) => (
+              <div key={metric.label} style={{ padding: '0.75rem 0.85rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>{metric.label}</span>
+                  <span style={{ fontSize: '0.66rem', color: metric.accent, fontFamily: 'var(--mono)', fontWeight: 700 }}>{Math.round(metric.value)}%</span>
+                </div>
+                <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(0, Math.min(100, metric.value))}%` }}
+                    transition={{ duration: 1.0, ease: E }}
+                    style={{ height: '100%', borderRadius: '99px', background: `linear-gradient(90deg, ${metric.accent}66, ${metric.accent})` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           {metrics.map((metric, index) => (
             <div key={metric.label}>
@@ -272,7 +310,9 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.875rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
           <Info size={13} style={{ color: 'var(--accent-bright)', flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', lineHeight: 1.6, fontStyle: 'italic' }}>
-            Retaking under better lighting can significantly improve prediction reliability.
+            {quality.lighting_condition === 'balanced'
+              ? 'Capture quality is in a usable range. If you want a more defensible result, keep the eyelid steady and fully centered.'
+              : 'Retaking under better lighting can significantly improve prediction reliability.'}
           </p>
         </div>
       </motion.div>
