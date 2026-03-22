@@ -96,6 +96,25 @@ class _HTTPSConnectionStub:
         self.closed = True
 
 
+class _GmailHTTPSConnectionStub:
+    requests: list[tuple[str, str, bytes, dict[str, str], str, float | None]] = []
+    response_queue: list[_HTTPResponseStub] = []
+
+    def __init__(self, host: str, timeout: float | None = None) -> None:
+        self.host = host
+        self.timeout = timeout
+        self.closed = False
+
+    def request(self, method: str, path: str, body=None, headers=None) -> None:
+        _GmailHTTPSConnectionStub.requests.append((method, path, body, headers or {}, self.host, self.timeout))
+
+    def getresponse(self) -> _HTTPResponseStub:
+        return _GmailHTTPSConnectionStub.response_queue.pop(0)
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def _client_with_service(service: _StubRouterService) -> TestClient:
     app = FastAPI()
     app.include_router(router)
@@ -338,3 +357,56 @@ def test_email_report_service_sends_email_via_sendgrid(monkeypatch: pytest.Monke
     assert body["content"][0]["type"] == "text/plain"
     assert body["content"][1]["type"] == "text/html"
     assert "CBC test" in body["content"][0]["value"]
+
+
+def test_email_report_service_sends_email_via_gmail_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    _GmailHTTPSConnectionStub.requests = []
+    _GmailHTTPSConnectionStub.response_queue = [
+        _HTTPResponseStub(body='{"access_token":"ya29.test-token"}', status=200),
+        _HTTPResponseStub(body='{"id":"gmail_message_123"}', status=200),
+    ]
+    monkeypatch.setattr(settings, "email_provider", "gmail_api")
+    monkeypatch.setattr(settings, "gmail_client_id", "client-id")
+    monkeypatch.setattr(settings, "gmail_client_secret", "client-secret")
+    monkeypatch.setattr(settings, "gmail_refresh_token", "refresh-token")
+    monkeypatch.setattr(settings, "gmail_token_url", "https://oauth2.googleapis.com/token")
+    monkeypatch.setattr(settings, "gmail_api_base", "https://gmail.googleapis.com/gmail/v1")
+    monkeypatch.setattr(settings, "email_from_name", "AnemiaLens")
+    monkeypatch.setattr(settings, "email_from_email", "asnanp875@gmail.com")
+    monkeypatch.setattr(settings, "email_reply_to", "asnanp875@gmail.com")
+    monkeypatch.setattr(settings, "smtp_timeout", 12.0)
+    monkeypatch.setattr(email_report_module.http.client, "HTTPSConnection", _GmailHTTPSConnectionStub)
+
+    service = EmailReportService()
+    service.send_report(
+        EmailReportContent(
+            recipient="patient@example.com",
+            share_text="Moderate risk summary.\nPlease follow up with a CBC test.",
+            triage_label="Moderate Risk",
+            predicted_hemoglobin=10.6,
+            anemia_risk=0.54,
+        )
+    )
+
+    assert len(_GmailHTTPSConnectionStub.requests) == 2
+
+    token_method, token_path, token_body, token_headers, token_host, token_timeout = _GmailHTTPSConnectionStub.requests[0]
+    assert token_method == "POST"
+    assert token_host == "oauth2.googleapis.com"
+    assert token_timeout == 12.0
+    assert token_path == "/token"
+    assert token_headers["Content-Type"] == "application/x-www-form-urlencoded"
+    assert b"grant_type=refresh_token" in token_body
+    assert b"client_id=client-id" in token_body
+    assert b"client_secret=client-secret" in token_body
+    assert b"refresh_token=refresh-token" in token_body
+
+    send_method, send_path, send_body_raw, send_headers, send_host, send_timeout = _GmailHTTPSConnectionStub.requests[1]
+    send_body = json.loads(send_body_raw.decode("utf-8"))
+    assert send_method == "POST"
+    assert send_host == "gmail.googleapis.com"
+    assert send_timeout == 12.0
+    assert send_path == "/gmail/v1/users/me/messages/send"
+    assert send_headers["Authorization"] == "Bearer ya29.test-token"
+    assert send_headers["Content-Type"] == "application/json"
+    assert "raw" in send_body

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import http.client
 import hashlib
@@ -11,7 +12,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
 from urllib import error as urllib_error
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from app.config import SCREENING_DISCLAIMER, settings
 
@@ -45,6 +46,13 @@ class EmailReportService:
             return bool(settings.resend_api_key and self._from_email)
         if self._provider == "sendgrid":
             return bool(settings.sendgrid_api_key and self._from_email)
+        if self._provider == "gmail_api":
+            return bool(
+                settings.gmail_client_id
+                and settings.gmail_client_secret
+                and settings.gmail_refresh_token
+                and self._from_email
+            )
         return bool(
             settings.smtp_host
             and settings.smtp_username
@@ -74,6 +82,8 @@ class EmailReportService:
                 self._send_via_resend(payload)
             elif self._provider == "sendgrid":
                 self._send_via_sendgrid(payload)
+            elif self._provider == "gmail_api":
+                self._send_via_gmail_api(payload)
             else:
                 self._send_via_smtp(payload)
         except smtplib.SMTPAuthenticationError as exc:
@@ -190,6 +200,89 @@ class EmailReportService:
             raise EmailReportDeliveryError(
                 f"Email provider rejected the request: {detail or f'HTTP {response.status}'}"
             )
+
+    def _send_via_gmail_api(self, payload: EmailReportContent) -> None:
+        access_token = self._gmail_access_token()
+        parsed = urlsplit(f"{settings.gmail_api_base.rstrip('/')}/users/me/messages/send")
+        path = parsed.path or "/gmail/v1/users/me/messages/send"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        message = self._build_message(payload)
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+        body = json.dumps({"raw": raw_message}).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+            "User-Agent": "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)",
+        }
+        connection_factory = (
+            http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        )
+        try:
+            connection = connection_factory(parsed.netloc, timeout=settings.smtp_timeout)
+            try:
+                connection.request("POST", path, body=body, headers=headers)
+                response = connection.getresponse()
+                raw = response.read().decode("utf-8", errors="replace")
+            finally:
+                connection.close()
+        except OSError as exc:
+            raise EmailReportDeliveryError(
+                "Could not reach the configured email provider."
+            ) from exc
+        if response.status >= 400:
+            detail = self._extract_provider_error(raw)
+            raise EmailReportDeliveryError(
+                f"Email provider rejected the request: {detail or f'HTTP {response.status}'}"
+            )
+
+    def _gmail_access_token(self) -> str:
+        parsed = urlsplit(settings.gmail_token_url)
+        path = parsed.path or "/token"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        body = urlencode(
+            {
+                "client_id": settings.gmail_client_id,
+                "client_secret": settings.gmail_client_secret,
+                "refresh_token": settings.gmail_refresh_token,
+                "grant_type": "refresh_token",
+            }
+        ).encode("utf-8")
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": str(len(body)),
+            "User-Agent": "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)",
+        }
+        connection_factory = (
+            http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        )
+        try:
+            connection = connection_factory(parsed.netloc, timeout=settings.smtp_timeout)
+            try:
+                connection.request("POST", path, body=body, headers=headers)
+                response = connection.getresponse()
+                raw = response.read().decode("utf-8", errors="replace")
+            finally:
+                connection.close()
+        except OSError as exc:
+            raise EmailReportDeliveryError(
+                "Could not reach Google's token endpoint."
+            ) from exc
+        if response.status >= 400:
+            detail = self._extract_provider_error(raw)
+            raise EmailReportDeliveryError(
+                f"Gmail authorization failed: {detail or f'HTTP {response.status}'}"
+            )
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise EmailReportDeliveryError("Gmail authorization returned an invalid response.") from exc
+        access_token = data.get("access_token")
+        if not isinstance(access_token, str) or not access_token.strip():
+            raise EmailReportDeliveryError("Gmail authorization did not return an access token.")
+        return access_token
 
     def _build_resend_payload(self, payload: EmailReportContent) -> dict[str, object]:
         body: dict[str, object] = {
@@ -338,6 +431,12 @@ class EmailReportService:
         except json.JSONDecodeError:
             body = None
         if isinstance(body, dict):
+            error_obj = body.get("error")
+            if isinstance(error_obj, dict):
+                for key in ("message", "status"):
+                    value = error_obj.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
             errors = body.get("errors")
             if isinstance(errors, list):
                 for item in errors:
