@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import smtplib
 import ssl
@@ -7,6 +8,8 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from app.config import SCREENING_DISCLAIMER, settings
 
@@ -18,7 +21,7 @@ class EmailReportError(RuntimeError):
 
 
 class EmailReportNotConfiguredError(EmailReportError):
-    """Raised when SMTP credentials are missing."""
+    """Raised when the selected email provider is not configured."""
 
 
 class EmailReportDeliveryError(EmailReportError):
@@ -36,6 +39,8 @@ class EmailReportContent:
 
 class EmailReportService:
     def is_configured(self) -> bool:
+        if self._provider == "resend":
+            return bool(settings.resend_api_key and self._from_email)
         return bool(
             settings.smtp_host
             and settings.smtp_username
@@ -54,33 +59,17 @@ class EmailReportService:
     def send_report(self, payload: EmailReportContent) -> None:
         if not self.is_configured():
             raise EmailReportNotConfiguredError(
-                "Email delivery is not configured. Set SMTP credentials in backend/.env or your deployment environment."
+                "Email delivery is not configured. Set the selected provider credentials in backend/.env or your deployment environment."
             )
 
-        message = self._build_message(payload)
         masked_recipient = self.masked_recipient(payload.recipient)
         log.info("[FIX] email report send started for %s", masked_recipient)
 
         try:
-            if settings.smtp_use_ssl:
-                with smtplib.SMTP_SSL(
-                    settings.smtp_host,
-                    settings.smtp_port,
-                    timeout=settings.smtp_timeout,
-                    context=ssl.create_default_context(),
-                ) as server:
-                    self._deliver(server, message)
+            if self._provider == "resend":
+                self._send_via_resend(payload)
             else:
-                with smtplib.SMTP(
-                    settings.smtp_host,
-                    settings.smtp_port,
-                    timeout=settings.smtp_timeout,
-                ) as server:
-                    server.ehlo()
-                    if settings.smtp_use_starttls:
-                        server.starttls(context=ssl.create_default_context())
-                        server.ehlo()
-                    self._deliver(server, message)
+                self._send_via_smtp(payload)
         except smtplib.SMTPAuthenticationError as exc:
             log.error("[FIX] email report authentication failed for %s", masked_recipient)
             raise EmailReportDeliveryError(
@@ -100,16 +89,78 @@ class EmailReportService:
         log.info("[FIX] email report sent successfully to %s", masked_recipient)
 
     @property
+    def _provider(self) -> str:
+        return settings.email_provider.strip().lower()
+
+    @property
     def _from_email(self) -> str:
         return settings.email_from_email or settings.smtp_username
 
-    def _deliver(self, server: smtplib.SMTP, message: EmailMessage) -> None:
-        server.login(settings.smtp_username, settings.smtp_password)
-        server.send_message(message)
+    def _send_via_smtp(self, payload: EmailReportContent) -> None:
+        message = self._build_message(payload)
+        if settings.smtp_use_ssl:
+            with smtplib.SMTP_SSL(
+                settings.smtp_host,
+                settings.smtp_port,
+                timeout=settings.smtp_timeout,
+                context=ssl.create_default_context(),
+            ) as server:
+                self._deliver(server, message)
+        else:
+            with smtplib.SMTP(
+                settings.smtp_host,
+                settings.smtp_port,
+                timeout=settings.smtp_timeout,
+            ) as server:
+                server.ehlo()
+                if settings.smtp_use_starttls:
+                    server.starttls(context=ssl.create_default_context())
+                    server.ehlo()
+                self._deliver(server, message)
+
+    def _send_via_resend(self, payload: EmailReportContent) -> None:
+        request = urllib_request.Request(
+            url=f"{settings.resend_api_base.rstrip('/')}/emails",
+            data=json.dumps(self._build_resend_payload(payload)).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {settings.resend_api_key}",
+                "Content-Type": "application/json",
+                "Idempotency-Key": self._idempotency_key(payload),
+            },
+            method="POST",
+        )
+        try:
+            with urllib_request.urlopen(request, timeout=settings.smtp_timeout) as response:
+                response.read()
+        except urllib_error.HTTPError as exc:
+            detail = self._extract_provider_error(exc.read().decode("utf-8", errors="replace"))
+            raise EmailReportDeliveryError(
+                f"Email provider rejected the request: {detail or f'HTTP {exc.code}'}"
+            ) from exc
+        except urllib_error.URLError as exc:
+            raise EmailReportDeliveryError(
+                "Could not reach the configured email provider."
+            ) from exc
+
+    def _build_resend_payload(self, payload: EmailReportContent) -> dict[str, object]:
+        body: dict[str, object] = {
+            "from": formataddr((settings.email_from_name, self._from_email)),
+            "to": [payload.recipient],
+            "subject": self._subject(payload),
+            "html": self._build_html(payload),
+            "text": self._build_plain_text(payload),
+        }
+        if settings.email_reply_to:
+            body["reply_to"] = settings.email_reply_to
+        return body
+
+    def _idempotency_key(self, payload: EmailReportContent) -> str:
+        safe_label = payload.triage_label.lower().replace(" ", "-")
+        return f"email-report/{payload.recipient.lower()}/{safe_label}"[:256]
 
     def _build_message(self, payload: EmailReportContent) -> EmailMessage:
         message = EmailMessage()
-        message["Subject"] = f"AnemiaLens Screening Report - {payload.triage_label}"
+        message["Subject"] = self._subject(payload)
         message["From"] = formataddr((settings.email_from_name, self._from_email))
         message["To"] = payload.recipient
         if settings.email_reply_to:
@@ -121,6 +172,9 @@ class EmailReportService:
         message.set_content(plain_body)
         message.add_alternative(html_body, subtype="html")
         return message
+
+    def _subject(self, payload: EmailReportContent) -> str:
+        return f"AnemiaLens Screening Report - {payload.triage_label}"
 
     def _build_plain_text(self, payload: EmailReportContent) -> str:
         hb_line = self._hemoglobin_line(payload.predicted_hemoglobin)
@@ -192,3 +246,20 @@ class EmailReportService:
     def _hemoglobin_line(self, predicted_hemoglobin: float | None) -> str:
         label, value = self._hemoglobin_parts(predicted_hemoglobin)
         return f"{label}: {value}"
+
+    def _deliver(self, server: smtplib.SMTP, message: EmailMessage) -> None:
+        server.login(settings.smtp_username, settings.smtp_password)
+        server.send_message(message)
+
+    def _extract_provider_error(self, raw_body: str) -> str | None:
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError:
+            body = None
+        if isinstance(body, dict):
+            for key in ("message", "error", "name"):
+                value = body.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        stripped = raw_body.strip()
+        return stripped or None
