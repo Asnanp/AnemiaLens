@@ -280,6 +280,7 @@ def test_email_report_service_sends_email_via_resend(monkeypatch: pytest.MonkeyP
     assert path == "/emails"
     assert headers["Authorization"] == "Bearer re_test_123"
     assert headers["Content-Type"] == "application/json"
+    assert headers["Idempotency-Key"].startswith("email-report/patient@example.com/moderate-risk/")
     assert headers["User-Agent"] == "AnemiaLens/1.0 (+https://anemia-lens.vercel.app)"
     assert body["from"] == "AnemiaLens <onboarding@resend.dev>"
     assert body["to"] == ["patient@example.com"]
