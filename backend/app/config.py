@@ -132,7 +132,11 @@ class Settings(BaseSettings):
     hf_api_key: str = Field(default="", repr=False, validation_alias=AliasChoices("ANEMIALENS_HF_API_KEY", "HF_API_KEY"))
     hf_provider: str = Field(default="", validation_alias=AliasChoices("ANEMIALENS_HF_PROVIDER", "HF_PROVIDER"))
 
-    # --- Email delivery (SMTP) -------------------------------------------
+    # --- Email delivery --------------------------------------------------
+    email_provider: Literal["smtp", "resend"] = Field(
+        default="smtp",
+        validation_alias=AliasChoices("ANEMIALENS_EMAIL_PROVIDER", "EMAIL_PROVIDER"),
+    )
     smtp_host: str = Field(
         default="smtp.gmail.com",
         validation_alias=AliasChoices("ANEMIALENS_SMTP_HOST", "SMTP_HOST"),
@@ -198,6 +202,15 @@ class Settings(BaseSettings):
             "SMTP_REPLY_TO",
         ),
     )
+    resend_api_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices("ANEMIALENS_RESEND_API_KEY", "RESEND_API_KEY"),
+    )
+    resend_api_base: str = Field(
+        default="https://api.resend.com",
+        validation_alias=AliasChoices("ANEMIALENS_RESEND_API_BASE", "RESEND_API_BASE"),
+    )
 
     # --- Image quality thresholds ----------------------------------------
     min_blur_score: float = Field(default=60.0, ge=0.0, le=200.0)
@@ -244,6 +257,7 @@ class Settings(BaseSettings):
         "email_from_name",
         "email_from_email",
         "email_reply_to",
+        "resend_api_base",
         mode="before",
     )
     @classmethod
@@ -274,11 +288,23 @@ class Settings(BaseSettings):
             self.email_from_email,
             self.email_reply_to,
         ]
-        if any(smtp_values) and not (self.smtp_username and self.smtp_password):
+        if (
+            self.email_provider == "smtp"
+            and any(smtp_values)
+            and not (self.smtp_username and self.smtp_password)
+        ):
             import warnings
             warnings.warn(
                 "SMTP settings are partially configured. "
                 "Set both SMTP username and password for email delivery to work.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        if self.email_provider == "resend" and not self.resend_api_key:
+            import warnings
+            warnings.warn(
+                "Resend email delivery is enabled but ANEMIALENS_RESEND_API_KEY is missing. "
+                "Email send requests will fail until the API key is set.",
                 RuntimeWarning,
                 stacklevel=2,
             )
