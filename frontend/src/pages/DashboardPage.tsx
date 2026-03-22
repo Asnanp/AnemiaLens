@@ -13,7 +13,7 @@ import { useHistory } from '../hooks/useHistory';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
-function bandColor(band: string): string {
+function bandColor(band?: string | null): string {
   switch (band) {
     case 'low_risk': return '#10B981';
     case 'moderate_risk': return '#F59E0B';
@@ -23,13 +23,13 @@ function bandColor(band: string): string {
   }
 }
 
-function bandLabel(band: string): string {
+function bandLabel(band?: string | null): string {
   switch (band) {
     case 'low_risk': return 'Low Risk';
     case 'moderate_risk': return 'Moderate';
     case 'high_concern': return 'High Concern';
     case 'uncertain_retake_needed': return 'Retake Needed';
-    default: return band.replace(/_/g, ' ');
+    default: return (band ?? 'unknown').replace(/_/g, ' ');
   }
 }
 

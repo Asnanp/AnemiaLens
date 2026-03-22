@@ -73,13 +73,14 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
   const passed = blocking === 0;
   const normalizeBlur = (value: number) => Math.max(0, Math.min(100, ((value - 55) / 165) * 100));
   const normalizeFraming = (value: number) => Math.max(0, Math.min(100, ((value - 0.75) / 1.1) * 100));
-  const lightingConditionLabel = quality.lighting_condition.replace(/_/g, ' ');
+  const lightingCondition = quality.lighting_condition ?? 'unknown';
+  const lightingConditionLabel = lightingCondition.replace(/_/g, ' ');
 
   const ringColor = (value: number) => (value >= 75 ? '#10B981' : value >= 40 ? '#F59E0B' : '#EF4444');
 
   const metrics = [
     { label: 'Sharpness', value: normalizeBlur(quality.blur_score) },
-    { label: 'Lighting', value: quality.lighting_score * 100 },
+    { label: 'Lighting', value: (quality.lighting_score ?? 0) * 100 },
     { label: 'Framing', value: normalizeFraming(quality.framing_score) },
   ];
 
@@ -258,17 +259,17 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
             <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.72)' }}>
               Lighting Intelligence
             </span>
-            <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: ringColor(quality.lighting_score * 100) }}>
+            <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: ringColor((quality.lighting_score ?? 0) * 100) }}>
               {lightingConditionLabel}
             </span>
           </div>
           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.8rem' }}>
-            {quality.lighting_summary}
+            {quality.lighting_summary ?? 'Lighting analysis is unavailable for this scan.'}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
             {[
-              { label: 'Glare Risk', value: quality.glare_risk * 100, accent: '#F59E0B' },
-              { label: 'Shadow Risk', value: quality.shadow_risk * 100, accent: '#EF4444' },
+              { label: 'Glare Risk', value: (quality.glare_risk ?? 0) * 100, accent: '#F59E0B' },
+              { label: 'Shadow Risk', value: (quality.shadow_risk ?? 0) * 100, accent: '#EF4444' },
             ].map((metric) => (
               <div key={metric.label} style={{ padding: '0.75rem 0.85rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', gap: '0.75rem' }}>
@@ -310,7 +311,7 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.875rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
           <Info size={13} style={{ color: 'var(--accent-bright)', flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', lineHeight: 1.6, fontStyle: 'italic' }}>
-            {quality.lighting_condition === 'balanced'
+            {lightingCondition === 'balanced'
               ? 'Capture quality is in a usable range. If you want a more defensible result, keep the eyelid steady and fully centered.'
               : 'Retaking under better lighting can significantly improve prediction reliability.'}
           </p>

@@ -49,14 +49,16 @@ export async function generatePdfReport(analysis: AnalyzeResponse) {
   yPos += 10;
 
   // Convert triage string to readable
-  const triageLabel = analysis.triage.band.replace(/_/g, ' ').toUpperCase();
+  const safeToken = (value: string | null | undefined, fallback = 'N/A') =>
+    value ? value.replace(/_/g, ' ') : fallback;
+  const triageLabel = safeToken(analysis.triage?.band, 'unknown').toUpperCase();
   
   autoTable(doc, {
     startY: yPos,
     head: [['Metric', 'Value', 'Details']],
     body: [
       ['Triage Band', triageLabel, `Score: ${analysis.triage.score}`],
-      ['Screening Result', analysis.prediction?.screening_label.replace(/_/g, ' ') || 'N/A', `Risk: ${((analysis.prediction?.anemia_risk || 0) * 100).toFixed(1)}%`],
+      ['Screening Result', safeToken(analysis.prediction?.screening_label), `Risk: ${((analysis.prediction?.anemia_risk || 0) * 100).toFixed(1)}%`],
       ['Estimated Hemoglobin', `${analysis.prediction?.predicted_hemoglobin?.toFixed(1) || 'N/A'} g/dL`, `Confidence: ${((analysis.prediction?.confidence || 0) * 100).toFixed(0)}%`],
     ],
     theme: 'grid',
@@ -77,7 +79,13 @@ export async function generatePdfReport(analysis: AnalyzeResponse) {
   doc.setFontSize(10);
   doc.setTextColor(...darkText);
   
-  const briefText = analysis.clinical_brief.share_text || analysis.clinical_brief.headline;
+  const briefText =
+    analysis.clinical_brief?.share_text
+    || analysis.clinical_brief?.headline
+    || analysis.handoff_summary?.share_text
+    || analysis.handoff_summary?.headline
+    || analysis.triage?.summary
+    || 'Clinical summary unavailable.';
   const briefLines = doc.splitTextToSize(briefText.replace(/\\n/g, '\n'), pageWidth - 30);
   doc.text(briefLines, 15, yPos);
   yPos += briefLines.length * 5 + 10;
@@ -97,7 +105,7 @@ export async function generatePdfReport(analysis: AnalyzeResponse) {
 
   const presentSymptoms = Object.entries(analysis.symptoms)
     .filter(([_, value]) => value === true)
-    .map(([key, _]) => key.replace(/_/g, ' '));
+    .map(([key, _]) => safeToken(key, key));
 
   const symptomList = presentSymptoms.length > 0 
     ? presentSymptoms.join(', ')

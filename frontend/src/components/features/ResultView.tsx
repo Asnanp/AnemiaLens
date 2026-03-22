@@ -79,11 +79,16 @@ type ReliabilityStatus = {
 };
 
 function classificationLabel(label: string): string {
-  return label.toLowerCase().replace(/\s+/g, '-');
+  return (label ?? 'screening result').toLowerCase().replace(/\s+/g, '-');
 }
 
 function formatModelVersion(modelSource?: string | null): string {
   return (modelSource ?? 'archive-evidence-fusion-v4').replace(/_/g, '-').toLowerCase();
+}
+
+function humanizeToken(value?: string | null, fallback = 'N/A'): string {
+  if (!value) return fallback;
+  return value.replace(/_/g, ' ');
 }
 
 function getReliabilityStatus(analysis: AnalyzeResponse): ReliabilityStatus {
@@ -412,9 +417,9 @@ function ClinicalModePanel({ analysis }: { analysis: AnalyzeResponse }) {
         Clinical Audit Data
       </div>
       {[
-        { label: 'Calibration Band', val: audit.calibration_band?.replace(/_/g, ' ') ?? 'N/A' },
+        { label: 'Calibration Band', val: humanizeToken(audit.calibration_band) },
         { label: 'Threshold Margin', val: audit.threshold_margin !== null ? `${(audit.threshold_margin * 100).toFixed(1)}%` : 'N/A' },
-        { label: 'Processing Path', val: meta.processing_path?.replace(/_/g, ' ') ?? 'N/A' },
+        { label: 'Processing Path', val: humanizeToken(meta.processing_path) },
         { label: 'Safety Layers', val: meta.safety_layers?.join(', ') || 'None' },
       ].map(row => (
         <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.6rem 0.875rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -635,7 +640,7 @@ function AudienceModePanel({
         },
         {
           label: 'Processing path',
-          value: `${meta.processing_path.replace(/_/g, ' ')} with ${meta.safety_layers.length} active safety layers and ${audit.review_flags.length} review flags.`,
+          value: `${humanizeToken(meta.processing_path)} with ${(meta.safety_layers ?? []).length} active safety layers and ${(audit.review_flags ?? []).length} review flags.`,
         },
         {
           label: 'Clinical handoff',
