@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install only Render runtime deps first.
-COPY backend/requirements-render.txt .
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements-render.txt
+# Copy and install backend runtime deps first.
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
 COPY backend/ .
