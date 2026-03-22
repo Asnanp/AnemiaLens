@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
-import { analyzeScreening, checkBackendHealth, checkImageQuality, getRuntimeStatus } from '../api';
-import type { AnalyzeResponse, QualityAssessment, RecentScreening, RuntimeStatusResponse, SymptomInput, TriageResult } from '../types';
+import { analyzeScreening, checkBackendHealth, checkImageQuality, getRuntimeStatus, onWakeStatus } from '../api';
+import type {
+  AnalyzeResponse,
+  PatientProfileInput,
+  QualityAssessment,
+  RecentScreening,
+  RuntimeStatusResponse,
+  SymptomInput,
+  TriageResult,
+} from '../types';
 
 const defaultSymptoms: SymptomInput = {
   fatigue: false,
@@ -9,6 +17,12 @@ const defaultSymptoms: SymptomInput = {
   shortness_of_breath: false,
   heavy_menstrual_bleeding: null,
   poor_diet_low_iron: false
+};
+
+const defaultPatientProfile: PatientProfileInput = {
+  age: null,
+  sex: 'not_specified',
+  diet_type: 'not_specified',
 };
 
 const RECENT_KEY = 'anemialens.recent-screenings';
@@ -68,6 +82,7 @@ export function useScreening() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<SymptomInput>(defaultSymptoms);
+  const [patientProfile, setPatientProfile] = useState<PatientProfileInput>(defaultPatientProfile);
   const [quality, setQuality] = useState<QualityAssessment | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [runtime, setRuntime] = useState<RuntimeStatusResponse | null>(null);
@@ -80,7 +95,17 @@ export function useScreening() {
   useEffect(() => {
     setRecent(loadRecent());
     checkBackendHealth().then(setBackendUp);
+    const unsubscribeWake = onWakeStatus((status) => {
+      if (status === 'ready') {
+        setBackendUp(true);
+      } else if (status === 'failed') {
+        setBackendUp(false);
+      }
+    });
     getRuntimeStatus().then(setRuntime).catch(() => null);
+    return () => {
+      unsubscribeWake();
+    };
   }, []);
 
   useEffect(() => () => {
@@ -98,6 +123,7 @@ export function useScreening() {
     setQuality(null);
     setAnalysis(null);
     setError(null);
+    setIsOfflineMode(false);
     setStep(0);
   };
 
@@ -107,6 +133,9 @@ export function useScreening() {
       : { ...prev, [key]: !prev[key] }
   );
 
+  const updatePatientProfile = <K extends keyof PatientProfileInput>(key: K, value: PatientProfileInput[K]) =>
+    setPatientProfile(prev => ({ ...prev, [key]: value }));
+
   const runQuality = async () => {
     if (!file) return;
     setLoading(true);
@@ -114,6 +143,8 @@ export function useScreening() {
     try {
       const result = await checkImageQuality(file);
       setQuality(result);
+      setBackendUp(true);
+      setIsOfflineMode(false);
       setStep(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Image quality check failed.');
@@ -133,8 +164,10 @@ export function useScreening() {
         const raw = localStorage.getItem('anemialens.symptom-severity');
         if (raw) symptomSeverity = JSON.parse(raw);
       } catch { /* ignore */ }
-      const result = await analyzeScreening(file, symptoms, undefined, undefined, symptomSeverity);
+      const result = await analyzeScreening(file, symptoms, patientProfile, undefined, undefined, symptomSeverity);
       setAnalysis(result);
+      setBackendUp(true);
+      setIsOfflineMode(false);
       const item = buildRecent(result);
       if (item) {
         const next = [item, ...recent].slice(0, 6);
@@ -170,6 +203,7 @@ export function useScreening() {
       setFile(new File([blob], `${id}.jpg`, { type: 'image/jpeg' }));
       setPreview(imageUrl);
       setSymptoms(sampleSymptoms);
+      setPatientProfile(defaultPatientProfile);
       setQuality(null);
       setAnalysis(null);
       setStep(0);
@@ -185,6 +219,7 @@ export function useScreening() {
     setFile(null);
     setPreview(null);
     setSymptoms(defaultSymptoms);
+    setPatientProfile(defaultPatientProfile);
     setQuality(null);
     setAnalysis(null);
     setError(null);
@@ -218,6 +253,10 @@ export function useScreening() {
       low_risk: 'Low Risk',
       uncertain_retake_needed: 'Uncertain',
     };
+
+    const patientId = `ANM-OFF-${Date.now().toString().slice(-4)}`;
+    const caseId = `CASE-OFF-${Date.now().toString().slice(-4)}`;
+    const activeSymptomLabelsList = activeKeys.map(k => symptomLabels[k as keyof SymptomInput]);
 
     const offlineResult: AnalyzeResponse = {
       blocked: false,
@@ -319,6 +358,74 @@ export function useScreening() {
         used_raw_frame_rescue: false,
         safety_layers: ['offline_mode'],
       },
+      patient_profile: {
+        patient_id: patientId,
+        age: patientProfile.age,
+        sex: patientProfile.sex,
+        diet_type: patientProfile.diet_type,
+        reported_symptoms: activeSymptomLabelsList,
+        summary: activeSymptomLabelsList.length > 0
+          ? `Offline intake preserved ${activeSymptomLabelsList.join(', ')} for follow-up context.`
+          : 'Offline intake captured basic context only.',
+      },
+      workflow_stages: [
+        {
+          key: 'image_quality_agent',
+          agent_label: 'Image Quality Agent',
+          title: 'Capture validation',
+          status: 'blocked',
+          summary: 'Offline mode cannot validate the image, so quality assurance is unavailable.',
+        },
+        {
+          key: 'screening_agent',
+          agent_label: 'Screening Agent',
+          title: 'Conjunctiva screening',
+          status: 'blocked',
+          summary: 'Image-based screening was skipped because the backend was unavailable.',
+        },
+        {
+          key: 'triage_agent',
+          agent_label: 'Triage Agent',
+          title: 'Symptom + image fusion',
+          status: 'complete',
+          summary: `The triage layer used symptom-only input and assigned ${labelMap[band].toLowerCase()}.`,
+        },
+        {
+          key: 'guidance_agent',
+          agent_label: 'Guidance Agent',
+          title: 'Next-step guidance',
+          status: 'complete',
+          summary: 'Fallback guidance was produced locally to preserve a safe follow-up path.',
+        },
+      ],
+      structured_case: {
+        case_id: caseId,
+        patient_id: patientId,
+        age: patientProfile.age,
+        sex: patientProfile.sex,
+        diet_type: patientProfile.diet_type,
+        symptoms: activeSymptomLabelsList,
+        image_quality: {
+          status: 'blocked',
+          lighting_condition: 'unknown',
+          lighting_score: 0,
+          blur_detected: false,
+          eye_region_visible: false,
+          primary_issue: 'Offline mode',
+          warnings: ['No image analysis available'],
+        },
+        screening_result: {
+          risk_level: band,
+          confidence: null,
+          reliability: null,
+          predicted_hemoglobin: null,
+          anemia_risk: null,
+        },
+        recommendation: band === 'high_concern'
+          ? 'Seek medical review soon.'
+          : 'Reconnect and retake with an image for a full screening.',
+        case_summary: `Offline symptom-only case suggests ${labelMap[band].toLowerCase()}.`,
+      },
       symptoms,
       language: null,
       region: null,
@@ -333,10 +440,11 @@ export function useScreening() {
     step, setStep,
     file, previewUrl,
     symptoms, toggleSymptom, setSymptoms,
+    patientProfile, updatePatientProfile,
     quality, analysis, runtime,
     recent, loading, error, backendUp,
     isOfflineMode,
     pickFile, runQuality, runAnalysis, loadSample, reset, symptomOnlyAssess,
-    symptomLabels, defaultSymptoms
+    symptomLabels, defaultSymptoms, defaultPatientProfile
   };
 }

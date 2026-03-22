@@ -1,108 +1,243 @@
-# AnemiaLens Presentation Script
+# AnemiaLens Hackathon Demo Script
+
+## Before You Present
+
+Fix these two lines in the PPT first:
+
+- Slide 10: change `Render` to `Hugging Face Spaces`
+- Slide 9: change `Any lighting condition` to `Works on any smartphone, with image quality checking`
 
 ---
 
-## OPENING (Slides 1-3)
+## Best Demo Flow
 
-"This is AnemiaLens. It's a screening tool that checks for anemia using just a smartphone camera. You take a photo of the inner eyelid, and it gives you a risk assessment — no blood test needed.
+Use this order:
 
-We built this because anemia affects nearly 2 billion people globally, but most don't know they have it. In many areas, getting a blood test is expensive, takes days, or just doesn't happen.
+1. Problem
+2. Why this signal works
+3. Switch to website
+4. Capture
+5. Quality check
+6. Result
+7. Explanation
+8. Email
+9. Back to PPT
+10. Safety + closing
 
-The thing is, the signal is already there. When hemoglobin drops, the inner eyelid turns pale. Doctors have used this for decades. We just taught a phone to read it."
+This is the best flow because judges first understand the problem, then they see the real product working.
 
 ---
 
-## DEMO TRANSITION
+## Full Easy-English Script
 
-"Let me show you how it works."
+### Slide 1 to Slide 3
+
+“Hello everyone.
+
+Anemia affects more than 1.9 billion people around the world.
+But checking anemia usually needs a blood test, money, time, and access to a clinic.
+In many places, people do not get tested early, and sometimes they are not tested at all.
+
+Our idea is simple.
+When hemoglobin becomes low, the inner lower eyelid becomes pale.
+Doctors have known this for many years.
+So we built a system that uses a smartphone camera to read that signal.
+
+This is AnemiaLens.
+It is a first-pass anemia screening tool.
+No lab.
+No needle.
+No waiting.”
+
+---
+
+### Demo Transition
+
+“Now I will show the live demo.”
 
 **[Switch to website: https://anemia-lens.vercel.app]**
 
 ---
 
-## LIVE DEMO
+### Website Demo
 
-"I'll upload an eye image here."
+“This is the live product.
 
-**[Upload image]**
+First, the user starts screening.
+Then the user captures or uploads an image of the lower eyelid.
 
-"First, it checks image quality — lighting, blur, framing — because bad input means unreliable output."
+After that, the app checks image quality.
+This is important because if the image is too dark, blurry, or unclear, the system should not make a risky claim.
 
-**[Show quality check passing]**
+So before giving a result, it checks whether the image is good enough.
 
-"Then it processes the image, extracts features from the conjunctiva, and combines that with any symptoms you report."
+When the image passes the quality check, the system analyzes the visual signal and combines it with symptom information.
 
-**[Wait for result]**
+Then it gives the result.
+But we do not only show a risk label.
+We also explain why the system gave this result.
 
-"Here's the result. It shows a risk level and an estimated hemoglobin value. It also explains why it gave this result — not just a black box.
+For example, it may detect reduced redness in the conjunctival region, and it also looks at symptom severity.
+Then it combines those signals and gives the final result.
 
-And if the system isn't confident, it won't guess. It'll tell you to retake the photo. That's important for safety."
+We also show confidence and reliability.
+This is important because in healthcare, the system should know when it may be wrong.
 
-**[Switch back to slides]**
+And finally, the user can send the report by email.
+That makes the result easy to share with a doctor, clinic, or family member.”
 
----
-
-## ARCHITECTURE (Slide 4-7)
-
-"So that's the user experience. Behind it, there's a full pipeline.
-
-We extract 41 color and texture features from the eye image — things like pallor index, redness uniformity, hue distribution. Then an ensemble model combines those features with symptom data to predict anemia risk and hemoglobin level.
-
-We trained it on 217 real patient images, and the pipeline is designed to match exactly what happens during inference — no domain gap between training and production.
-
-We also built in uncertainty estimation, so the model knows when it doesn't know."
+**[Back to PPT]**
 
 ---
 
-## AI TOOLS (Slide 6)
+### Slide 4 or Slide 5
 
-"Quick note on how this was built. We used Kiro for the frontend — it has a UI/UX skill that generated the entire design system in one command. Dark glassmorphism, responsive layout, accessibility features, all of it.
+“So this is not only a model.
+It is a full screening system.
 
-For the backend and ML, we used Amazon Q with a custom ML engineer agent. It handled feature engineering, pipeline retraining, and the FastAPI backend. Every line was reviewed and tested, but the AI did the heavy lifting."
+It includes image capture, image quality checking, prediction, explanation, reliability, and report sharing.
 
----
-
-## SAFETY (Slide 8)
-
-"Now, safety. In medical AI, being confidently wrong is worse than being uncertain. So we built multiple guardrails.
-
-There's an image quality gate that blocks bad inputs before any model runs. We expose the uncertainty score on every prediction. If uncertainty is too high, we hide the hemoglobin estimate. And we filter the AI-generated guidance to make sure it never makes diagnostic claims.
-
-This is a screening tool, not a diagnosis. That distinction matters."
+That is what makes AnemiaLens different.
+It is designed like a real product, not just a model output.”
 
 ---
 
-## WHO IT'S FOR (Slide 9)
+### Slide 7 or Slide 8
 
-"This is designed for low-resource clinics and community health workers in places like South Asia and Sub-Saharan Africa, where lab testing is limited or delayed.
+“Another important part is safety.
 
-The goal is simple: give people a fast, free first-pass signal so they know when they need a real blood test. Zero marginal cost per screening. Any smartphone. No hardware. No waiting."
+In healthcare, being confidently wrong is dangerous.
+So our system does not try to act smart on bad inputs.
 
----
+It checks image quality first.
+It shows reliability.
+And it gives safe guidance instead of pretending to make a diagnosis.
 
-## CLOSING (Slide 10)
-
-"So that's AnemiaLens. A photo becomes an early warning signal.
-
-Because something this common shouldn't go unnoticed.
-
-Thank you."
+This is a screening aid, not a diagnosis tool.
+Its job is to tell people when they may need a real blood test.”
 
 ---
 
-## BACKUP SLIDES / Q&A PREP
+### Slide 9
 
-**If asked about accuracy:**
-"The model achieves around 70% accuracy with 89% recall on the validation set. Recall is prioritized because missing anemia is worse than a false alarm. The AUC is 0.80, which is solid for a screening tool."
+“This can help in low-resource clinics and community health settings, especially where lab testing is slow, costly, or difficult to access.
 
-**If asked about regulatory status:**
-"This is a research prototype, not a medical device. It's not FDA-approved or CE-marked. It's designed as a decision support tool for healthcare workers, not for direct consumer diagnosis."
+The goal is simple:
+give people a fast first-pass signal, so they know earlier when they may need proper testing.”
 
-**If asked about data privacy:**
-"Images are processed server-side but not stored permanently. We don't collect PHI. The system is designed to be deployed on-premise in clinics if needed."
+---
 
-**If asked about cost:**
-"The app is free. The backend is hosted on Hugging Face Spaces right now. In production, server costs would still be minimal for a large number of screenings."
+### Slide 10 Closing
 
-**If asked about next steps:**
-"We're looking to partner with NGOs or health organizations for field validation. We also want to expand the dataset and add support for more languages."
+“So that is AnemiaLens.
+
+A smartphone-first anemia screening system that is fast, explainable, safety-aware, and easy to use.
+
+It does not replace a blood test.
+It helps people know when they need one.
+
+Thank you.”
+
+---
+
+## Short Website Talking Lines
+
+When showing the live website, say these short lines:
+
+- “This is the capture step.”
+- “Here the app checks image quality.”
+- “Now we get the result.”
+- “Here is the explanation.”
+- “And here we send the report by email.”
+
+Do not talk too much during the live demo.
+Keep moving.
+
+---
+
+## Best 3-Minute Version
+
+If your time is around 3 minutes, use this:
+
+### 0:00 to 0:35
+
+“Anemia affects more than 1.9 billion people, but testing usually needs labs, time, money, and access.
+In many places, early detection does not happen.”
+
+### 0:35 to 0:50
+
+“The inner lower eyelid becomes pale when hemoglobin drops.
+Doctors know this signal.
+We taught a smartphone to read it.”
+
+### 0:50 to 2:10
+
+**[Live website demo]**
+
+“This is capture.
+This is quality check.
+This is the result.
+This is the explanation.
+And this is the email report.”
+
+### 2:10 to 2:40
+
+“AnemiaLens is not just a model.
+It is a full pipeline with safety checks, reliability, explainability, and report sharing.”
+
+### 2:40 to 3:00
+
+“It is not a diagnosis tool.
+It is a screening aid that helps people know earlier when they may need a real blood test.
+That is AnemiaLens.”
+
+---
+
+## Best Final Line
+
+Use this line at the end:
+
+“AnemiaLens helps people know earlier when they may need a blood test.”
+
+---
+
+## Judge Q&A Answers
+
+### If they ask: Is this a diagnosis tool?
+
+“No.
+It is a screening aid.
+It helps identify people who may need confirmatory testing.”
+
+### If they ask: Why is the quality check important?
+
+“Because bad image input can create unsafe results.
+So the system checks the image first before giving a result.”
+
+### If they ask: What makes your project different?
+
+“It is not only prediction.
+It combines quality checking, explainability, confidence, reliability, and report sharing in one working product.”
+
+### If they ask: Why email?
+
+“Because the result should be easy to share with a doctor, clinic, or family member.
+That makes the tool more useful in real life.”
+
+### If they ask: Why does this matter?
+
+“Because anemia is very common, but early testing is still not easy for many people.
+This gives a faster first step.”
+
+---
+
+## Demo Reminder
+
+When you present:
+
+- speak continuously
+- do not stop too much
+- do not explain every button
+- move fast from problem to live demo
+- keep the live demo smooth
+- end with safety and real-world impact

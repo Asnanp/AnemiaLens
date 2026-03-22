@@ -17,6 +17,8 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.screening import Screening
 from app.models.user import User
+from app.schemas import AnalyzeResponse
+from app.services.screening_store import persist_screening_result
 
 log = logging.getLogger("anemialens.history")
 
@@ -65,6 +67,16 @@ class ScreeningListResponse(BaseModel):
 class DeleteResponse(BaseModel):
     deleted: bool
     uid: str
+
+
+class SaveScreeningRequest(BaseModel):
+    analysis: AnalyzeResponse
+
+
+class SaveScreeningResponse(BaseModel):
+    saved: bool
+    uid: str
+    message: str
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +248,30 @@ async def delete_screening(
     await db.delete(screening)
     log.info("Screening deleted: %s by user %s", screening_uid, user.uid)
     return DeleteResponse(deleted=True, uid=screening_uid)
+
+
+@router.post(
+    "/save-current",
+    response_model=SaveScreeningResponse,
+    summary="Save the current screening result to the authenticated account",
+)
+async def save_current_screening(
+    body: SaveScreeningRequest,
+    user: Annotated[User, Depends(get_current_user)],
+) -> SaveScreeningResponse:
+    analysis = body.analysis
+    screening = await persist_screening_result(
+        request_id=analysis.analysis_meta.request_id,
+        analysis=analysis,
+        user_id=user.id,
+        processing_time_ms=analysis.analysis_meta.processing_time_ms,
+    )
+    log.info("Screening saved to account: %s by user %s", screening.uid, user.uid)
+    return SaveScreeningResponse(
+        saved=True,
+        uid=screening.uid,
+        message="Screening saved to your account history.",
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -171,7 +171,7 @@ body:has(a:hover) #cursor-ring { width: 48px; height: 48px; border-color: var(--
   padding: 0.875rem 2rem; border-radius: 99px;
   font-family: var(--sans); font-weight: 600; font-size: 0.78rem;
   letter-spacing: 0.06em; text-transform: uppercase;
-  border: none; cursor: none; position: relative; overflow: hidden;
+  border: none; cursor: pointer; position: relative; overflow: hidden;
   transition: all 0.4s var(--ease);
 }
 /* Sweep shimmer on hover */

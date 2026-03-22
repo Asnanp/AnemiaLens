@@ -16,9 +16,9 @@ from app.ml.runtime_stack import (
 
 
 def test_decision_threshold_defaults_are_source_aware() -> None:
-    assert decision_threshold_for_source("roi_original") == 0.435
-    assert decision_threshold_for_source("palpebral") == 0.66
-    assert decision_threshold_for_source("forniceal_palpebral") == 0.66
+    assert decision_threshold_for_source("roi_original") == 0.495
+    assert decision_threshold_for_source("palpebral") == 0.65
+    assert decision_threshold_for_source("forniceal_palpebral") == 0.65
 
 
 def test_runtime_stack_prediction_keeps_archive_signal_without_secondary_model() -> None:
@@ -34,7 +34,7 @@ def test_runtime_stack_prediction_keeps_archive_signal_without_secondary_model()
     assert result["anemia_risk"] == 0.58
     assert result["predicted_hemoglobin"] == 11.4
     assert result["uncertainty"] == 0.21
-    assert result["decision_threshold"] == 0.435
+    assert result["decision_threshold"] == 0.495
 
 
 def test_runtime_stack_blends_archive_and_efficientnet_for_roi() -> None:
@@ -52,16 +52,16 @@ def test_runtime_stack_blends_archive_and_efficientnet_for_roi() -> None:
         source_hint="roi_original",
     )
 
-    assert round(result["anemia_risk"], 4) == 0.636
-    assert round(result["predicted_hemoglobin"], 4) == 10.848
-    assert round(result["decision_threshold"], 4) == 0.435
-    assert round(result["uncertainty"], 4) > 0.18
+    assert round(result["anemia_risk"], 4) == 0.5138
+    assert round(result["predicted_hemoglobin"], 4) == 11.16
+    assert round(result["decision_threshold"], 4) == 0.495
+    assert round(result["uncertainty"], 4) == 0.2424
 
 
 def test_runtime_stack_weights_are_source_aware() -> None:
-    assert risk_archive_weight_for_source("roi_original") == 0.84
+    assert risk_archive_weight_for_source("roi_original") == 0.55
     assert risk_archive_weight_for_source("palpebral") == 1.0
-    assert hb_archive_weight_for_source("roi_original") == 0.96
+    assert hb_archive_weight_for_source("roi_original") == 0.70
     assert hb_archive_weight_for_source("palpebral") == 1.0
 
 

@@ -5,7 +5,7 @@ import json
 from pydantic import ValidationError
 
 from app.config import settings
-from app.schemas import SymptomInput
+from app.schemas import PatientProfileInput, SymptomInput
 
 
 class InvalidRequestPayload(ValueError):
@@ -28,6 +28,24 @@ def parse_symptoms(raw: str | None) -> SymptomInput:
         if detail:
             raise InvalidRequestPayload(f"Invalid symptoms payload: {detail}") from exc
         raise InvalidRequestPayload("Invalid symptoms payload.") from exc
+
+
+def parse_patient_profile(raw: str | None) -> PatientProfileInput:
+    if not raw:
+        return PatientProfileInput()
+
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise InvalidRequestPayload("Invalid patient profile payload: expected a JSON object.")
+        return PatientProfileInput.model_validate(payload)
+    except InvalidRequestPayload:
+        raise
+    except (TypeError, json.JSONDecodeError, ValidationError) as exc:
+        detail = _validation_detail(exc)
+        if detail:
+            raise InvalidRequestPayload(f"Invalid patient profile payload: {detail}") from exc
+        raise InvalidRequestPayload("Invalid patient profile payload.") from exc
 
 
 def normalize_optional_text(

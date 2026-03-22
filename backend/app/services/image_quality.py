@@ -428,8 +428,7 @@ class ImageQualityService:
     def allows_raw_frame_rescue(self, assessment: QualityAssessment) -> bool:
         blocking_codes = {issue.code for issue in assessment.issues if issue.severity == "blocking"}
         return bool(blocking_codes) and (
-            blocking_codes.issubset({"bad_framing", "eye_not_visible"})
-            or blocking_codes == {"poor_lighting"}
+            blocking_codes.issubset({"bad_framing", "eye_not_visible", "poor_lighting"})
         )
 
     def build_raw_frame_rescue_assessment(self, assessment: QualityAssessment) -> QualityAssessment:

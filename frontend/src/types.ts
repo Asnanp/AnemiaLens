@@ -7,6 +7,18 @@ export type SymptomInput = {
   poor_diet_low_iron: boolean;
 };
 
+export type PatientProfileInput = {
+  age: number | null;
+  sex: 'female' | 'male' | 'other' | 'not_specified';
+  diet_type: 'omnivore' | 'vegetarian' | 'vegan' | 'mixed' | 'not_specified';
+};
+
+export type PatientProfile = PatientProfileInput & {
+  patient_id: string;
+  reported_symptoms: string[];
+  summary: string;
+};
+
 export type QualityIssue = {
   code: string;
   severity: 'warning' | 'blocking';
@@ -148,6 +160,41 @@ export type ClinicalBrief = {
   share_text: string;
 };
 
+export type WorkflowStage = {
+  key: 'image_quality_agent' | 'screening_agent' | 'triage_agent' | 'guidance_agent';
+  agent_label: string;
+  title: string;
+  status: 'passed' | 'warning' | 'blocked' | 'complete';
+  summary: string;
+};
+
+export type StructuredCaseRecord = {
+  case_id: string;
+  patient_id: string;
+  age: number | null;
+  sex: PatientProfile['sex'];
+  diet_type: PatientProfile['diet_type'];
+  symptoms: string[];
+  image_quality: {
+    status: 'acceptable' | 'warning' | 'blocked';
+    lighting_condition: string;
+    lighting_score: number;
+    blur_detected: boolean;
+    eye_region_visible: boolean;
+    primary_issue: string | null;
+    warnings: string[];
+  };
+  screening_result: {
+    risk_level: TriageResult['band'];
+    confidence: number | null;
+    reliability: PredictionResult['reliability_flag'] | null;
+    predicted_hemoglobin: number | null;
+    anemia_risk: number | null;
+  };
+  recommendation: string;
+  case_summary: string;
+};
+
 export type AnalysisMeta = {
   request_id: string;
   generated_at: string;
@@ -223,6 +270,9 @@ export type AnalyzeResponse = {
   clinical_brief: ClinicalBrief;
   handoff_summary: HandoffSummary;
   analysis_meta: AnalysisMeta;
+  patient_profile: PatientProfile;
+  workflow_stages: WorkflowStage[];
+  structured_case: StructuredCaseRecord;
   symptoms: SymptomInput;
   language?: string | null;
   region?: string | null;

@@ -46,13 +46,16 @@ from app.services.decision_audit import build_decision_audit
 from app.services.guidance import GuidanceService
 from app.services.handoff import HandoffSummaryService
 from app.services.image_quality import ImageQualityService
+from app.services.patient_case import PatientCaseService
 from app.services.prediction import ScreeningPredictor
 from app.services.request_parsing import (
     InvalidRequestPayload,
     normalize_optional_text,
+    parse_patient_profile,
     parse_symptoms,
 )
 from app.services.runtime_status import build_runtime_status
+from app.services.screening_store import persist_screening_result
 from app.services.triage import TriageService
 
 load_dotenv(BACKEND_ROOT / ".env")
@@ -114,6 +117,7 @@ async def lifespan(app: FastAPI):
     app.state.case_insight_service = CaseInsightService()
     app.state.clinical_brief_service = ClinicalBriefService()
     app.state.handoff_service = HandoffSummaryService()
+    app.state.patient_case_service = PatientCaseService()
     log.info("All ML services initialised.")
 
     # ---------- Model warm-up ----------
@@ -277,12 +281,12 @@ def _too_large_response(request_id: str, max_mb: float) -> JSONResponse:
     )
 
 
-def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality, symptom_score: float = 0.0):
+def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality):
     if quality.passed or not services.quality_service.allows_raw_frame_rescue(quality):
         return quality, None, False
 
     raw_image = load_image_bytes(image_bytes).convert("RGB")
-    raw_prediction = services.predictor.predict(raw_image, quality, symptom_score=symptom_score)
+    raw_prediction = services.predictor.predict(raw_image, quality)
     if not services.predictor.should_accept_raw_frame_rescue(raw_prediction):
         return quality, None, False
 
@@ -302,48 +306,12 @@ async def _persist_screening(
 ) -> None:
     """Save the screening result to the database."""
     try:
-        from app.database import async_session_factory
-        from app.models.screening import Screening
-
-        screening = Screening(
+        await persist_screening_result(
             request_id=request_id,
+            analysis=analysis,
             user_id=user_id,
-            triage_band=analysis.triage.band,
-            triage_score=analysis.triage.score,
-            triage_label=analysis.triage.label,
-            anemia_risk=analysis.prediction.anemia_risk if analysis.prediction else None,
-            predicted_hemoglobin=analysis.prediction.predicted_hemoglobin if analysis.prediction else None,
-            confidence=analysis.prediction.confidence if analysis.prediction else None,
-            uncertainty=analysis.prediction.uncertainty if analysis.prediction else None,
-            screening_label=analysis.prediction.screening_label if analysis.prediction else None,
-            model_source=analysis.prediction.model_source if analysis.prediction else None,
-            quality_passed=analysis.quality.passed,
-            blocked=analysis.blocked,
-            processing_path=analysis.decision_audit.processing_path,
-            guidance_source=analysis.guidance.source,
-            symptoms_json=json.dumps(analysis.symptoms.model_dump()),
-            full_response_json=json.dumps(analysis.model_dump(), default=str),
-            share_text=analysis.handoff_summary.share_text,
-            urgency_label=analysis.handoff_summary.urgency_label,
-            headline=analysis.handoff_summary.headline,
             processing_time_ms=processing_time_ms,
-            language=analysis.language,
-            region=analysis.region,
         )
-
-        async with async_session_factory() as session:
-            session.add(screening)
-            await session.commit()
-
-            # Update user scan count
-            if user_id is not None:
-                from app.models.user import User
-                from sqlalchemy import select
-                result = await session.execute(select(User).where(User.id == user_id))
-                user = result.scalar_one_or_none()
-                if user:
-                    user.scan_count += 1
-                    await session.commit()
 
     except Exception as exc:
         log.warning("Failed to persist screening (non-fatal): %s", exc)
@@ -440,6 +408,7 @@ async def analyze(
     request: Request,
     image: Annotated[UploadFile, File(description="Eye photo (JPEG or PNG).")],
     symptoms: Annotated[str | None, Form(description="JSON-encoded symptom flags.")] = None,
+    patient_profile: Annotated[str | None, Form(description="JSON-encoded intake profile.")] = None,
     language: Annotated[str | None, Form(description="Preferred language for guidance.")] = None,
     region: Annotated[str | None, Form(description="Geographic region for localised guidance.")] = None,
 ) -> AnalyzeResponse | JSONResponse:
@@ -493,6 +462,7 @@ async def analyze(
     # --- Input validation --------------------------------------------------
     try:
         symptom_input = parse_symptoms(symptoms)
+        patient_profile_input = parse_patient_profile(patient_profile)
         language = normalize_optional_text(language, field_name="language")
         region = normalize_optional_text(region, field_name="region")
     except InvalidRequestPayload as exc:
@@ -513,12 +483,10 @@ async def analyze(
         return _image_error_response(rid)
 
     # --- Inference (skipped on quality failure) -----------------------------
-    # Compute symptom_score early so it can influence ML prediction
-    symptom_score = svc.triage_service._symptom_score(symptom_input)
-    prediction = svc.predictor.predict(rgb, quality, symptom_score=symptom_score) if quality.passed else None
+    prediction = svc.predictor.predict(rgb, quality) if quality.passed else None
     used_raw_frame_rescue = False
     if prediction is None:
-        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(svc, image_bytes, quality, symptom_score=symptom_score)
+        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(svc, image_bytes, quality)
 
     # --- Triage + guidance -------------------------------------------------
     signal_breakdown = svc.triage_service.build_signal_breakdown(quality, prediction, symptom_input)
@@ -577,6 +545,27 @@ async def analyze(
         guidance=guidance,
         used_raw_frame_rescue=used_raw_frame_rescue,
     )
+    patient_profile_result = svc.patient_case_service.build_profile(
+        rid,
+        patient_profile_input,
+        symptom_input,
+    )
+    workflow_stages = svc.patient_case_service.build_workflow_stages(
+        quality,
+        prediction,
+        triage,
+        guidance,
+        symptom_input,
+    )
+    structured_case = svc.patient_case_service.build_structured_case(
+        rid,
+        patient_profile_result,
+        quality,
+        prediction,
+        triage,
+        guidance,
+        symptom_input,
+    )
 
     response = AnalyzeResponse(
         blocked=not quality.passed,
@@ -589,6 +578,9 @@ async def analyze(
         clinical_brief=clinical_brief,
         handoff_summary=handoff_summary,
         analysis_meta=analysis_meta,
+        patient_profile=patient_profile_result,
+        workflow_stages=workflow_stages,
+        structured_case=structured_case,
         symptoms=symptom_input,
         language=language,
         region=region,

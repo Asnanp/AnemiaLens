@@ -2,21 +2,41 @@
  * Combined login/register page with premium glassmorphism design.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { ScanEye, ArrowRight, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { ScanEye, ArrowRight, User, Mail, Lock, Eye, EyeOff, X } from 'lucide-react';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
-export default function AuthPage({ onClose }: { onClose: () => void }) {
+type AuthPageProps = {
+  onClose: () => void;
+  onSuccess?: () => void;
+  initialMode?: 'login' | 'register';
+};
+
+export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: AuthPageProps) {
   const { login, register, error, clearError, isLoading } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(initialMode);
+    setLocalError(null);
+    clearError();
+  }, [initialMode, clearError]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +47,7 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
       setLocalError('Please fill in all required fields.');
       return;
     }
-    if (password.length < 8) {
+    if (mode === 'register' && password.length < 8) {
       setLocalError('Password must be at least 8 characters.');
       return;
     }
@@ -38,6 +58,7 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
       } else {
         await register(email, password, fullName || undefined);
       }
+      onSuccess?.();
       onClose();
     } catch {
       // Error is handled by auth context
@@ -58,6 +79,8 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
         background: 'rgba(4,4,10,0.85)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
+        padding: '1rem',
+        overflowY: 'auto',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -74,13 +97,38 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
           backdropFilter: 'blur(40px)',
           boxShadow: '0 48px 100px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12)',
           overflow: 'hidden',
+          maxHeight: 'min(90vh, 780px)',
+          overflowY: 'auto',
         }}
       >
         {/* Header */}
         <div style={{
-          padding: '2.5rem 2.5rem 0',
+          padding: '2rem 1.5rem 0',
           textAlign: 'center',
+          position: 'relative',
         }}>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close authentication modal"
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              width: 36,
+              height: 36,
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.03)',
+              color: 'var(--text-dim)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={16} />
+          </button>
           <div style={{
             width: 48, height: 48, borderRadius: '14px',
             background: 'linear-gradient(135deg, #C8001E, #E8294A)',
@@ -108,7 +156,7 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
 
         {/* Tab toggle */}
         <div style={{
-          display: 'flex', margin: '1.5rem 2.5rem 0', borderRadius: '0.75rem',
+          display: 'flex', margin: '1.5rem 1.5rem 0', borderRadius: '0.75rem',
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
           overflow: 'hidden',
         }}>
@@ -133,7 +181,7 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem 2.5rem 2.5rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem 1.5rem 1.75rem' }}>
           <AnimatePresence mode="wait">
             {displayError && (
               <motion.div
@@ -225,6 +273,12 @@ export default function AuthPage({ onClose }: { onClose: () => void }) {
                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
+          </div>
+
+          <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            {mode === 'login'
+              ? 'Sign in to reopen your dashboard, saved reports, and screening history.'
+              : 'Create an account to save current and future screenings into your personal history.'}
           </div>
 
           <button
