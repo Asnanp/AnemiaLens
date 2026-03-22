@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import http.client
+import hashlib
 import logging
 import smtplib
 import ssl
@@ -167,7 +168,18 @@ class EmailReportService:
 
     def _idempotency_key(self, payload: EmailReportContent) -> str:
         safe_label = payload.triage_label.lower().replace(" ", "-")
-        return f"email-report/{payload.recipient.lower()}/{safe_label}"[:256]
+        fingerprint = hashlib.sha256(
+            "\n".join(
+                [
+                    payload.recipient.lower(),
+                    payload.triage_label,
+                    payload.share_text.strip(),
+                    "" if payload.predicted_hemoglobin is None else f"{payload.predicted_hemoglobin:.3f}",
+                    f"{payload.anemia_risk:.6f}",
+                ]
+            ).encode("utf-8")
+        ).hexdigest()[:20]
+        return f"email-report/{payload.recipient.lower()}/{safe_label}/{fingerprint}"[:256]
 
     def _build_message(self, payload: EmailReportContent) -> EmailMessage:
         message = EmailMessage()
