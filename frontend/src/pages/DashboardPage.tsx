@@ -588,6 +588,11 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                           Hb {screening.predicted_hemoglobin.toFixed(1)} g/dL
                         </span>
                       )}
+                      {screening.predicted_hemoglobin === null && (
+                        <span style={{ padding: '0.28rem 0.55rem', borderRadius: '999px', fontSize: '0.58rem', fontFamily: 'var(--mono)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                          Hb unavailable
+                        </span>
+                      )}
                       {screening.confidence !== null && (
                         <span style={{ padding: '0.28rem 0.55rem', borderRadius: '999px', fontSize: '0.58rem', fontFamily: 'var(--mono)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
                           Confidence {(screening.confidence * 100).toFixed(0)}%
