@@ -1,97 +1,149 @@
-<svg width="1440" height="760" viewBox="0 0 1440 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1440" height="1080" viewBox="0 0 1440 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="160" y1="80" x2="1240" y2="700" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#090A12"/>
-      <stop offset="1" stop-color="#030309"/>
+    <linearGradient id="bg" x1="120" y1="40" x2="1240" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#070810"/>
+      <stop offset="1" stop-color="#03030A"/>
     </linearGradient>
-    <linearGradient id="panel" x1="248" y1="174" x2="1054" y2="618" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#10131F" stop-opacity="0.98"/>
-      <stop offset="1" stop-color="#0A0C14" stop-opacity="0.92"/>
+    <linearGradient id="brand" x1="1080" y1="76" x2="1260" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF5D80"/>
+      <stop offset="1" stop-color="#D31A3F"/>
     </linearGradient>
-    <linearGradient id="accent" x1="330" y1="190" x2="980" y2="600" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF4A70"/>
-      <stop offset="0.52" stop-color="#D7153C"/>
-      <stop offset="1" stop-color="#9A0E2D"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1040 350) rotate(90) scale(230 260)">
-      <stop stop-color="#FF335E" stop-opacity="0.8"/>
-      <stop offset="1" stop-color="#FF335E" stop-opacity="0"/>
+    <radialGradient id="scannerGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1044 444) rotate(90) scale(206 240)">
+      <stop stop-color="#FF224F" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#FF224F" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="line" x1="836" y1="130" x2="1194" y2="470" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF4A70"/>
-      <stop offset="1" stop-color="#F4AF43"/>
+    <linearGradient id="scannerLine" x1="848" y1="244" x2="1172" y2="634" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF5B7D"/>
+      <stop offset="1" stop-color="#B50F31"/>
     </linearGradient>
-    <filter id="blur" x="730" y="60" width="560" height="560" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feGaussianBlur stdDeviation="45"/>
+    <filter id="softGlow" x="778" y="158" width="536" height="566" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="38"/>
     </filter>
   </defs>
 
-  <rect width="1440" height="760" rx="36" fill="url(#bg)"/>
-  <rect x="28" y="28" width="1384" height="704" rx="30" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
-  <path d="M170 156C246 112 366 88 548 88H1202" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
-  <path d="M186 646H594" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>
+  <rect width="1440" height="1080" rx="32" fill="url(#bg)"/>
+  <rect x="16" y="16" width="1408" height="1048" rx="28" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
 
-  <rect x="106" y="92" width="92" height="92" rx="24" fill="url(#accent)"/>
-  <text x="152" y="149" fill="#FFFFFF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="36" font-weight="800" text-anchor="middle">AL</text>
+  <circle cx="28" cy="18" r="16" stroke="#B11134" stroke-width="2"/>
+  <circle cx="1296" cy="94" r="1.8" fill="#A11632"/>
+  <circle cx="1262" cy="262" r="2.2" fill="#B81639" fill-opacity="0.7"/>
+  <circle cx="216" cy="654" r="1.6" fill="#9D1431" fill-opacity="0.7"/>
+  <circle cx="1190" cy="666" r="1.6" fill="#9D1431" fill-opacity="0.7"/>
+  <circle cx="472" cy="176" r="1.6" fill="#A11431" fill-opacity="0.6"/>
+  <circle cx="586" cy="566" r="1.6" fill="#A11431" fill-opacity="0.6"/>
 
-  <text x="226" y="132" fill="#F4F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="800">Anemia</text>
-  <text x="408" y="132" fill="#FF4A70" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="800">Lens</text>
+  <g transform="translate(300 48)">
+    <rect width="820" height="74" rx="37" fill="#12131E" fill-opacity="0.92" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+    <rect x="14" y="13" width="42" height="42" rx="14" fill="url(#brand)"/>
+    <text x="35" y="40" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="800" text-anchor="middle">AL</text>
 
-  <rect x="108" y="214" width="218" height="40" rx="20" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
-  <circle cx="140" cy="234" r="6" fill="#31D3A2"/>
-  <text x="158" y="240" fill="#DCE3F7" font-family="IBM Plex Mono, Consolas, monospace" font-size="15" font-weight="600">LIVE PRODUCT · SCREENING WORKFLOW</text>
+    <text x="74" y="34" fill="#F7F8FE" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="800">Anemia</text>
+    <text x="137" y="34" fill="#FF5578" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="800">Lens</text>
+    <text x="74" y="53" fill="#82879A" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="500">Smartphone screening workflow</text>
 
-  <text x="108" y="338" fill="#F9FAFF" font-family="Georgia, Times New Roman, serif" font-size="94" font-weight="700">AI anemia screening</text>
-  <text x="108" y="422" fill="#FF5A7C" font-family="Georgia, Times New Roman, serif" font-size="94" font-weight="700">from a smartphone eye image.</text>
+    <rect x="222" y="19" width="52" height="20" rx="10" fill="#1E222E" stroke="#FFFFFF" stroke-opacity="0.08"/>
+    <circle cx="236" cy="29" r="4" fill="#44D1A0"/>
+    <text x="249" y="33" fill="#F6F8FF" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600">Live</text>
 
-  <text x="108" y="494" fill="#C6CCDE" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="31" font-weight="500">
-    Quality-gated capture. Calibrated risk scoring. Mistral-powered guidance.
-  </text>
-  <text x="108" y="538" fill="#9199AF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="400">
-    Built to feel like a real healthcare tool: safer retakes, clearer trust signals, clinician-ready summaries.
-  </text>
+    <text x="310" y="36" fill="#9095A6" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" letter-spacing="1.2">PROOF</text>
+    <text x="412" y="36" fill="#9095A6" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" letter-spacing="1.2">TECHNOLOGY</text>
+    <text x="556" y="36" fill="#9095A6" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" letter-spacing="1.2">WORKFLOW</text>
+    <text x="680" y="36" fill="#9095A6" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" letter-spacing="1.2">SCREENING</text>
 
-  <rect x="108" y="588" width="284" height="60" rx="30" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
-  <text x="250" y="625" fill="#F8FAFF" font-family="IBM Plex Mono, Consolas, monospace" font-size="20" font-weight="500" text-anchor="middle">anemia-lens.vercel.app</text>
+    <rect x="604" y="13" width="88" height="48" rx="24" fill="#1D1F2B" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+    <text x="648" y="33" fill="#F4F6FD" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle">SIGN IN</text>
 
-  <g filter="url(#blur)">
-    <circle cx="1032" cy="334" r="164" fill="url(#glow)"/>
+    <rect x="704" y="13" width="132" height="48" rx="24" fill="#1B1B28" stroke="#A51B36" stroke-width="1.5"/>
+    <text x="770" y="33" fill="#FF5377" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle">CREATE ACCOUNT</text>
+
+    <rect x="848" y="13" width="150" height="48" rx="24" fill="url(#brand)"/>
+    <text x="923" y="33" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="middle">START SCREENING →</text>
   </g>
 
-  <rect x="782" y="122" width="516" height="500" rx="30" fill="url(#panel)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-  <text x="822" y="176" fill="#8892AA" font-family="IBM Plex Mono, Consolas, monospace" font-size="14" font-weight="600">QUALITY-GATED RESULT</text>
+  <g transform="translate(190 182)">
+    <rect width="230" height="42" rx="21" fill="#10131B" fill-opacity="0.88" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="1.5"/>
+    <circle cx="24" cy="21" r="5" fill="#E92A4B"/>
+    <text x="40" y="26" fill="#FF5B7D" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" letter-spacing="1.8">AI-POWERED SCREENING HUB</text>
+  </g>
 
-  <rect x="822" y="214" width="186" height="130" rx="22" fill="rgba(255,255,255,0.03)" stroke="rgba(255,74,112,0.22)" stroke-width="1.5"/>
-  <text x="852" y="252" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">SCREENING BAND</text>
-  <text x="852" y="308" fill="#F5F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="40" font-weight="800">Moderate</text>
-  <text x="852" y="336" fill="#FF6384" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Risk</text>
+  <text x="190" y="344" fill="#F7F6F1" font-family="Cormorant Garamond, Georgia, serif" font-size="110" font-weight="700">See what</text>
+  <text x="190" y="452" fill="#848089" font-family="Cormorant Garamond, Georgia, serif" font-size="108" font-style="italic" font-weight="300">your blood</text>
+  <text x="190" y="560" fill="#FF4E74" font-family="Cormorant Garamond, Georgia, serif" font-size="112" font-weight="700">reveals.</text>
 
-  <rect x="1028" y="214" width="230" height="130" rx="22" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
-  <text x="1056" y="252" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">CONFIDENCE + TRUST</text>
-  <text x="1056" y="306" fill="#F5F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="42" font-weight="800">81%</text>
-  <text x="1134" y="306" fill="#36D39A" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">stable</text>
-  <text x="1056" y="334" fill="#8E97AD" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="500">confidence is separated from capture reliability</text>
+  <text x="190" y="618" fill="#969BAA" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="500">AnemiaLens transforms your smartphone into a first-pass</text>
+  <text x="190" y="654" fill="#969BAA" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="500">screening tool. Clinical-grade vision AI analyzes conjunctival</text>
+  <text x="190" y="690" fill="#969BAA" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="500">pallor so you can act sooner, safely.</text>
 
-  <rect x="822" y="372" width="436" height="104" rx="22" fill="rgba(255,255,255,0.028)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
-  <text x="852" y="406" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">WHY THIS RESULT</text>
-  <text x="852" y="442" fill="#E7EBF8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">
-    Conjunctival redness stayed below the concern threshold and
-  </text>
-  <text x="852" y="472" fill="#E7EBF8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">
-    symptom burden did not raise the triage story.
-  </text>
+  <g transform="translate(190 718)">
+    <rect width="196" height="54" rx="27" fill="url(#brand)"/>
+    <text x="98" y="33" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800" text-anchor="middle">START SCREENING</text>
+    <rect x="210" y="0" width="172" height="54" rx="27" fill="#141621" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+    <text x="296" y="33" fill="#F2F4FA" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="middle">SEE WORKFLOW →</text>
+  </g>
 
-  <rect x="822" y="500" width="206" height="88" rx="20" fill="rgba(255,255,255,0.026)" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
-  <text x="850" y="532" fill="#F4AF43" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="700">QUALITY CHECK</text>
-  <text x="850" y="566" fill="#F2F4FB" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">Balanced lighting</text>
+  <g transform="translate(190 790)">
+    <rect width="190" height="108" rx="18" fill="#12141E" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <circle cx="20" cy="24" r="5" fill="#FF4E74"/>
+    <text x="34" y="28" fill="#F2F4FB" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Quality gate first</text>
+    <text x="18" y="58" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">Bad captures are blocked before</text>
+    <text x="18" y="80" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">the app makes a clinical claim.</text>
 
-  <rect x="1050" y="500" width="208" height="88" rx="20" fill="rgba(255,255,255,0.026)" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
-  <text x="1078" y="532" fill="#31D3A2" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="700">NEXT STEP</text>
-  <text x="1078" y="566" fill="#F2F4FB" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">Routine follow-up</text>
+    <rect x="206" y="0" width="190" height="108" rx="18" fill="#12141E" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <circle cx="226" cy="24" r="5" fill="#FF4E74"/>
+    <text x="240" y="28" fill="#F2F4FB" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Clear confidence</text>
+    <text x="224" y="58" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">Confidence and reliability stay</text>
+    <text x="224" y="80" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">separate so uncertainty is visible.</text>
 
-  <circle cx="1126" cy="284" r="88" stroke="url(#line)" stroke-width="2.2" stroke-opacity="0.45"/>
-  <circle cx="1126" cy="284" r="46" stroke="#FF4A70" stroke-width="2" stroke-opacity="0.55"/>
-  <circle cx="1126" cy="284" r="12" fill="#FF4A70"/>
-  <path d="M1032 284H1220" stroke="url(#line)" stroke-opacity="0.65" stroke-width="2"/>
-  <path d="M1126 190V378" stroke="#FF4A70" stroke-opacity="0.35" stroke-width="2"/>
+    <rect x="412" y="0" width="190" height="108" rx="18" fill="#12141E" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <circle cx="432" cy="24" r="5" fill="#FF4E74"/>
+    <text x="446" y="28" fill="#F2F4FB" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">Share-ready output</text>
+    <text x="430" y="58" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">Email and PDF handoff keep the</text>
+    <text x="430" y="80" fill="#8F95A7" font-family="Inter, Arial, sans-serif" font-size="12.5" font-weight="500">result easy to share with a provider.</text>
+  </g>
+
+  <path d="M190 920H792" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.5"/>
+
+  <g transform="translate(190 940)">
+    <rect width="182" height="112" rx="18" fill="#10121A" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <text x="20" y="50" fill="#F6F4EE" font-family="Cormorant Garamond, Georgia, serif" font-size="46" font-weight="400">1.92</text>
+    <text x="93" y="50" fill="#FF5377" font-family="Cormorant Garamond, Georgia, serif" font-size="28" font-weight="700">B+</text>
+    <text x="20" y="86" fill="#8E93A4" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" letter-spacing="1.5">ANEMIA CASES GLOBALLY</text>
+
+    <rect x="198" y="0" width="182" height="112" rx="18" fill="#10121A" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <text x="218" y="50" fill="#F6F4EE" font-family="Cormorant Garamond, Georgia, serif" font-size="46" font-weight="400">92</text>
+    <text x="270" y="50" fill="#FF5377" font-family="Cormorant Garamond, Georgia, serif" font-size="28" font-weight="700">%</text>
+    <text x="218" y="86" fill="#8E93A4" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" letter-spacing="1.5">MODEL SENSITIVITY</text>
+
+    <rect x="396" y="0" width="182" height="112" rx="18" fill="#10121A" fill-opacity="0.86" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.4"/>
+    <text x="416" y="50" fill="#F6F4EE" font-family="Cormorant Garamond, Georgia, serif" font-size="46" font-weight="400">710</text>
+    <text x="416" y="86" fill="#8E93A4" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" letter-spacing="1.5">CLINICAL SPECIMENS</text>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <circle cx="1044" cy="444" r="168" fill="url(#scannerGlow)"/>
+  </g>
+
+  <circle cx="1044" cy="444" r="206" stroke="#5B1022" stroke-opacity="0.48" stroke-width="2"/>
+  <circle cx="1044" cy="444" r="172" stroke="#661326" stroke-opacity="0.42" stroke-width="1.5"/>
+  <circle cx="1044" cy="444" r="138" stroke="#A21835" stroke-opacity="0.45" stroke-width="2"/>
+  <circle cx="1044" cy="444" r="74" stroke="#C31F3E" stroke-opacity="0.62" stroke-width="2"/>
+  <circle cx="1044" cy="444" r="16" fill="#FF224F"/>
+  <path d="M888 444H1200" stroke="url(#scannerLine)" stroke-width="2.6" stroke-opacity="0.92"/>
+  <path d="M1044 288V600" stroke="#C11B3A" stroke-opacity="0.46" stroke-width="2"/>
+  <path d="M876 392V364H904" stroke="#FFFFFF" stroke-opacity="0.84" stroke-width="2"/>
+  <path d="M876 496V524H904" stroke="#FFFFFF" stroke-opacity="0.84" stroke-width="2"/>
+  <path d="M1212 392V364H1184" stroke="#FFFFFF" stroke-opacity="0.84" stroke-width="2"/>
+  <path d="M1212 496V524H1184" stroke="#FFFFFF" stroke-opacity="0.84" stroke-width="2"/>
+
+  <circle cx="962" cy="404" r="4" fill="#C11B3A"/>
+  <circle cx="988" cy="452" r="4" fill="#D52347"/>
+  <circle cx="1098" cy="392" r="4" fill="#D52347"/>
+  <circle cx="1134" cy="428" r="4" fill="#C11B3A"/>
+  <circle cx="1106" cy="494" r="4" fill="#D52347"/>
+  <circle cx="1012" cy="518" r="4" fill="#C11B3A"/>
+  <circle cx="1142" cy="470" r="4" fill="#D52347"/>
+  <circle cx="938" cy="534" r="4" fill="#B91739"/>
+  <circle cx="1174" cy="366" r="4" fill="#B91739"/>
+
+  <text x="932" y="676" fill="#73798D" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" letter-spacing="1.8">SCANNING CONJUNCTIVAL ROI</text>
 </svg>
