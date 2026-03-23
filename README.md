@@ -332,7 +332,6 @@ AnemiaLens/
   - share / save actions
 - Weak captures do not get the same level of certainty as clean captures.
 - Hemoglobin estimates are withheld when the system does not consider them trustworthy enough.
-- A GitHub-ready social preview asset is included at [docs/assets/github-social-preview.svg](docs/assets/github-social-preview.svg) if you want to upload it in the repository social preview settings.
 
 ---
 
