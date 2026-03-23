@@ -251,6 +251,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <motion.div
+        className="dashboard-shell"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: E }}
@@ -264,7 +265,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
           overflow: 'hidden',
         }}
       >
-        <div style={{
+        <div className="dashboard-header" style={{
           padding: 'clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2.5rem)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           display: 'flex',
@@ -300,11 +301,11 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                 </span>
               </div>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.15rem' }}>
-                {user.email} · member since {formatShortDate(user.created_at)}
+                {user.email} | member since {formatShortDate(user.created_at)}
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <div className="dashboard-header-actions" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
             <button onClick={handleRefresh} disabled={isLoading || statsLoading} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <RefreshCw size={12} style={{ animation: isLoading || statsLoading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
             </button>
@@ -337,10 +338,10 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                 <div>
                   <div className="section-eyebrow" style={{ marginBottom: '0.55rem' }}>Screening Intelligence</div>
                   <div style={{ fontFamily: 'var(--serif)', fontSize: '1.9rem', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>
-                    Your screening history now feels like a living case log.
+                    Your care log, not just a pile of saved scans.
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-dim)', lineHeight: 1.7, maxWidth: 520 }}>
-                    Track the pattern, not just the last result. The dashboard now summarizes risk movement, confidence quality, and the latest follow-up context at a glance.
+                    Track the pattern, not just the last result. The dashboard surfaces risk movement, confidence quality, and the latest follow-up context in one clear view.
                   </p>
                 </div>
                 <div style={{ minWidth: 150, padding: '0.85rem 1rem', borderRadius: '1rem', background: `${trendColor}10`, border: `1px solid ${trendColor}25` }}>
@@ -377,7 +378,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
                     {latest
-                      ? `${formatDateTime(latest.created_at)}${latest.headline ? ` · ${latest.headline}` : ''}`
+                      ? `${formatDateTime(latest.created_at)}${latest.headline ? ` | ${latest.headline}` : ''}`
                       : 'Once you run a scan, the newest case summary appears here.'}
                   </div>
                 </div>

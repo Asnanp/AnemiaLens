@@ -3,29 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AnemiaLens | AI Anemia Screening from a Smartphone Eye Image</title>
     <meta
       name="description"
-      content="AnemiaLens - AI-powered anemia screening from a smartphone eye image. Non-invasive, instant hemoglobin estimation for global health."
+      content="AnemiaLens is an AI-powered anemia screening platform that uses a smartphone eye image, symptom context, quality gating, and explainable risk output to support earlier follow-up."
     />
+    <meta
+      name="keywords"
+      content="AnemiaLens, anemia screening, AI anemia screening, smartphone anemia screening, conjunctival pallor, hemoglobin estimation, eye image screening, anemia risk assessment"
+    />
+    <meta name="author" content="AnemiaLens" />
+    <meta name="application-name" content="AnemiaLens" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="theme-color" content="#05060a" />
     <meta name="color-scheme" content="dark" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta property="og:title" content="AnemiaLens - AI-Powered Anemia Screening" />
+    <meta name="apple-mobile-web-app-title" content="AnemiaLens" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="canonical" href="https://anemia-lens.vercel.app/" />
+    <meta property="og:site_name" content="AnemiaLens" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="AnemiaLens | AI Anemia Screening from a Smartphone Eye Image" />
     <meta
       property="og:description"
-      content="Non-invasive hemoglobin estimation from a single eye photo. AI-powered, instant, accessible."
+      content="Smartphone-first anemia screening with image quality checks, explainable risk output, confidence guidance, and clinician-ready follow-up summaries."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://anemia-lens.vercel.app/" />
+    <meta property="og:image" content="https://anemia-lens.vercel.app/social-card.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="AnemiaLens AI anemia screening platform preview" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AnemiaLens | AI Anemia Screening from a Smartphone Eye Image" />
+    <meta
+      name="twitter:description"
+      content="AI-powered smartphone anemia screening with conjunctival image analysis, quality gating, and explainable results."
+    />
+    <meta name="twitter:image" content="https://anemia-lens.vercel.app/social-card.svg" />
+    <meta name="twitter:image:alt" content="AnemiaLens AI anemia screening platform preview" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <title>AnemiaLens - AI-Powered Medical Diagnostics</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://anemia-lens.vercel.app/#organization",
+            "name": "AnemiaLens",
+            "url": "https://anemia-lens.vercel.app/",
+            "logo": "https://anemia-lens.vercel.app/favicon.svg",
+            "description": "AnemiaLens is an AI-powered smartphone anemia screening platform built around conjunctival image analysis, symptom context, quality gating, and explainable follow-up guidance."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://anemia-lens.vercel.app/#website",
+            "url": "https://anemia-lens.vercel.app/",
+            "name": "AnemiaLens",
+            "publisher": {
+              "@id": "https://anemia-lens.vercel.app/#organization"
+            },
+            "description": "AI anemia screening from a smartphone eye image."
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://anemia-lens.vercel.app/#application",
+            "name": "AnemiaLens",
+            "url": "https://anemia-lens.vercel.app/",
+            "applicationCategory": "HealthApplication",
+            "operatingSystem": "Web",
+            "description": "A smartphone-first anemia screening workflow that combines conjunctival image analysis, symptom intake, quality checks, explainable risk output, and clinician-ready summaries.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "publisher": {
+              "@id": "https://anemia-lens.vercel.app/#organization"
+            }
+          },
+          {
+            "@type": "MedicalWebPage",
+            "@id": "https://anemia-lens.vercel.app/#medical-webpage",
+            "url": "https://anemia-lens.vercel.app/",
+            "name": "AnemiaLens",
+            "about": [
+              "Anemia screening",
+              "Conjunctival pallor",
+              "Hemoglobin follow-up",
+              "AI-assisted healthcare triage"
+            ],
+            "isPartOf": {
+              "@id": "https://anemia-lens.vercel.app/#website"
+            },
+            "publisher": {
+              "@id": "https://anemia-lens.vercel.app/#organization"
+            }
+          }
+        ]
+      }
+    </script>
     <style>
       body {
         margin: 0;
@@ -37,6 +125,18 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <section style="padding: 2rem; max-width: 56rem; margin: 0 auto; line-height: 1.7;">
+        <h1>AnemiaLens</h1>
+        <p>
+          AnemiaLens is an AI-powered anemia screening experience that uses a smartphone eye image, symptom context,
+          image quality gating, explainable risk summaries, and follow-up guidance to support earlier clinical action.
+        </p>
+        <p>
+          Visit <a href="https://anemia-lens.vercel.app/">https://anemia-lens.vercel.app/</a> for the live app.
+        </p>
+      </section>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

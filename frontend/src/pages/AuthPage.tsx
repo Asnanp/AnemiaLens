@@ -66,6 +66,11 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
   };
 
   const displayError = localError || error;
+  const authHighlights = [
+    'Save every screening into your account history',
+    'Reopen reports and track confidence over time',
+    'Keep sharing and follow-up tools in one place',
+  ];
 
   return (
     <motion.div
@@ -85,6 +90,7 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <motion.div
+        className="auth-shell"
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -103,7 +109,7 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
       >
         {/* Header */}
         <div style={{
-          padding: '2rem 1.5rem 0',
+          padding: '1.8rem 1.5rem 0',
           textAlign: 'center',
           position: 'relative',
         }}>
@@ -152,6 +158,45 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
               ? 'Sign in to access your screening history and saved results.'
               : 'Join AnemiaLens to save screenings and track your health journey.'}
           </p>
+
+          <div
+            className="auth-benefit-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '0.65rem',
+              marginTop: '1.25rem',
+              textAlign: 'left',
+            }}
+          >
+            {authHighlights.map((item) => (
+              <div
+                key={item}
+                style={{
+                  padding: '0.8rem 0.85rem',
+                  borderRadius: '0.95rem',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex',
+                  gap: '0.55rem',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    marginTop: '0.35rem',
+                    background: 'var(--accent-bright)',
+                    boxShadow: '0 0 10px rgba(232,41,74,0.35)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: '0.7rem', lineHeight: 1.55, color: 'var(--text-muted)' }}>{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Tab toggle */}
@@ -181,7 +226,7 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '1.5rem 1.5rem 1.75rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.4rem 1.5rem 1.75rem' }}>
           <AnimatePresence mode="wait">
             {displayError && (
               <motion.div
@@ -275,7 +320,18 @@ export default function AuthPage({ onClose, onSuccess, initialMode = 'login' }: 
             </div>
           </div>
 
-          <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 0.95rem',
+              fontSize: '0.72rem',
+              color: 'var(--text-dim)',
+              lineHeight: 1.65,
+              borderRadius: '0.85rem',
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
             {mode === 'login'
               ? 'Sign in to reopen your dashboard, saved reports, and screening history.'
               : 'Create an account to save current and future screenings into your personal history.'}

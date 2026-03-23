@@ -1,0 +1,19 @@
+# AnemiaLens
+
+AnemiaLens is an AI-powered anemia screening web application built around smartphone conjunctival image analysis, symptom context, quality gating, explainable risk output, and clinician-ready follow-up summaries.
+
+## Canonical site
+- https://anemia-lens.vercel.app/
+
+## Product summary
+- Smartphone-first anemia screening workflow
+- Image quality checks before prediction
+- Risk explanation with confidence and reliability context
+- Patient-friendly and clinician-ready follow-up guidance
+- Screening aid only, not a diagnostic device
+
+## Preferred brand name
+- AnemiaLens
+
+## Medical safety note
+- AnemiaLens is intended for early screening support and does not replace CBC, hemoglobin testing, or clinician judgment.

@@ -75,7 +75,7 @@ export function IntakeView({
     : 'No symptoms are selected. The screening will lean more heavily on the eye-image signal unless you add symptoms.';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+    <div className="intake-layout" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
       <motion.div
         className="glass"
         initial={{ opacity: 0, y: 20 }}
@@ -131,7 +131,7 @@ export function IntakeView({
             </div>
 
             {showOptionalContext && (
-              <div style={{ display: 'grid', gap: '1rem' }}>
+              <div className="intake-optional-grid" style={{ display: 'grid', gap: '1rem' }}>
                 <div>
                   <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.55rem' }}>
                     Age
@@ -163,7 +163,7 @@ export function IntakeView({
                   <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.55rem' }}>
                     Sex
                   </div>
-                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <div className="intake-choice-row" style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                     {SEX_OPTIONS.map((option) => {
                       const active = patientProfile.sex === option.value;
                       return (
@@ -192,7 +192,7 @@ export function IntakeView({
                   <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.55rem' }}>
                     Diet type
                   </div>
-                  <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <div className="intake-choice-row" style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
                     {DIET_OPTIONS.map((option) => {
                       const active = patientProfile.diet_type === option.value;
                       return (
@@ -248,7 +248,7 @@ export function IntakeView({
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}>
+        <div className="intake-symptom-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}>
           {(Object.keys(symptomLabels) as Array<keyof SymptomInput>).map((key) => {
             const active = symptoms[key] === true;
             const icon = SYMPTOM_ICONS[key as string] ?? <HeartPulse size={16} />;
@@ -302,12 +302,12 @@ export function IntakeView({
           })}
         </div>
 
-        <div style={{ paddingTop: '0.35rem', display: 'flex', gap: '0.75rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div className="intake-actions" style={{ paddingTop: '0.35rem', display: 'flex', gap: '0.75rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <button className="btn btn-glass" style={{ padding: '0.75rem 1.35rem', fontSize: '0.7rem' }} onClick={onBack}>
             Back
           </button>
           <button className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '0.7rem' }} onClick={onContinue} disabled={loading}>
-            {loading ? 'Analyzing…' : 'Run Clinical Workflow'}
+            {loading ? 'Analyzing...' : 'Run Clinical Workflow'}
           </button>
         </div>
       </motion.div>
