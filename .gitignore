@@ -60,3 +60,20 @@ catboost_info/
 .DS_Store
 Thumbs.db
 ~$*
+
+# Local Codex / temporary workspace files
+.codex-space-sync/
+.codex-tmp-hf/
+backend/backend-launch.cmd
+frontend/frontend-launch.cmd
+frontend/run-local-dev.cmd
+frontend/playwright-report/
+frontend/test-results/
+frontend/scripts/
+scripts/
+spawn-test*.txt
+task-test.txt
+render.yaml
+presentation_script.md
+frontend/src/components/features/ResultWorkflowView.tsx
+ppt-rewrite.md
