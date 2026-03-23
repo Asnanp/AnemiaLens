@@ -20,8 +20,7 @@
 
 ---
 
-![AnemiaLens premium hero](<img width="1905" height="987" alt="Screenshot 2026-03-23 091728" src="https://github.com/user-attachments/assets/b15dbfbf-4d4a-4bd1-bcd3-5c7b742fface" />
-)
+![AnemiaLens premium hero](https://github.com/user-attachments/assets/b15dbfbf-4d4a-4bd1-bcd3-5c7b742fface)
 
 
 ---
