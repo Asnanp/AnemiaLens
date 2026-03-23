@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 const apiTarget =
   process.env.VITE_API_PROXY_TARGET
   ?? process.env.VITE_API_BASE_URL
-  ?? 'http://127.0.0.1:5000';
+  ?? 'https://asnannp-anemialens.hf.space';
 
 export default defineConfig({
   plugins: [react()],

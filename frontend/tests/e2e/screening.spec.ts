@@ -29,17 +29,19 @@ test.describe('AnemiaLens guest screening experience', () => {
 
     await expect(page).toHaveTitle(/AnemiaLens/);
     await expect(page.locator('h1').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Start Screening/i })).toBeVisible();
+    await expect(page.locator('main').getByRole('button', { name: /Start Screening/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Sign In/i }).first()).toBeVisible();
   });
 
   test('Guest users can access screening without an auth modal', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: /Sign In/i })).toHaveCount(0);
-    await page.getByRole('button', { name: /Start Screening/i }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.locator('main').getByRole('button', { name: /Start Screening/i }).first().click();
 
     await expectScreeningSectionInView(page);
     await expect(page.locator('#screening')).toContainText('Interactive');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('Navbar get started control scrolls the screening section into view', async ({ page }) => {
@@ -48,9 +50,10 @@ test.describe('AnemiaLens guest screening experience', () => {
     const menuToggle = page.getByRole('button', { name: /Toggle menu/i });
     if (await menuToggle.isVisible()) {
       await clickViaDom(page, 'button[aria-label="Toggle menu"]');
+      await clickViaDom(page, 'button.nav-mobile-cta');
+    } else {
+      await clickViaDom(page, 'header button.nav-primary-cta');
     }
-
-    await clickViaDom(page, 'header button:visible >> text=Get Started');
     await expectScreeningSectionInView(page);
   });
 });
