@@ -1146,7 +1146,9 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
   const bandBorder = isHigh ? 'rgba(239,68,68,0.3)'  : isModerate ? 'rgba(245,158,11,0.3)'  : 'rgba(16,185,129,0.3)';
   const bandGlow   = isHigh ? 'rgba(239,68,68,0.2)'  : isModerate ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)';
 
-  const hbRaw  = analysis.prediction?.predicted_hemoglobin ?? 0;
+  const hbValue = analysis.prediction?.predicted_hemoglobin ?? null;
+  const hasHbEstimate = hbValue !== null;
+  const hbRaw  = hbValue ?? 0;
   const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
   const reliability = getReliabilityStatus(analysis);
@@ -1252,10 +1254,26 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             {/* Metrics row */}
             <div className="result-hero-metrics" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(1.5rem,4vw,3.5rem)', flexWrap: 'wrap', marginBottom: '2rem' }}>
               <div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(3.5rem,8vw,7rem)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.04em', color: bandColor, textShadow: `0 0 80px ${bandColor}40` }}>
-                  {hbAnim.toFixed(1)}
-                </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-dim)', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '0.5rem' }}>g/dL Hemoglobin</div>
+                {hasHbEstimate ? (
+                  <>
+                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(3.5rem,8vw,7rem)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.04em', color: bandColor, textShadow: `0 0 80px ${bandColor}40` }}>
+                      {hbAnim.toFixed(1)}
+                    </div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-dim)', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '0.5rem' }}>g/dL Hemoglobin</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: bandColor, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+                      Hemoglobin estimate
+                    </div>
+                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2rem,5vw,3.6rem)', fontWeight: 600, lineHeight: 1.05, letterSpacing: '-0.03em', color: 'var(--text)' }}>
+                      Unavailable
+                    </div>
+                    <div style={{ maxWidth: 280, fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.65rem' }}>
+                      The model kept the screening label, but withheld a hemoglobin estimate because this capture was not clean enough for a trustworthy number.
+                    </div>
+                  </>
+                )}
               </div>
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
               <RiskArc value={risk} color={bandColor} />
@@ -1280,7 +1298,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
             {/* WHO band + Confidence + Action — 3 col */}
             <div className="result-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              {hbRaw > 0 && (
+              {hasHbEstimate && (
                 <div style={{ padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', gridColumn: 'span 1' }}>
                   <HbReferenceBand hb={hbRaw} />
                 </div>

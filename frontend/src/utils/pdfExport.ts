@@ -52,6 +52,8 @@ export async function generatePdfReport(analysis: AnalyzeResponse) {
   const safeToken = (value: string | null | undefined, fallback = 'N/A') =>
     value ? value.replace(/_/g, ' ') : fallback;
   const triageLabel = safeToken(analysis.triage?.band, 'unknown').toUpperCase();
+  const hemoglobinValue = analysis.prediction?.predicted_hemoglobin;
+  const hemoglobinDisplay = hemoglobinValue == null ? 'Unavailable' : `${hemoglobinValue.toFixed(1)} g/dL`;
   
   autoTable(doc, {
     startY: yPos,
@@ -59,7 +61,7 @@ export async function generatePdfReport(analysis: AnalyzeResponse) {
     body: [
       ['Triage Band', triageLabel, `Score: ${analysis.triage.score}`],
       ['Screening Result', safeToken(analysis.prediction?.screening_label), `Risk: ${((analysis.prediction?.anemia_risk || 0) * 100).toFixed(1)}%`],
-      ['Estimated Hemoglobin', `${analysis.prediction?.predicted_hemoglobin?.toFixed(1) || 'N/A'} g/dL`, `Confidence: ${((analysis.prediction?.confidence || 0) * 100).toFixed(0)}%`],
+      ['Estimated Hemoglobin', hemoglobinDisplay, `Confidence: ${((analysis.prediction?.confidence || 0) * 100).toFixed(0)}%`],
     ],
     theme: 'grid',
     headStyles: { fillColor: accent, textColor: 255 },
