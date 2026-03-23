@@ -1,44 +1,45 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="120" y1="80" x2="1080" y2="560" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#080915"/>
-      <stop offset="1" stop-color="#03030C"/>
+    <linearGradient id="bg" x1="120" y1="70" x2="1080" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090A12"/>
+      <stop offset="1" stop-color="#04050C"/>
     </linearGradient>
     <linearGradient id="accent" x1="250" y1="130" x2="850" y2="510" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF305E"/>
-      <stop offset="1" stop-color="#C8001E"/>
+      <stop stop-color="#FF4A70"/>
+      <stop offset="1" stop-color="#C41035"/>
     </linearGradient>
     <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(835 318) rotate(90) scale(190 230)">
-      <stop stop-color="#FF1F4F" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#FF1F4F" stop-opacity="0"/>
+      <stop stop-color="#FF335E" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FF335E" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
   <rect width="1200" height="630" rx="34" fill="url(#bg)"/>
-  <rect x="38" y="38" width="1124" height="554" rx="28" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="38" y="38" width="1124" height="554" rx="28" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2"/>
 
   <circle cx="836" cy="315" r="188" fill="url(#glow)"/>
   <circle cx="836" cy="315" r="160" stroke="#721225" stroke-opacity="0.45" stroke-width="2"/>
   <circle cx="836" cy="315" r="112" stroke="#A81B37" stroke-opacity="0.65" stroke-width="2"/>
-  <circle cx="836" cy="315" r="58" stroke="#FF305E" stroke-opacity="0.75" stroke-width="2"/>
+  <circle cx="836" cy="315" r="58" stroke="#FF4A70" stroke-opacity="0.75" stroke-width="2"/>
   <circle cx="836" cy="315" r="18" fill="url(#accent)"/>
-  <path d="M696 315H976" stroke="#FF305E" stroke-opacity="0.78" stroke-width="3"/>
-  <path d="M836 175V455" stroke="#FF305E" stroke-opacity="0.48" stroke-width="2"/>
+  <path d="M696 315H976" stroke="#FF4A70" stroke-opacity="0.78" stroke-width="3"/>
+  <path d="M836 175V455" stroke="#FF4A70" stroke-opacity="0.48" stroke-width="2"/>
 
   <rect x="90" y="90" width="92" height="92" rx="24" fill="url(#accent)"/>
-  <text x="136" y="147" fill="#FFFFFF" font-family="Barlow, Arial, sans-serif" font-size="36" font-weight="800" text-anchor="middle">AL</text>
+  <text x="136" y="147" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="800" text-anchor="middle">AL</text>
 
-  <text x="215" y="133" fill="#FFFFFF" font-family="Barlow, Arial, sans-serif" font-size="42" font-weight="800">Anemia</text>
-  <text x="388" y="133" fill="#FF4A70" font-family="Barlow, Arial, sans-serif" font-size="42" font-weight="800">Lens</text>
+  <text x="215" y="133" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Anemia</text>
+  <text x="388" y="133" fill="#FF4A70" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="800">Lens</text>
 
-  <text x="90" y="250" fill="#FFFFFF" font-family="Cormorant Garamond, Georgia, serif" font-size="82" font-weight="700">AI anemia screening</text>
-  <text x="90" y="330" fill="#FF4A70" font-family="Cormorant Garamond, Georgia, serif" font-size="82" font-weight="700">from a smartphone eye image.</text>
+  <text x="90" y="226" fill="#9BA5BE" font-family="IBM Plex Mono, monospace" font-size="18" font-weight="600">LIVE PRODUCT · QUALITY-GATED WORKFLOW</text>
+  <text x="90" y="286" fill="#FFFFFF" font-family="Cormorant Garamond, Georgia, serif" font-size="82" font-weight="700">AI anemia screening</text>
+  <text x="90" y="366" fill="#FF4A70" font-family="Cormorant Garamond, Georgia, serif" font-size="82" font-weight="700">from a smartphone eye image.</text>
 
-  <text x="90" y="400" fill="#C8CBD8" font-family="Barlow, Arial, sans-serif" font-size="28" font-weight="500">
-    Quality-gated capture. Explainable risk output. Mistral-guided follow-up.
+  <text x="90" y="438" fill="#C8CBD8" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="500">
+    Quality-gated capture. Calibrated confidence. Mistral-guided follow-up.
   </text>
-  <text x="90" y="444" fill="#9AA0B5" font-family="Barlow, Arial, sans-serif" font-size="24" font-weight="400">
-    Built for earlier action, safer screening workflows, and clinician-ready summaries.
+  <text x="90" y="480" fill="#9AA0B5" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="400">
+    Built for earlier action, safer retakes, and clinician-ready screening summaries.
   </text>
 
   <rect x="90" y="500" width="288" height="56" rx="28" fill="#FFFFFF" fill-opacity="0.04" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2"/>
