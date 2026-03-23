@@ -1,0 +1,97 @@
+<svg width="1440" height="760" viewBox="0 0 1440 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="80" x2="1240" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090A12"/>
+      <stop offset="1" stop-color="#030309"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="248" y1="174" x2="1054" y2="618" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10131F" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#0A0C14" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="330" y1="190" x2="980" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4A70"/>
+      <stop offset="0.52" stop-color="#D7153C"/>
+      <stop offset="1" stop-color="#9A0E2D"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1040 350) rotate(90) scale(230 260)">
+      <stop stop-color="#FF335E" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#FF335E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="line" x1="836" y1="130" x2="1194" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4A70"/>
+      <stop offset="1" stop-color="#F4AF43"/>
+    </linearGradient>
+    <filter id="blur" x="730" y="60" width="560" height="560" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="45"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="760" rx="36" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1384" height="704" rx="30" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M170 156C246 112 366 88 548 88H1202" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+  <path d="M186 646H594" stroke="rgba(255,255,255,0.06)" stroke-width="1.5"/>
+
+  <rect x="106" y="92" width="92" height="92" rx="24" fill="url(#accent)"/>
+  <text x="152" y="149" fill="#FFFFFF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="36" font-weight="800" text-anchor="middle">AL</text>
+
+  <text x="226" y="132" fill="#F4F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="800">Anemia</text>
+  <text x="408" y="132" fill="#FF4A70" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="800">Lens</text>
+
+  <rect x="108" y="214" width="218" height="40" rx="20" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+  <circle cx="140" cy="234" r="6" fill="#31D3A2"/>
+  <text x="158" y="240" fill="#DCE3F7" font-family="IBM Plex Mono, Consolas, monospace" font-size="15" font-weight="600">LIVE PRODUCT · SCREENING WORKFLOW</text>
+
+  <text x="108" y="338" fill="#F9FAFF" font-family="Georgia, Times New Roman, serif" font-size="94" font-weight="700">AI anemia screening</text>
+  <text x="108" y="422" fill="#FF5A7C" font-family="Georgia, Times New Roman, serif" font-size="94" font-weight="700">from a smartphone eye image.</text>
+
+  <text x="108" y="494" fill="#C6CCDE" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="31" font-weight="500">
+    Quality-gated capture. Calibrated risk scoring. Mistral-powered guidance.
+  </text>
+  <text x="108" y="538" fill="#9199AF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="400">
+    Built to feel like a real healthcare tool: safer retakes, clearer trust signals, clinician-ready summaries.
+  </text>
+
+  <rect x="108" y="588" width="284" height="60" rx="30" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+  <text x="250" y="625" fill="#F8FAFF" font-family="IBM Plex Mono, Consolas, monospace" font-size="20" font-weight="500" text-anchor="middle">anemia-lens.vercel.app</text>
+
+  <g filter="url(#blur)">
+    <circle cx="1032" cy="334" r="164" fill="url(#glow)"/>
+  </g>
+
+  <rect x="782" y="122" width="516" height="500" rx="30" fill="url(#panel)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <text x="822" y="176" fill="#8892AA" font-family="IBM Plex Mono, Consolas, monospace" font-size="14" font-weight="600">QUALITY-GATED RESULT</text>
+
+  <rect x="822" y="214" width="186" height="130" rx="22" fill="rgba(255,255,255,0.03)" stroke="rgba(255,74,112,0.22)" stroke-width="1.5"/>
+  <text x="852" y="252" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">SCREENING BAND</text>
+  <text x="852" y="308" fill="#F5F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="40" font-weight="800">Moderate</text>
+  <text x="852" y="336" fill="#FF6384" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Risk</text>
+
+  <rect x="1028" y="214" width="230" height="130" rx="22" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+  <text x="1056" y="252" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">CONFIDENCE + TRUST</text>
+  <text x="1056" y="306" fill="#F5F7FF" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="42" font-weight="800">81%</text>
+  <text x="1134" y="306" fill="#36D39A" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">stable</text>
+  <text x="1056" y="334" fill="#8E97AD" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="500">confidence is separated from capture reliability</text>
+
+  <rect x="822" y="372" width="436" height="104" rx="22" fill="rgba(255,255,255,0.028)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+  <text x="852" y="406" fill="#A3ACC4" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="600">WHY THIS RESULT</text>
+  <text x="852" y="442" fill="#E7EBF8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">
+    Conjunctival redness stayed below the concern threshold and
+  </text>
+  <text x="852" y="472" fill="#E7EBF8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">
+    symptom burden did not raise the triage story.
+  </text>
+
+  <rect x="822" y="500" width="206" height="88" rx="20" fill="rgba(255,255,255,0.026)" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+  <text x="850" y="532" fill="#F4AF43" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="700">QUALITY CHECK</text>
+  <text x="850" y="566" fill="#F2F4FB" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">Balanced lighting</text>
+
+  <rect x="1050" y="500" width="208" height="88" rx="20" fill="rgba(255,255,255,0.026)" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+  <text x="1078" y="532" fill="#31D3A2" font-family="IBM Plex Mono, Consolas, monospace" font-size="13" font-weight="700">NEXT STEP</text>
+  <text x="1078" y="566" fill="#F2F4FB" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">Routine follow-up</text>
+
+  <circle cx="1126" cy="284" r="88" stroke="url(#line)" stroke-width="2.2" stroke-opacity="0.45"/>
+  <circle cx="1126" cy="284" r="46" stroke="#FF4A70" stroke-width="2" stroke-opacity="0.55"/>
+  <circle cx="1126" cy="284" r="12" fill="#FF4A70"/>
+  <path d="M1032 284H1220" stroke="url(#line)" stroke-opacity="0.65" stroke-width="2"/>
+  <path d="M1126 190V378" stroke="#FF4A70" stroke-opacity="0.35" stroke-width="2"/>
+</svg>

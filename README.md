@@ -20,6 +20,10 @@
 
 ---
 
+![AnemiaLens premium hero](docs/assets/readme-hero.svg)
+
+---
+
 ## Overview
 
 AnemiaLens turns a smartphone photo of the inner lower eyelid into a **first-pass anemia screening workflow**. It combines:
@@ -49,6 +53,10 @@ Anemia affects a massive global population, but screening often still depends on
 AnemiaLens is built around a simpler question:
 
 **Can a phone help flag when someone may need a blood test sooner?**
+
+---
+
+![Why AnemiaLens feels product-grade](docs/assets/readme-panels.svg)
 
 ---
 
@@ -327,6 +335,7 @@ AnemiaLens/
   - share / save actions
 - Weak captures do not get the same level of certainty as clean captures.
 - Hemoglobin estimates are withheld when the system does not consider them trustworthy enough.
+- A GitHub-ready social preview asset is included at [docs/assets/github-social-preview.svg](docs/assets/github-social-preview.svg) if you want to upload it in the repository social preview settings.
 
 ---
 
