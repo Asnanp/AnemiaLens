@@ -56,10 +56,6 @@ AnemiaLens is built around a simpler question:
 
 ---
 
-![Why AnemiaLens feels product-grade](docs/assets/readme-panels.svg)
-
----
-
 ## Live Product
 
 - **Frontend:** [https://anemia-lens.vercel.app](https://anemia-lens.vercel.app)
