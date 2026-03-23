@@ -1,0 +1,17 @@
+{
+  "name": "AnemiaLens",
+  "short_name": "AnemiaLens",
+  "description": "AI-powered smartphone anemia screening with image quality checks and explainable results.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05060a",
+  "theme_color": "#05060a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

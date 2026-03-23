@@ -333,6 +333,7 @@ function SignalBar({ label, value, color, delay = 0 }: { label: string; value: n
 
 function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
   const reliability = getReliabilityStatus(analysis);
+  const activeSymptoms = activeSymptomLabels(analysis.symptoms);
   const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const mandatorySummary = buildMandatoryWhySummary(analysis);
   const confidenceBreakdown = analysis.prediction?.confidence_breakdown;
@@ -343,6 +344,22 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
       ]
     : [];
   const nextMoveSummary = analysis.quality.lighting_summary;
+  const factPills = [
+    {
+      label: 'Image signal',
+      value: analysis.prediction
+        ? `${Math.round(analysis.prediction.anemia_risk * 100)}% image-led risk`
+        : 'Retake required before scoring',
+    },
+    {
+      label: 'Symptom context',
+      value: activeSymptoms.length > 0 ? joinHuman(activeSymptoms) : 'No symptoms added',
+    },
+    {
+      label: 'Capture check',
+      value: nextMoveSummary || humanizeToken(analysis.quality.lighting_condition, 'Quality checked'),
+    },
+  ];
   return (
     <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08, duration: 0.5, ease: E }}
@@ -358,7 +375,7 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         <div>
           <div className="section-eyebrow">Why This Result</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.45rem', maxWidth: 760 }}>
-            The one explanation the user actually needs.
+            Grounded in the image signal, symptom context, and capture quality used for this run.
           </div>
         </div>
         <div style={{ padding: '0.35rem 0.85rem', borderRadius: '99px', fontSize: '0.55rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: bandColor, background: `${bandColor}12`, border: `1px solid ${bandColor}30` }}>
@@ -370,23 +387,45 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         {mandatorySummary}
       </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
-          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
-            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
-              Prediction trust
+      <div className="result-fact-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+        {factPills.map((pill) => (
+          <div
+            key={pill.label}
+            className="result-fact-pill"
+            style={{
+              padding: '0.9rem 1rem',
+              borderRadius: '0.875rem',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div style={{ fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.38rem' }}>
+              {pill.label}
             </div>
-            <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
-                <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
-              </div>
-              {confidenceRows.map((row) => (
-                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-                  <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.6, textTransform: pill.label === 'Symptom context' ? 'capitalize' : 'none' }}>
+              {pill.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="result-explanation-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+        <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
+          <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.7)', marginBottom: '0.65rem' }}>
+            Confidence + reliability
+          </div>
+          <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
+              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+              <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
+              <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
+            </div>
+            {confidenceRows.map((row) => (
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
                 <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{row.value}</span>
               </div>
             ))}
@@ -398,20 +437,19 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,165,0,0.05)', border: '1px solid rgba(255,165,0,0.14)' }}>
-            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.8)', marginBottom: '0.45rem' }}>
+            <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,165,0,0.8)', marginBottom: '0.65rem' }}>
               Best next move
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
               {nextMoveSummary} {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
             </div>
           </div>
-
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
               Safety
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              This system is designed as a screening aid and prioritizes safety by avoiding false reassurance.
+              This is still a screening result, not a diagnosis. The safest next step is guided follow-up, not false certainty.
             </div>
           </div>
         </div>
@@ -1197,7 +1235,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
         style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
         {/* ── ROW 1: HERO CARD ── */}
-        <motion.div className="glass" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div className="glass result-hero-card" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: E }}
           style={{ padding: 'clamp(1.5rem,4vw,3rem)', borderLeft: `4px solid ${bandColor}`, background: bandBg, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), -8px 0 80px ${bandGlow}`, position: 'relative', overflow: 'hidden' }}>
           <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.18, 0.1] }} transition={{ duration: 6, repeat: Infinity }}
@@ -1212,7 +1250,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             </div>
 
             {/* Metrics row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(1.5rem,4vw,3.5rem)', flexWrap: 'wrap', marginBottom: '2rem' }}>
+            <div className="result-hero-metrics" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(1.5rem,4vw,3.5rem)', flexWrap: 'wrap', marginBottom: '2rem' }}>
               <div>
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(3.5rem,8vw,7rem)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.04em', color: bandColor, textShadow: `0 0 80px ${bandColor}40` }}>
                   {hbAnim.toFixed(1)}
@@ -1222,7 +1260,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
               <RiskArc value={risk} color={bandColor} />
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              <div className="result-metric-cluster" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                 {[
                   { label: 'Triage Score', val: `${Math.round((analysis.triage.score ?? 0) * 100)}%` },
                   { label: 'Confidence', val: `${Math.round((analysis.prediction?.confidence ?? 0) * 100)}%` },
@@ -1241,7 +1279,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             </p>
 
             {/* WHO band + Confidence + Action — 3 col */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="result-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               {hbRaw > 0 && (
                 <div style={{ padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', gridColumn: 'span 1' }}>
                   <HbReferenceBand hb={hbRaw} />
@@ -1268,23 +1306,28 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
         <WhyThisResultPanel analysis={analysis} bandColor={bandColor} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.5rem' }}>
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
+        <div className="result-core-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.5rem' }}>
+          <motion.div className="glass result-section-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
             <div className="section-eyebrow">Next steps</div>
 
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
                 <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>
-                  AI guidance
+                  {analysis.guidance.source === 'mistral' ? 'Mistral guidance' : 'Clinical guidance'}
                 </div>
                 <div style={{ padding: '0.28rem 0.72rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.85)' }}>
-                  {analysis.guidance.source === 'mistral' ? `Mistral • ${analysis.guidance.model_used ?? 'live'}` : 'Fallback guidance'}
+                  {analysis.guidance.source === 'mistral' ? `Powered by ${analysis.guidance.model_used ?? 'Mistral'}` : 'Fallback guidance'}
                 </div>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
                 {analysis.guidance.explanation}
               </div>
+              {analysis.guidance.source === 'mistral' && (
+                <div style={{ marginTop: '0.7rem', fontSize: '0.68rem', color: 'rgba(0,194,255,0.72)', lineHeight: 1.55 }}>
+                  Language and follow-up guidance in this card is generated by the live Mistral layer.
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.16)' }}>
@@ -1315,7 +1358,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             )}
           </motion.div>
 
-          <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
+          <motion.div className="glass result-section-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: `3px solid ${bandColor}` }}>
             <div className="section-eyebrow">Case tools</div>
             {!isAuthenticated && onOpenAuth && (

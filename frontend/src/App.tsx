@@ -9,29 +9,40 @@ import { useScreening } from './hooks/useScreening';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UploadZone } from './components/features/UploadZone';
-import { QualityView } from './components/features/QualityView';
-import { IntakeView } from './components/features/IntakeView';
-import { ResultView } from './components/features/ResultView';
-import { ThreeBackground, AuroraCanvas } from './components/features/VisualSystem';
-import AuthPage from './pages/AuthPage';
 import {
   WakeBanner, LuxuryParticles, Cursor, MarqueeTicker,
   STEPS_META, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
-import {
-  Hero, Challenge, DifferentiatorsSection, WorkflowStepper, TechSection, Footer,
-} from './pages/LandingSections';
+import { Hero } from './pages/HeroSection';
 import { ArrowRight, ChevronRight, User } from 'lucide-react';
 
-import { SupabaseTest } from './components/SupabaseTest';
 import { toast, ToastContainer } from './components/Toast';
 import { saveScreeningToAccount } from './api';
 import type { AnalyzeResponse } from './types';
 
+const loadAuthPage = () => import('./pages/AuthPage');
+const AuthPage = lazy(loadAuthPage);
+const loadQualityView = () => import('./components/features/QualityView');
+const QualityView = lazy(async () => ({ default: (await loadQualityView()).QualityView }));
+const loadIntakeView = () => import('./components/features/IntakeView');
+const IntakeView = lazy(async () => ({ default: (await loadIntakeView()).IntakeView }));
+const loadResultView = () => import('./components/features/ResultView');
+const ResultView = lazy(async () => ({ default: (await loadResultView()).ResultView }));
 const loadDashboardPage = () => import('./pages/DashboardPage');
 const DashboardPage = lazy(loadDashboardPage);
 const loadAdminDashboardPage = () => import('./pages/AdminDashboardPage');
 const AdminDashboardPage = lazy(loadAdminDashboardPage);
+const loadLandingSections = () => import('./pages/LandingSections');
+const Challenge = lazy(async () => ({ default: (await loadLandingSections()).Challenge }));
+const DifferentiatorsSection = lazy(async () => ({ default: (await loadLandingSections()).DifferentiatorsSection }));
+const WorkflowStepper = lazy(async () => ({ default: (await loadLandingSections()).WorkflowStepper }));
+const TechSection = lazy(async () => ({ default: (await loadLandingSections()).TechSection }));
+const Footer = lazy(async () => ({ default: (await loadLandingSections()).Footer }));
+const loadVisualSystem = () => import('./components/features/VisualSystem');
+const AuroraCanvas = lazy(async () => ({ default: (await loadVisualSystem()).AuroraCanvas }));
+const ThreeBackground = lazy(async () => ({ default: (await loadVisualSystem()).ThreeBackground }));
+const loadSupabaseTest = () => import('./components/SupabaseTest');
+const SupabaseTest = lazy(async () => ({ default: (await loadSupabaseTest()).SupabaseTest }));
 
 const NAV_LINKS = [
   { label: 'Proof', id: 'proof' },
@@ -91,6 +102,49 @@ function OverlayLoader({ title, detail }: { title: string; detail: string }) {
   );
 }
 
+function InlineSurfaceLoader({ label }: { label: string }) {
+  return (
+    <div
+      className="glass"
+      style={{
+        padding: '1.25rem 1.5rem',
+        borderRadius: '1rem',
+        display: 'grid',
+        gap: '0.6rem',
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(255,255,255,0.07)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '0.58rem',
+          fontFamily: 'var(--mono)',
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: 'var(--text-dim)',
+        }}
+      >
+        Loading
+      </div>
+      <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>{label}</div>
+    </div>
+  );
+}
+
+function SectionFallback({ minHeight = 360 }: { minHeight?: number }) {
+  return (
+    <div
+      style={{
+        minHeight,
+        width: '100%',
+        borderRadius: '1.5rem',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))',
+        border: '1px solid rgba(255,255,255,0.04)',
+      }}
+    />
+  );
+}
+
 function Navbar({ backendUp }: { backendUp: boolean }) {
   const { isAuthenticated, user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
@@ -99,11 +153,18 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [compactViewport, setCompactViewport] = useState(() => window.innerWidth <= 1080);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', fn, { passive: true });
     return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setCompactViewport(window.innerWidth <= 1080);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const scrollTo = (id: string) => {
@@ -120,74 +181,70 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   return (
     <>
       <motion.header
-        initial={{ y: -80, opacity: 0 }}
+        initial={compactViewport ? false : { y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: E }}
+        transition={{ duration: compactViewport ? 0.25 : 0.8, ease: E }}
         style={{
           position: 'fixed',
-          top: scrolled ? '0.75rem' : '1.5rem',
-          left: '50%', transform: 'translateX(-50%)',
-          zIndex: 100, width: 'min(900px, calc(100vw - 2rem))',
+          top: compactViewport
+            ? (scrolled ? 'max(env(safe-area-inset-top), 0.4rem)' : 'calc(env(safe-area-inset-top) + 0.5rem)')
+            : (scrolled ? '0.75rem' : '1.5rem'),
+          left: 0,
+          right: 0,
+          margin: '0 auto',
+          zIndex: 100,
+          width: compactViewport ? 'calc(100vw - 1rem)' : 'min(1120px, calc(100vw - 1rem))',
           transition: 'top 0.3s ease',
         }}
       >
         <div
           className="glass nav-pill"
           style={{
-            padding: '0.875rem 1.75rem',
+            padding: compactViewport ? '0.8rem 0.9rem' : '0.85rem 1rem',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            borderRadius: menuOpen ? '1.5rem 1.5rem 0 0' : '99px',
+            borderRadius: compactViewport
+              ? (menuOpen ? '1.35rem 1.35rem 0 0' : '1.35rem')
+              : (menuOpen ? '1.5rem 1.5rem 0 0' : '99px'),
             background: scrolled ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.055)',
             backdropFilter: 'blur(32px) saturate(180%)',
             WebkitBackdropFilter: 'blur(32px) saturate(180%)',
             transition: 'background 0.3s, box-shadow 0.3s, border-radius 0.3s',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '10px',
-              background: 'linear-gradient(135deg, #C8001E 0%, #E8294A 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.6rem', fontWeight: 800, color: '#fff',
-              fontFamily: 'var(--mono)', flexShrink: 0,
-            }}>AL</div>
-            <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '-0.02em' }}>
-              Anemia<span style={{ color: 'var(--accent-bright)' }}>Lens</span>
-            </span>
+          <div className="nav-brand-group">
+            <div className="nav-logo-badge nav-brand-mark">AL</div>
+            <div className="nav-brand-copy">
+              <span className="nav-brand-title">
+                Anemia<span style={{ color: 'var(--accent-bright)' }}>Lens</span>
+              </span>
+              <span className="nav-brand-subtitle">Smartphone screening workflow</span>
+            </div>
             {backendUp && (
-              <span className="stat-chip" style={{ padding: '0.2rem 0.6rem', fontSize: '0.5rem', gap: '0.3rem' }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+              <span className="stat-chip nav-status-chip">
+                <span className="nav-status-dot" />
                 Live
               </span>
             )}
           </div>
 
-          <nav className="nav-desktop" style={{ display: 'flex', gap: '2rem' }}>
+          <nav className="nav-desktop nav-link-row">
             {NAV_LINKS.map(({ label, id }) => (
               <a key={label} href={`#${id}`} className="label-tag nav-link"
                 style={{ color: 'var(--text-muted)' }}>{label}</a>
             ))}
           </nav>
 
-          <div className="nav-desktop" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div className="nav-desktop nav-actions">
             {!isAuthenticated && (
               <>
                 <button
-                  className="btn btn-glass"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px' }}
+                  className="btn btn-glass nav-secondary-action"
                   onClick={() => openAuth('login')}
                 >
                   Sign In
                 </button>
                 <button
-                  className="btn btn-glass"
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.65rem',
-                    borderRadius: '99px',
-                    border: '1px solid rgba(200,0,30,0.3)',
-                    color: 'var(--accent-bright)',
-                  }}
+                  className="btn btn-glass nav-secondary-action nav-register-action"
                   onClick={() => openAuth('register')}
                 >
                   Create Account
@@ -197,14 +254,12 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
             {isAuthenticated && (
               <>
                 {user?.role === 'admin' && (
-                  <button className="btn btn-glass"
-                    style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px', color: '#EF4444' }}
+                  <button className="btn btn-glass nav-secondary-action nav-admin-action"
                     onMouseEnter={() => { void loadAdminDashboardPage(); }}
                     onFocus={() => { void loadAdminDashboardPage(); }}
                     onClick={() => setShowAdmin(true)}>Admin Panel</button>
                 )}
-                <button className="btn btn-glass"
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', borderRadius: '99px', gap: '0.4rem' }}
+                <button className="btn btn-glass nav-secondary-action nav-dashboard-action"
                   onMouseEnter={() => { void loadDashboardPage(); }}
                   onFocus={() => { void loadDashboardPage(); }}
                   onClick={() => setShowDashboard(true)}>
@@ -212,21 +267,20 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 </button>
               </>
             )}
-            <button className="btn btn-glass"
-              style={{ padding: '0.55rem 1.25rem', fontSize: '0.65rem', borderRadius: '99px',
-                boxShadow: 'inset 0 0 0 1px rgba(200,0,30,0.4)' }}
+            <button className="btn btn-primary nav-primary-cta"
               onClick={() => scrollTo('screening')}>
-              Get Started <ArrowRight size={12} />
+              Start Screening <ArrowRight size={12} />
             </button>
           </div>
 
           <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)}
             aria-label="Toggle menu"
-            style={{ display: 'none', flexDirection: 'column', gap: '5px', width: 36, height: 36,
-              background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}>
-            <span style={{ display: 'block', width: 20, height: 1.5, background: 'var(--text)', borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 14, height: 1.5, background: 'var(--text)', borderRadius: 2, alignSelf: 'flex-end' }} />
-            <span style={{ display: 'block', width: 20, height: 1.5, background: 'var(--text)', borderRadius: 2 }} />
+            aria-expanded={menuOpen}
+            style={{ display: 'none', flexDirection: 'column', gap: '5px', width: 44, height: 44,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', padding: '0.75rem', borderRadius: '14px' }}>
+            <span style={{ display: 'block', width: 18, height: 1.5, background: 'var(--text)', borderRadius: 2, transform: menuOpen ? 'translateY(6.5px) rotate(45deg)' : 'none', transition: 'transform 0.24s ease' }} />
+            <span style={{ display: 'block', width: 14, height: 1.5, background: 'var(--text)', borderRadius: 2, alignSelf: 'flex-end', opacity: menuOpen ? 0 : 1, transition: 'opacity 0.2s ease' }} />
+            <span style={{ display: 'block', width: 18, height: 1.5, background: 'var(--text)', borderRadius: 2, transform: menuOpen ? 'translateY(-6.5px) rotate(-45deg)' : 'none', transition: 'transform 0.24s ease' }} />
           </button>
         </div>
 
@@ -234,44 +288,77 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
           {menuOpen && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }}
-              style={{ overflow: 'hidden', background: 'rgba(4,4,10,0.92)', backdropFilter: 'blur(32px)',
+              style={{ overflow: 'hidden', background: 'rgba(4,4,10,0.94)', backdropFilter: 'blur(32px)',
                 borderTop: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 0 1.5rem 1.5rem' }}>
-              <div style={{ padding: '1.25rem 1.75rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div className="nav-mobile-panel">
+                <div className="nav-mobile-meta">
+                  <div>
+                    <div className="label-tag" style={{ color: 'var(--text-dim)', marginBottom: '0.45rem' }}>Ready To Screen</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.4 }}>Capture, review, and share a safer first-pass anemia screening.</div>
+                  </div>
+                  <div className="nav-mobile-status">
+                    <span className="nav-status-dot" />
+                    {backendUp ? 'Backend live' : 'Backend reconnecting'}
+                  </div>
+                </div>
                 {NAV_LINKS.map(({ label, id }, i) => (
                   <motion.a key={label} href={`#${id}`}
                     initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
                     onClick={() => scrollTo(id)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '0.875rem 1rem', borderRadius: '0.875rem',
-                      fontFamily: 'var(--mono)', fontSize: '0.72rem', textTransform: 'uppercase',
-                      letterSpacing: '0.15em', color: 'var(--text-muted)' }}>
+                    className="nav-mobile-link"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     {label}<ChevronRight size={14} />
                   </motion.a>
                 ))}
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0.5rem 0' }} />
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0.4rem 0 0.1rem' }} />
                 {!isAuthenticated && (
-                  <>
+                  <div className="nav-mobile-actions">
                     <button
-                      className="btn btn-glass"
-                      style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem' }}
+                      className="btn btn-glass nav-mobile-action"
                       onClick={() => openAuth('login')}
                     >
                       Sign In
                     </button>
                     <button
-                      className="btn btn-glass"
-                      style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem', border: '1px solid rgba(200,0,30,0.25)', color: 'var(--accent-bright)' }}
+                      className="btn btn-glass nav-mobile-action nav-register-action"
                       onClick={() => openAuth('register')}
                     >
                       Create Account
                     </button>
-                  </>
+                  </div>
                 )}
-                <button className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.875rem', fontSize: '0.72rem', borderRadius: '0.875rem' }}
+                {isAuthenticated && (
+                  <div className="nav-mobile-actions">
+                    {user?.role === 'admin' && (
+                      <button
+                        className="btn btn-glass nav-mobile-action nav-admin-action"
+                        onMouseEnter={() => { void loadAdminDashboardPage(); }}
+                        onFocus={() => { void loadAdminDashboardPage(); }}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setShowAdmin(true);
+                        }}
+                      >
+                        Admin Panel
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-glass nav-mobile-action"
+                      onMouseEnter={() => { void loadDashboardPage(); }}
+                      onFocus={() => { void loadDashboardPage(); }}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setShowDashboard(true);
+                      }}
+                    >
+                      <User size={14} /> Open Dashboard
+                    </button>
+                  </div>
+                )}
+                <button className="btn btn-primary nav-mobile-cta"
                   onClick={() => { setMenuOpen(false); scrollTo('screening'); }}>
-                  Get Started
+                  Start Screening
                 </button>
               </div>
             </motion.div>
@@ -281,10 +368,12 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
 
       <AnimatePresence>
         {showAuth && (
-          <AuthPage
-            initialMode={authMode}
-            onClose={() => setShowAuth(false)}
-          />
+          <Suspense fallback={<OverlayLoader title="Opening Account Access" detail="Loading secure sign-in and registration." />}>
+            <AuthPage
+              initialMode={authMode}
+              onClose={() => setShowAuth(false)}
+            />
+          </Suspense>
         )}
         {showDashboard && (
           <Suspense fallback={<OverlayLoader title="Preparing Dashboard" detail="Loading your screening intelligence workspace." />}>
@@ -404,15 +493,17 @@ function ScreeningSection() {
 
         <AnimatePresence>
           {showAuth && (
-            <AuthPage
-              initialMode={authMode}
-              onClose={() => setShowAuth(false)}
-              onSuccess={() => {
-                if (pendingSave) {
-                  toast.info('Signing in complete. Saving this screening to your account.');
-                }
-              }}
-            />
+            <Suspense fallback={<OverlayLoader title="Opening Account Access" detail="Loading secure sign-in and save-to-account flow." />}>
+              <AuthPage
+                initialMode={authMode}
+                onClose={() => setShowAuth(false)}
+                onSuccess={() => {
+                  if (pendingSave) {
+                    toast.info('Signing in complete. Saving this screening to your account.');
+                  }
+                }}
+              />
+            </Suspense>
           )}
           {!backendUp && step < 3 && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -519,21 +610,31 @@ function ScreeningSection() {
                 <UploadZone onFileSelect={pickFile} previewUrl={previewUrl} onClear={reset} onRunQuality={runQuality} loading={loading} disabled={!file} />
               </div>
             )}
-            {step === 1 && quality && <QualityView quality={quality} onContinue={() => setStep(2)} onBack={() => setStep(0)} loading={loading} />}
+            {step === 1 && quality && (
+              <Suspense fallback={<InlineSurfaceLoader label="Preparing image quality review." />}>
+                <QualityView quality={quality} onContinue={() => setStep(2)} onBack={() => setStep(0)} loading={loading} />
+              </Suspense>
+            )}
             {step === 2 && !loading && (
-              <IntakeView
-                symptoms={symptoms}
-                patientProfile={patientProfile}
-                toggleSymptom={toggleSymptom}
-                updatePatientProfile={updatePatientProfile}
-                onContinue={runAnalysis}
-                onBack={() => setStep(1)}
-                loading={loading}
-                symptomLabels={symptomLabels}
-              />
+              <Suspense fallback={<InlineSurfaceLoader label="Preparing symptom and patient intake." />}>
+                <IntakeView
+                  symptoms={symptoms}
+                  patientProfile={patientProfile}
+                  toggleSymptom={toggleSymptom}
+                  updatePatientProfile={updatePatientProfile}
+                  onContinue={runAnalysis}
+                  onBack={() => setStep(1)}
+                  loading={loading}
+                  symptomLabels={symptomLabels}
+                />
+              </Suspense>
             )}
             {step === 2 && loading && <QwenLoadingOverlay />}
-            {step === 3 && analysis && <ResultView analysis={analysis} onReset={reset} onDownload={handleDownload} onOpenAuth={(mode = 'login') => openAuth(mode, true)} />}
+            {step === 3 && analysis && (
+              <Suspense fallback={<InlineSurfaceLoader label="Preparing your screening result and report actions." />}>
+                <ResultView analysis={analysis} onReset={reset} onDownload={handleDownload} onOpenAuth={(mode = 'login') => openAuth(mode, true)} />
+              </Suspense>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -544,6 +645,7 @@ function ScreeningSection() {
 function AppContent() {
   const { backendUp } = useScreening();
   const showSupabaseTest = import.meta.env.DEV && import.meta.env.VITE_SHOW_SUPABASE_TEST === 'true';
+  const [compactVisualMode, setCompactVisualMode] = useState(() => window.innerWidth <= 900);
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -563,30 +665,76 @@ function AppContent() {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+    const warm = () => {
+      void loadLandingSections();
+      void loadVisualSystem();
+      void loadAuthPage();
+      void loadQualityView();
+      void loadIntakeView();
+      void loadResultView();
+      void loadDashboardPage();
+      void loadAdminDashboardPage();
+      if (showSupabaseTest) void loadSupabaseTest();
+    };
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(() => warm(), { timeout: 1800 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = setTimeout(warm, 1200);
+    return () => clearTimeout(timer);
+  }, [showSupabaseTest]);
+
+  useEffect(() => {
+    const onResize = () => setCompactVisualMode(window.innerWidth <= 900);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--void)' }}>
       <AnimatePresence><WakeBanner /></AnimatePresence>
-      <Cursor />
-      <LuxuryParticles />
-      <AuroraCanvas />
-      <ThreeBackground />
+      {!compactVisualMode && <Cursor />}
+      {!compactVisualMode && <LuxuryParticles />}
+      {!compactVisualMode && (
+        <Suspense fallback={null}>
+          <AuroraCanvas />
+          <ThreeBackground />
+        </Suspense>
+      )}
       <Navbar backendUp={backendUp} />
       <main style={{ position: 'relative', zIndex: 1 }}>
         <Hero />
-        <MarqueeTicker />
+        {!compactVisualMode && <MarqueeTicker />}
         <div className="section-divider" />
-        <Challenge />
+        <Suspense fallback={<SectionFallback />}>
+          <Challenge />
+        </Suspense>
         <div className="section-divider" />
-        <DifferentiatorsSection />
+        <Suspense fallback={<SectionFallback />}>
+          <DifferentiatorsSection />
+        </Suspense>
         <div className="section-divider" />
-        <WorkflowStepper />
+        <Suspense fallback={<SectionFallback minHeight={280} />}>
+          <WorkflowStepper />
+        </Suspense>
         <div className="section-divider" />
         <ScreeningSection />
         <div className="section-divider" />
-        <TechSection />
+        <Suspense fallback={<SectionFallback />}>
+          <TechSection />
+        </Suspense>
       </main>
-      <Footer />
-      {showSupabaseTest && <SupabaseTest />}
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
+      {showSupabaseTest && (
+        <Suspense fallback={null}>
+          <SupabaseTest />
+        </Suspense>
+      )}
       <ToastContainer />
     </div>
   );

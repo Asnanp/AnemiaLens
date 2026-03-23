@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://anemia-lens.vercel.app/sitemap.xml
