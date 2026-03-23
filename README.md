@@ -1,119 +1,224 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/AnemiaLens-AI%20Screening-C8001E?style=for-the-badge&logoColor=white" />
+<img src="https://img.shields.io/badge/AnemiaLens-AI%20Anemia%20Screening-C8001E?style=for-the-badge" alt="AnemiaLens badge" />
 
 # AnemiaLens
 
-### Non-invasive anemia screening using smartphone camera + AI
+### Smartphone-first anemia screening with quality gating, calibrated risk scoring, and grounded clinical guidance
 
 **No lab. No needle. No waiting.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-anemia--lens.vercel.app-C8001E?style=flat-square)](https://anemia-lens.vercel.app)
-[![Backend](https://img.shields.io/badge/Backend-Hugging%20Face%20Spaces-46E3B7?style=flat-square)](https://asnannp-anemialens.hf.space/health)
+[![Live App](https://img.shields.io/badge/Live-anemia--lens.vercel.app-C8001E?style=flat-square)](https://anemia-lens.vercel.app)
+[![Backend](https://img.shields.io/badge/API-Hugging%20Face%20Spaces-46E3B7?style=flat-square)](https://asnannp-anemialens.hf.space/health)
+[![Docs](https://img.shields.io/badge/API%20Docs-FastAPI-009688?style=flat-square)](https://asnannp-anemialens.hf.space/docs)
+[![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61DAFB?style=flat-square)](https://react.dev)
+[![Backend Stack](https://img.shields.io/badge/Backend-FastAPI%20%2B%20PyTorch-3776AB?style=flat-square)](https://fastapi.tiangolo.com)
+[![Database](https://img.shields.io/badge/Database-Supabase-3ECF8E?style=flat-square)](https://supabase.com)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python)](https://python.org)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
 
 </div>
 
 ---
 
-## What is AnemiaLens?
+## Overview
 
-AnemiaLens turns a smartphone camera into a first-pass anemia screening tool. It analyzes conjunctival pallor from the inner lower eyelid, combines that visual signal with symptom context, and returns a grounded risk assessment in seconds.
+AnemiaLens turns a smartphone photo of the inner lower eyelid into a **first-pass anemia screening workflow**. It combines:
 
-> **1.92 billion people** are affected by anemia globally. Many cases stay undetected because lab testing still depends on access, cost, and time that many communities do not have.
+- conjunctival image analysis
+- image quality and lighting checks
+- symptom-aware triage
+- calibrated confidence scoring
+- grounded guidance generated with Mistral AI
+- email-ready case sharing from the live app
 
-The current live product is built around four trust signals:
-- quality-gated capture before prediction
-- lighting-aware screening with glare and shadow detection
-- confidence breakdown instead of a single opaque score
-- one-click report sharing by email from the live app
+The goal is not to replace laboratory testing. The goal is to help people reach the **right next step earlier**, especially where lab access is delayed, expensive, or unavailable.
+
+> **Clinical safety posture:** AnemiaLens is a screening aid only and does not diagnose anemia or replace the advice of a qualified medical professional.
 
 ---
 
-## Demo
+## Why It Matters
 
-| Step | Description |
-|------|-------------|
-| Upload | Take or upload a photo of the inner lower eyelid |
-| Quality Check | AI scores sharpness, framing, lighting balance, glare risk, and shadow risk |
-| Symptoms | Answer a short symptom survey |
-| Analysis | Multi-stage ML pipeline produces risk score, hemoglobin estimate, and confidence breakdown |
-| Result | Get risk level, explainability, grounded clinical guidance, and an email-ready report |
+Anemia affects a massive global population, but screening often still depends on:
 
-**Frontend:** [https://anemia-lens.vercel.app](https://anemia-lens.vercel.app)  
-**Backend health:** [https://asnannp-anemialens.hf.space/health](https://asnannp-anemialens.hf.space/health)  
-**Backend docs:** [https://asnannp-anemialens.hf.space/docs](https://asnannp-anemialens.hf.space/docs)
+- lab access
+- trained staff
+- travel and cost
+- turnaround time
+
+AnemiaLens is built around a simpler question:
+
+**Can a phone help flag when someone may need a blood test sooner?**
+
+---
+
+## Live Product
+
+- **Frontend:** [https://anemia-lens.vercel.app](https://anemia-lens.vercel.app)
+- **Backend health:** [https://asnannp-anemialens.hf.space/health](https://asnannp-anemialens.hf.space/health)
+- **Backend docs:** [https://asnannp-anemialens.hf.space/docs](https://asnannp-anemialens.hf.space/docs)
+- **Runtime status:** [https://asnannp-anemialens.hf.space/api/runtime-status](https://asnannp-anemialens.hf.space/api/runtime-status)
+
+---
+
+## What the App Does
+
+### Screening workflow
+
+1. Capture or upload an inner-eyelid image
+2. Run quality checks before trusting the image
+3. Add symptom context
+4. Generate a risk band and triage score
+5. Explain why the result happened
+6. Show confidence and trust level separately
+7. Recommend the safest next action
+8. Save or share the case by email
+
+### Trust layers built into the result
+
+- **Image Quality Gate**
+  - blur
+  - framing
+  - brightness
+  - glare risk
+  - shadow risk
+  - lighting condition classification
+
+- **Risk Explanation**
+  - image-led signal summary
+  - symptom contribution
+  - capture quality impact
+  - calibrated confidence framing
+
+- **Safety Output**
+  - retake prompts when image quality is weak
+  - screening-not-diagnosis warning
+  - clinician-follow-up language for moderate or concerning cases
+
+### Product-level account features
+
+- guest-first screening flow
+- sign up / sign in with Supabase-backed auth
+- save current screening into an account
+- personal dashboard and saved history
+- email delivery through Gmail API from the hosted app
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A["React + Vite frontend"] --> B["Vercel rewrites"]
+    B --> C["FastAPI backend on Hugging Face Spaces"]
+    C --> D["Image quality + lighting analysis"]
+    C --> E["Screening + triage pipeline"]
+    C --> F["Mistral guidance service"]
+    C --> G["Supabase Postgres"]
+    C --> H["Gmail API delivery"]
+```
+
+### Inference pipeline
+
+```mermaid
+flowchart LR
+    A["Eye image"] --> B["Quality gate"]
+    B --> C["ROI / vision inference"]
+    C --> D["Symptom-aware triage"]
+    D --> E["Confidence calibration"]
+    E --> F["Result + explainability"]
+    F --> G["Mistral guidance"]
+    G --> H["Email / dashboard / export"]
+```
+
+---
+
+## Evaluation Snapshot
+
+Current deployed ROI screening report:
+
+| Metric | Value |
+|---|---:|
+| Accuracy | **88.64%** |
+| Precision | **84.62%** |
+| Recall | **78.57%** |
+| F1 | **81.48%** |
+| Validation size | `44` |
+| Total evaluation records | `432` |
+
+Calibration report:
+
+| Diagnostic | Before | After |
+|---|---:|---:|
+| ECE | `0.2620` | **0.0909** |
+| Brier score | `0.0906` | **0.0501** |
+
+Source artifacts:
+
+- [backend/models/deployed_screening_report.json](backend/models/deployed_screening_report.json)
+- [backend/models/runtime_calibration_report.json](backend/models/runtime_calibration_report.json)
+
+---
+
+## Core Capabilities
+
+| Area | What ships today |
+|---|---|
+| Vision screening | Eye-image screening with ROI-based risk inference |
+| Quality intelligence | Blur, framing, brightness, glare, and shadow detection |
+| Lighting understanding | Balanced, dim, overexposed, glare-heavy, shadow-heavy |
+| Confidence design | Confidence separated from reliability / trust level |
+| Guidance | Mistral-powered patient-facing clinical guidance |
+| Accounts | Register, sign in, save current screening, view dashboard |
+| Reporting | Email-friendly screening summary through Gmail API |
+| Deployment | Vercel frontend + Hugging Face backend + Supabase database |
+| SEO | Structured metadata, sitemap, robots, social sharing assets |
 
 ---
 
 ## Tech Stack
 
-### Backend
-- **FastAPI** for the API
-- **SQLAlchemy + asyncpg** for persistence
-- **PostgreSQL (Supabase)** for production data
-- **PyTorch + EfficientNet-B0** for vision inference
-- **scikit-learn** for fusion and ensemble models
-- **Mistral AI** for grounded clinical guidance
-- **Gmail API** for hosted email report delivery
-- **JWT** for authentication
-- **Hugging Face Spaces** for backend hosting
-
 ### Frontend
-- **React 18 + TypeScript**
-- **Vite**
-- **Framer Motion**
-- **Three.js**
-- **Vercel** for frontend hosting
 
----
-
-## Features
-
-### Core
-- Guided multi-step screening flow
-- Image quality validation before analysis
-- Lighting intelligence with balanced, dim, overexposed, glare-heavy, and shadow-heavy states
-- Risk levels: Low / Moderate / High Concern / Retake Needed
-- Hemoglobin estimate with uncertainty handling
-- Confidence breakdown across capture quality, model stability, and decision margin
-- Explainability panel with signal breakdown
-- Clinical safety language and retake guidance
-- Email-ready screening report sent from the live app
-
-### Product
-- Guest-first screening flow
-- Supabase-backed account login and registration
-- Guest-to-account save flow for the current screening
-- Auth, history, and admin surfaces
-- Export and share actions
-- Doctor view and user view result modes
-- Dashboard and admin analytics
-- Saved case history with account-level trend tracking
-
----
-
-## Local Development
+- React 18
+- TypeScript
+- Vite
+- Framer Motion
+- Three.js
+- Radix UI primitives
+- Vercel deployment
 
 ### Backend
+
+- FastAPI
+- SQLAlchemy
+- PostgreSQL / Supabase
+- PyTorch
+- scikit-learn
+- Mistral AI
+- Gmail API
+- JWT auth
+- Hugging Face Spaces deployment
+
+---
+
+## Quick Start
+
+### 1. Run the backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 python start_server.py
 ```
 
-Or run directly:
+Backend health:
 
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- [http://127.0.0.1:5000/health](http://127.0.0.1:5000/health)
 
-### Frontend
+### 2. Run the frontend
 
 ```bash
 cd frontend
@@ -121,95 +226,120 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Frontend:
+
+- [http://127.0.0.1:5173](http://127.0.0.1:5173)
+
+---
+
+## Environment
+
+### Required backend environment variables
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase Postgres pooler connection string |
+| `JWT_SECRET_KEY` | access and refresh token signing |
+| `JWT_ALGORITHM` | usually `HS256` |
+| `ANEMIALENS_MISTRAL_API_KEY` | Mistral guidance generation |
+| `ANEMIALENS_MISTRAL_MODEL` | current default: `mistral-small-latest` |
+| `ANEMIALENS_EMAIL_PROVIDER` | `gmail_api` for the hosted setup |
+| `ANEMIALENS_GMAIL_CLIENT_ID` | Google OAuth client |
+| `ANEMIALENS_GMAIL_CLIENT_SECRET` | Google OAuth client secret |
+| `ANEMIALENS_GMAIL_REFRESH_TOKEN` | refresh token with `gmail.send` scope |
+| `ANEMIALENS_EMAIL_FROM_EMAIL` | verified Gmail sender |
+| `ANEMIALENS_EMAIL_REPLY_TO` | reply-to address |
+
+See:
+
+- [backend/.env.example](backend/.env.example)
 
 ---
 
 ## Deployment
 
-### Backend -> Hugging Face Spaces
+### Frontend
 
-1. Create a **Docker Space**
-2. Upload the repo `Dockerfile` and the `backend/` directory to the Space
-3. Set the Space metadata to use `app_port: 5000`
-4. Add the required secrets:
+The frontend is deployed to Vercel and rewrites API traffic to Hugging Face:
 
-| Key | Value |
-|-----|-------|
-| `DATABASE_URL` | Your Supabase transaction pooler URL |
-| `JWT_SECRET_KEY` | A long random string |
-| `JWT_ALGORITHM` | `HS256` |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` |
-| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `30` |
-| `ANEMIALENS_MISTRAL_API_KEY` | Your Mistral API key |
-| `ANEMIALENS_MISTRAL_ENABLED` | `true` |
-| `ANEMIALENS_MISTRAL_MODEL` | `mistral-small-latest` |
-| `ANEMIALENS_GUIDANCE_TIMEOUT` | `20` |
-| `ANEMIALENS_EMAIL_PROVIDER` | `gmail_api` |
-| `ANEMIALENS_GMAIL_CLIENT_ID` | Google OAuth client ID |
-| `ANEMIALENS_GMAIL_CLIENT_SECRET` | Google OAuth client secret |
-| `ANEMIALENS_GMAIL_REFRESH_TOKEN` | Gmail refresh token with `gmail.send` scope |
-| `ANEMIALENS_EMAIL_FROM_NAME` | `AnemiaLens` |
-| `ANEMIALENS_EMAIL_FROM_EMAIL` | Your verified Gmail address |
-| `ANEMIALENS_EMAIL_REPLY_TO` | Your verified Gmail address |
-| `PORT` | `5000` |
+- [vercel.json](vercel.json)
 
-5. Apply the SQL schema from `backend/supabase_schema.sql` to the target Supabase database before first login
-6. Auth, history, and save-to-account flows depend on the Supabase Postgres database being available at startup
+### Backend
 
-### Frontend -> Vercel
+The backend runs on Hugging Face Spaces and exposes:
 
-1. Connect the GitHub repo to Vercel
-2. Build from the repo root
-3. The root `vercel.json` rewrites `/api`, `/health`, and `/api/runtime-status` to the Hugging Face backend
+- `/health`
+- `/api/runtime-status`
+- `/api/analyze`
+- `/api/auth/*`
+- `/api/history/*`
+- `/api/email-report`
+
+### Database
+
+Supabase provides:
+
+- user auth persistence
+- saved screening history
+- account dashboard data
+
+Before first production use, apply:
+
+- [backend/supabase_schema.sql](backend/supabase_schema.sql)
 
 ---
 
-## Project Structure
+## Repository Layout
 
 ```text
 AnemiaLens/
-|-- backend/
-|   |-- app/
-|   |   |-- api/
-|   |   |-- ml/
-|   |   |-- models/
-|   |   |-- services/
-|   |   |-- middleware/
-|   |   |-- config.py
-|   |   |-- database.py
-|   |   `-- main.py
-|   |-- models/
-|   `-- start_server.py
-|-- frontend/
-|   |-- src/
-|   `-- tests/
-|-- vercel.json
-`-- archive/
+├─ backend/
+│  ├─ app/
+│  │  ├─ api/
+│  │  ├─ ml/
+│  │  ├─ services/
+│  │  ├─ middleware/
+│  │  ├─ config.py
+│  │  ├─ database.py
+│  │  └─ main.py
+│  ├─ models/
+│  ├─ tests/
+│  ├─ supabase_schema.sql
+│  └─ start_server.py
+├─ frontend/
+│  ├─ public/
+│  ├─ src/
+│  └─ tests/
+├─ vercel.json
+└─ README.md
 ```
 
 ---
 
-## Notes
+## Product Notes
 
-- The backend host is **Hugging Face Spaces**.
-- The frontend proxy is already configured for the live Hugging Face backend.
-- Hosted email delivery now uses **Gmail API over HTTPS**, which fits Hugging Face Spaces outbound networking rules.
-- The result page is designed to keep the main story short: result, why it happened, confidence, next step, and actions.
-- The quality gate is intentionally stricter than a simple blur check because judges and clinicians trust systems that know when the image is weak.
+- The app is intentionally **guest-friendly first**, then account-aware.
+- The result page is designed to keep the main story short:
+  - result
+  - why it happened
+  - confidence / trust level
+  - safest next step
+  - share / save actions
+- Weak captures do not get the same level of certainty as clean captures.
+- Hemoglobin estimates are withheld when the system does not consider them trustworthy enough.
 
 ---
 
 ## Disclaimer
 
-AnemiaLens is a screening aid only and does not diagnose anemia or replace the advice of a qualified medical professional.
+AnemiaLens is a screening aid only. It does not diagnose anemia, prescribe treatment, or replace clinical testing such as CBC or hemoglobin confirmation.
 
 ---
 
 <div align="center">
 
-**Because a photo should be enough to save a life.**
+**Because a phone should be able to help someone reach care earlier.**
 
-[Live Demo](https://anemia-lens.vercel.app) | [Backend API](https://asnannp-anemialens.hf.space/docs) | [GitHub](https://github.com/Asnanp/AnemiaLens)
+[Live App](https://anemia-lens.vercel.app) · [API Docs](https://asnannp-anemialens.hf.space/docs) · [GitHub](https://github.com/Asnanp/AnemiaLens)
 
 </div>
