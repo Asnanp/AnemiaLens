@@ -3,12 +3,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { endpoint } from '../api';
 import { useAuth } from './useAuth';
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-function endpoint(path: string): string {
-  return API_BASE ? `${API_BASE}${path}` : path;
-}
 
 export interface ScreeningHistoryItem {
   uid: string;

@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Request, UploadFile, status, Depends
+from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import UnidentifiedImageError
@@ -131,7 +131,11 @@ async def lifespan(app: FastAPI):
             from app.schemas import QualityAssessment
             dummy_quality = QualityAssessment(
                 passed=True, blur_score=100.0, brightness_score=0.3,
-                contrast_score=0.15, framing_score=1.5, issues=[],
+                contrast_score=0.15, framing_score=1.5,
+                lighting_score=0.5, lighting_condition="balanced",
+                lighting_summary="Warm-up dummy image.",
+                glare_risk=0.0, shadow_risk=0.0,
+                issues=[],
             )
             app.state.predictor.predict(dummy, dummy_quality)
             gc.collect()
@@ -406,6 +410,7 @@ async def quality_check(
 )
 async def analyze(
     request: Request,
+    background_tasks: BackgroundTasks,
     image: Annotated[UploadFile, File(description="Eye photo (JPEG or PNG).")],
     symptoms: Annotated[str | None, Form(description="JSON-encoded symptom flags.")] = None,
     patient_profile: Annotated[str | None, Form(description="JSON-encoded intake profile.")] = None,
@@ -587,9 +592,8 @@ async def analyze(
     )
 
     # --- Persist to database (async, non-blocking) -------------------------
-    import asyncio
-    asyncio.create_task(
-        _persist_screening(rid, response, user_id, processing_time_ms)
+    background_tasks.add_task(
+        _persist_screening, rid, response, user_id, processing_time_ms
     )
 
     return response

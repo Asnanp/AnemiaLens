@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -255,8 +255,8 @@ async def get_system_stats(
 )
 async def list_users(
     db: Annotated[AsyncSession, Depends(get_db)],
-    page: int = 1,
-    page_size: int = 50,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
 ) -> AdminUsersResponse:
     total_result = await db.execute(select(func.count()).select_from(User))
     total = total_result.scalar() or 0

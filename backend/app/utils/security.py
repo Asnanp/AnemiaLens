@@ -17,7 +17,14 @@ from passlib.context import CryptContext
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(BACKEND_ROOT / ".env")
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-only-change-in-production")
+_DEFAULT_SECRET = "dev-only-change-in-production"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", _DEFAULT_SECRET)
+if JWT_SECRET_KEY == _DEFAULT_SECRET:
+    import logging as _logging
+    _logging.getLogger("anemialens.security").warning(
+        "JWT_SECRET_KEY is using the insecure default value. "
+        "Set a strong, unique JWT_SECRET_KEY environment variable before deploying to production."
+    )
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 JWT_REFRESH_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "30"))

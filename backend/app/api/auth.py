@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # ---------------------------------------------------------------------------
 
 class RegisterRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=255)
+    email: EmailStr = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
 
@@ -116,7 +116,7 @@ async def register(
         log.exception("Registration failed for %s: %s", body.email, str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration error: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Registration failed. Please try again later.",
         )
 
 

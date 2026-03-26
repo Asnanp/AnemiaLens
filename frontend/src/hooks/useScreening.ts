@@ -91,6 +91,7 @@ export function useScreening() {
   const [error, setError] = useState<string | null>(null);
   const [backendUp, setBackendUp] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [symptomSeverity, setSymptomSeverity] = useState<Record<string, number> | undefined>(undefined);
 
   useEffect(() => {
     setRecent(loadRecent());
@@ -158,12 +159,6 @@ export function useScreening() {
     setLoading(true);
     setError(null);
     try {
-      // Read severity from localStorage (set by SymptomView)
-      let symptomSeverity: Record<string, number> | undefined;
-      try {
-        const raw = localStorage.getItem('anemialens.symptom-severity');
-        if (raw) symptomSeverity = JSON.parse(raw);
-      } catch { /* ignore */ }
       const result = await analyzeScreening(file, symptoms, patientProfile, undefined, undefined, symptomSeverity);
       setAnalysis(result);
       setBackendUp(true);
@@ -445,6 +440,7 @@ export function useScreening() {
     recent, loading, error, backendUp,
     isOfflineMode,
     pickFile, runQuality, runAnalysis, loadSample, reset, symptomOnlyAssess,
+    symptomSeverity, setSymptomSeverity,
     symptomLabels, defaultSymptoms, defaultPatientProfile
   };
 }

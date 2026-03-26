@@ -12,6 +12,8 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from app.dependencies import get_current_user
+from app.models.user import User
 from app.services.email_report import (
     EmailReportContent,
     EmailReportDeliveryError,
@@ -68,6 +70,7 @@ def get_email_report_service() -> EmailReportService:
 async def send_email_report(
     payload: EmailReportRequest,
     service: Annotated[EmailReportService, Depends(get_email_report_service)],
+    _user: Annotated[User, Depends(get_current_user)],
 ) -> EmailReportResponse:
     masked_recipient = service.masked_recipient(payload.email)
     log.info("[FIX] email report request received for %s", masked_recipient)

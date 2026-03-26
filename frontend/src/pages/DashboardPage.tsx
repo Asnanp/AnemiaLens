@@ -80,17 +80,19 @@ function TrendSparkline({ values, color }: { values: number[]; color: string }) 
     return `${x},${y}`;
   }).join(' ');
 
+  const gradientId = `dashboardTrend-${color.replace('#', '')}`;
+
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 88 }}>
       <defs>
-        <linearGradient id="dashboardTrend" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor={`${color}22`} />
           <stop offset="100%" stopColor={`${color}cc`} />
         </linearGradient>
       </defs>
       <polyline
         fill="none"
-        stroke="url(#dashboardTrend)"
+        stroke={`url(#${gradientId})`}
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -4,6 +4,7 @@ Stripe billing integration.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Annotated
@@ -52,16 +53,11 @@ async def create_checkout_session(
     origin = request.headers.get("origin", "http://localhost:5173")
 
     if _DEMO_MODE:
-        # DEMO MODE: Automatically upgrade the user instead of failing
-        log.warning("No Stripe API key found. Operating in DEMO MODE.")
-        u = await db.scalar(select(User).where(User.uid == user.uid))
-        if u:
-            u.subscription_tier = "pro"
-            await db.commit()
-            log.info("DEMO MODE: User %s upgraded to pro", u.email)
-            
-        # Return success redirect directly
-        return CheckoutSessionResponse(checkout_url=f"{origin}/?payment_success=true")
+        log.warning("No Stripe API key configured. Checkout unavailable in demo mode.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing is not configured. Please set a valid STRIPE_SECRET_KEY.",
+        )
 
     try:
         # The base origin for success/cancel URLs
@@ -69,7 +65,8 @@ async def create_checkout_session(
         # Determine if we should create a new customer or use an existing one
         customer_id = user.stripe_customer_id
         if not customer_id:
-            customer = stripe.Customer.create(
+            customer = await asyncio.to_thread(
+                stripe.Customer.create,
                 email=user.email,
                 metadata={"user_uid": user.uid},
             )
@@ -79,7 +76,8 @@ async def create_checkout_session(
             # or just write it below if we wrap in async block.
             # We'll just rely on the webhook to formalize the relation.
 
-        checkout_session = stripe.checkout.Session.create(
+        checkout_session = await asyncio.to_thread(
+            stripe.checkout.Session.create,
             customer=customer_id,
             payment_method_types=["card"],
             line_items=[

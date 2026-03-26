@@ -13,10 +13,6 @@
       "destination": "https://asnannp-anemialens.hf.space/health"
     },
     {
-      "source": "/api/runtime-status",
-      "destination": "https://asnannp-anemialens.hf.space/api/runtime-status"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
