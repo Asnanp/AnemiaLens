@@ -76,12 +76,20 @@ async def create_tables() -> None:
         log.info("Using session pooler (port 5432) for DDL operations.")
 
     try:
+        # Ensure all ORM models are imported so Base.metadata knows about them
+        import app.models  # noqa: F401
+
         from sqlalchemy.ext.asyncio import create_async_engine as _make_engine
+        ddl_connect_args: dict = {}
+        if "postgres" in ddl_url:
+            ddl_connect_args["ssl"] = "require"
+        elif "sqlite" in ddl_url:
+            ddl_connect_args["check_same_thread"] = False
         ddl_engine = _make_engine(
             ddl_url,
             echo=False,
             pool_pre_ping=True,
-            connect_args={"ssl": "require"} if "postgres" in ddl_url else {},
+            connect_args=ddl_connect_args,
         )
         async with ddl_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

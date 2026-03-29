@@ -105,9 +105,15 @@ async def lifespan(app: FastAPI):
     log.info("AnemiaLens starting up …")
 
     # ---------- Database ----------
-    # Tables are pre-created via supabase_schema.sql — skip DDL on startup
-    # (asyncpg + Supabase transaction pooler drops connection during DDL)
-    log.info("Database tables assumed present (pre-created via SQL).")
+    # For SQLite (local dev), auto-create tables so the app works out of the box.
+    # For PostgreSQL / Supabase, tables are pre-created via supabase_schema.sql
+    # (asyncpg + Supabase transaction pooler drops connection during DDL).
+    from app.database import DATABASE_URL, create_tables
+    if "sqlite" in DATABASE_URL:
+        log.info("SQLite detected — auto-creating database tables …")
+        await create_tables()
+    else:
+        log.info("Database tables assumed present (pre-created via SQL).")
 
     # ---------- ML Services ----------
     try:
@@ -178,7 +184,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         "https://anemialens.vercel.app",
         "https://anemia-lens.vercel.app",
         "https://asnanp.github.io",
