@@ -4,6 +4,8 @@ Screening history API — list, detail, delete past screenings.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 from typing import Annotated
@@ -12,6 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi.responses import StreamingResponse
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -139,38 +143,52 @@ async def list_screenings(
 @router.get(
     "/export/csv",
     summary="Export screening history as CSV (Pro only)",
+    tags=["history"],
 )
-async def export_screenings_csv_v2(
+async def export_screenings_csv(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Duplicate route at top so it isn't shadowed by /{screening_uid}."""
-    import csv, io
-    from fastapi.responses import StreamingResponse as SR
     if user.subscription_tier != "pro" and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="CSV export is a Pro feature. Upgrade to download your data.",
         )
+
     result = await db.execute(
-        select(Screening).where(Screening.user_id == user.id)
-        .order_by(desc(Screening.created_at)).limit(1000)
+        select(Screening)
+        .where(Screening.user_id == user.id)
+        .order_by(desc(Screening.created_at))
+        .limit(1000)
     )
     screenings = result.scalars().all()
+
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["date","triage_band","triage_label","anemia_risk_%","hemoglobin_g_dL","confidence_%","screening_label","guidance_source","processing_ms"])
+    writer.writerow([
+        "date", "triage_band", "triage_label", "anemia_risk_%",
+        "hemoglobin_g_dL", "confidence_%", "screening_label",
+        "guidance_source", "processing_ms",
+    ])
     for s in screenings:
         writer.writerow([
-            s.created_at.strftime("%Y-%m-%d %H:%M"), s.triage_band, s.triage_label,
-            f"{(s.anemia_risk or 0)*100:.1f}" if s.anemia_risk is not None else "",
+            s.created_at.strftime("%Y-%m-%d %H:%M"),
+            s.triage_band,
+            s.triage_label,
+            f"{(s.anemia_risk or 0) * 100:.1f}" if s.anemia_risk is not None else "",
             f"{s.predicted_hemoglobin:.1f}" if s.predicted_hemoglobin is not None else "",
-            f"{(s.confidence or 0)*100:.1f}" if s.confidence is not None else "",
-            s.screening_label or "", s.guidance_source, f"{s.processing_time_ms:.0f}",
+            f"{(s.confidence or 0) * 100:.1f}" if s.confidence is not None else "",
+            s.screening_label or "",
+            s.guidance_source,
+            f"{s.processing_time_ms:.0f}",
         ])
+
     output.seek(0)
-    return SR(iter([output.getvalue()]), media_type="text/csv",
-              headers={"Content-Disposition": "attachment; filename=anemialens_history.csv"})
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=anemialens_history.csv"},
+    )
 
 
 @router.get(
@@ -271,64 +289,4 @@ async def save_current_screening(
         saved=True,
         uid=screening.uid,
         message="Screening saved to your account history.",
-    )
-
-
-# ---------------------------------------------------------------------------
-# CSV Export (Pro only)
-# ---------------------------------------------------------------------------
-
-import csv
-import io
-from fastapi.responses import StreamingResponse
-
-
-@router.get(
-    "/export/csv",
-    summary="Export screening history as CSV (Pro only)",
-    tags=["history"],
-)
-async def export_screenings_csv(
-    user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    if user.subscription_tier != "pro" and user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="CSV export is a Pro feature. Upgrade to download your data.",
-        )
-
-    result = await db.execute(
-        select(Screening)
-        .where(Screening.user_id == user.id)
-        .order_by(desc(Screening.created_at))
-        .limit(1000)
-    )
-    screenings = result.scalars().all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "date", "triage_band", "triage_label", "anemia_risk_%",
-        "hemoglobin_g_dL", "confidence_%", "screening_label",
-        "guidance_source", "processing_ms",
-    ])
-    for s in screenings:
-        writer.writerow([
-            s.created_at.strftime("%Y-%m-%d %H:%M"),
-            s.triage_band,
-            s.triage_label,
-            f"{(s.anemia_risk or 0) * 100:.1f}" if s.anemia_risk is not None else "",
-            f"{s.predicted_hemoglobin:.1f}" if s.predicted_hemoglobin is not None else "",
-            f"{(s.confidence or 0) * 100:.1f}" if s.confidence is not None else "",
-            s.screening_label or "",
-            s.guidance_source,
-            f"{s.processing_time_ms:.0f}",
-        ])
-
-    output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=anemialens_history.csv"},
     )

@@ -110,18 +110,23 @@ async def lifespan(app: FastAPI):
     log.info("Database tables assumed present (pre-created via SQL).")
 
     # ---------- ML Services ----------
-    app.state.quality_service = ImageQualityService()
-    app.state.predictor = ScreeningPredictor()
-    app.state.triage_service = TriageService()
-    app.state.guidance_service = GuidanceService()
-    app.state.case_insight_service = CaseInsightService()
-    app.state.clinical_brief_service = ClinicalBriefService()
-    app.state.handoff_service = HandoffSummaryService()
-    app.state.patient_case_service = PatientCaseService()
-    log.info("All ML services initialised.")
+    try:
+        app.state.quality_service = ImageQualityService()
+        app.state.predictor = ScreeningPredictor()
+        app.state.triage_service = TriageService()
+        app.state.guidance_service = GuidanceService()
+        app.state.case_insight_service = CaseInsightService()
+        app.state.clinical_brief_service = ClinicalBriefService()
+        app.state.handoff_service = HandoffSummaryService()
+        app.state.patient_case_service = PatientCaseService()
+        log.info("All ML services initialised.")
+    except Exception as exc:
+        log.error("ML service initialisation failed: %s", exc, exc_info=True)
+        log.warning("Server will start in degraded mode — health endpoints remain available.")
 
     # ---------- Model warm-up ----------
-    if app.state.predictor.is_ready():
+    predictor = getattr(app.state, "predictor", None)
+    if predictor is not None and predictor.is_ready():
         try:
             from PIL import Image
             import numpy as np
@@ -133,7 +138,7 @@ async def lifespan(app: FastAPI):
                 passed=True, blur_score=100.0, brightness_score=0.3,
                 contrast_score=0.15, framing_score=1.5, issues=[],
             )
-            app.state.predictor.predict(dummy, dummy_quality)
+            predictor.predict(dummy, dummy_quality)
             gc.collect()
             log.info("Model warm-up complete — first inference latency eliminated.")
         except Exception as exc:
@@ -330,27 +335,43 @@ async def root() -> RedirectResponse:
 @app.get("/health", tags=["meta"], summary="Liveness probe")
 async def health(request: Request) -> dict[str, object]:
     """Returns 200 OK when the server is alive."""
-    guidance_status = request.app.state.guidance_service.runtime_status()
+    try:
+        guidance_svc = getattr(request.app.state, "guidance_service", None)
+        predictor = getattr(request.app.state, "predictor", None)
+        guidance_strategy = guidance_svc.runtime_status().active_strategy if guidance_svc else "unavailable"
+        model_ready = predictor.is_ready() if predictor else False
+    except Exception:
+        guidance_strategy = "unavailable"
+        model_ready = False
     return {
         "status": "ok",
-        "model_ready": request.app.state.predictor.is_ready(),
-        "guidance_strategy": guidance_status.active_strategy,
+        "model_ready": model_ready,
+        "guidance_strategy": guidance_strategy,
     }
 
 
 @app.get("/readyz", tags=["meta"], summary="Readiness probe")
 async def readyz(request: Request) -> JSONResponse:
-    predictor = request.app.state.predictor
-    guidance_status = request.app.state.guidance_service.runtime_status()
-    ready = predictor.is_ready()
+    predictor = getattr(request.app.state, "predictor", None)
+    guidance_svc = getattr(request.app.state, "guidance_service", None)
+    ready = predictor.is_ready() if predictor else False
+    if guidance_svc:
+        guidance_status = guidance_svc.runtime_status()
+        client_ready = guidance_status.client_ready
+        strategy = guidance_status.active_strategy
+        fallback_reason = guidance_status.fallback_reason
+    else:
+        client_ready = False
+        strategy = "unavailable"
+        fallback_reason = "services not initialised"
     return JSONResponse(
         status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
             "status": "ready" if ready else "degraded",
             "model_ready": ready,
-            "guidance_client_ready": guidance_status.client_ready,
-            "guidance_strategy": guidance_status.active_strategy,
-            "guidance_fallback_reason": guidance_status.fallback_reason,
+            "guidance_client_ready": client_ready,
+            "guidance_strategy": strategy,
+            "guidance_fallback_reason": fallback_reason,
         },
     )
 
@@ -362,10 +383,24 @@ async def readyz(request: Request) -> JSONResponse:
     summary="Model and guidance runtime information",
 )
 async def runtime_status(request: Request) -> RuntimeStatusResponse:
-    return build_runtime_status(
-        request.app.state.predictor,
-        request.app.state.guidance_service,
-    )
+    predictor = getattr(request.app.state, "predictor", None)
+    guidance_svc = getattr(request.app.state, "guidance_service", None)
+    if predictor is None or guidance_svc is None:
+        from app.schemas import GuidanceRuntimeStatus, ModelRuntimeStatus
+        return RuntimeStatusResponse(
+            guidance=GuidanceRuntimeStatus(
+                active_strategy="fallback",
+                client_ready=False,
+                fallback_reason="services not initialised",
+            ),
+            model=ModelRuntimeStatus(
+                primary_model="unavailable",
+                deep_stack_loaded=False,
+                legacy_loaded=False,
+                load_error="services not initialised",
+            ),
+        )
+    return build_runtime_status(predictor, guidance_svc)
 
 
 # ---------------------------------------------------------------------------

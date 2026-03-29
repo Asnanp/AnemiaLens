@@ -15,7 +15,7 @@ export function useSupabaseTodos() {
   useEffect(() => {
     async function getTodos() {
       if (!supabase) {
-        setError('Supabase not configured. Please create .env file with VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY');
+        setError('Supabase not configured. Please create .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
         setLoading(false);
         return;
       }
