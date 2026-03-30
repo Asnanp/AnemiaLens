@@ -41,24 +41,51 @@ class EmailReportContent:
 
 
 class EmailReportService:
-    def is_configured(self) -> bool:
+    def configuration_issue(self) -> str | None:
         if self._provider == "resend":
-            return bool(settings.resend_api_key and self._from_email)
+            if not settings.resend_api_key:
+                return "Resend is selected but ANEMIALENS_RESEND_API_KEY is missing."
+            if not self._from_email:
+                return "Resend is selected but ANEMIALENS_EMAIL_FROM_EMAIL is missing."
+            return None
+
         if self._provider == "sendgrid":
-            return bool(settings.sendgrid_api_key and self._from_email)
+            if not settings.sendgrid_api_key:
+                return "SendGrid is selected but ANEMIALENS_SENDGRID_API_KEY is missing."
+            if not self._from_email:
+                return "SendGrid is selected but ANEMIALENS_EMAIL_FROM_EMAIL is missing."
+            return None
+
         if self._provider == "gmail_api":
-            return bool(
-                settings.gmail_client_id
-                and settings.gmail_client_secret
-                and settings.gmail_refresh_token
-                and self._from_email
-            )
-        return bool(
-            settings.smtp_host
-            and settings.smtp_username
-            and settings.smtp_password
-            and self._from_email
-        )
+            missing: list[str] = []
+            if not settings.gmail_client_id:
+                missing.append("ANEMIALENS_GMAIL_CLIENT_ID")
+            if not settings.gmail_client_secret:
+                missing.append("ANEMIALENS_GMAIL_CLIENT_SECRET")
+            if not settings.gmail_refresh_token:
+                missing.append("ANEMIALENS_GMAIL_REFRESH_TOKEN")
+            if not self._from_email:
+                missing.append("ANEMIALENS_EMAIL_FROM_EMAIL")
+            if missing:
+                return f"Gmail API is selected but the following settings are missing: {', '.join(missing)}."
+            return None
+
+        missing: list[str] = []
+        if not settings.smtp_username:
+            missing.append("ANEMIALENS_SMTP_USERNAME")
+        if not settings.smtp_password:
+            missing.append("ANEMIALENS_SMTP_PASSWORD")
+        if not self._from_email:
+            missing.append("ANEMIALENS_EMAIL_FROM_EMAIL")
+        if missing:
+            detail = f"SMTP is selected but the following settings are missing: {', '.join(missing)}."
+            if "ANEMIALENS_SMTP_PASSWORD" in missing and settings.smtp_host == "smtp.gmail.com":
+                detail += " For Gmail SMTP, use a 16-character Google app password."
+            return detail
+        return None
+
+    def is_configured(self) -> bool:
+        return self.configuration_issue() is None
 
     def masked_recipient(self, recipient: str) -> str:
         local, _, domain = recipient.partition("@")
@@ -69,10 +96,9 @@ class EmailReportService:
         return f"{local[:2]}***@{domain}"
 
     def send_report(self, payload: EmailReportContent) -> None:
-        if not self.is_configured():
-            raise EmailReportNotConfiguredError(
-                "Email delivery is not configured. Set the selected provider credentials in backend/.env or your deployment environment."
-            )
+        configuration_issue = self.configuration_issue()
+        if configuration_issue is not None:
+            raise EmailReportNotConfiguredError(configuration_issue)
 
         masked_recipient = self.masked_recipient(payload.recipient)
         log.info("[FIX] email report send started for %s", masked_recipient)

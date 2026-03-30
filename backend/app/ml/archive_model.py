@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import re
 import zipfile
@@ -17,7 +18,11 @@ from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
 
-from app.ml.features import FEATURE_NAMES, extract_eye_features
+from app.ml.features import (
+    FEATURE_NAMES,
+    ULTIMATE_CLINICAL_FEATURE_NAMES,
+    extract_eye_features,
+)
 # Import stacked model classes so joblib can deserialize v4 artifacts
 from app.ml.stacked_model import StackedClassifier, StackedRegressor  # noqa: F401
 from app.services.conjunctiva_roi import ConjunctivaRoiExtractor
@@ -30,6 +35,7 @@ ARCHIVE_FEATURE_NAMES = FEATURE_NAMES + [
     "source_forniceal_palpebral",
 ]
 _XLSX_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+log = logging.getLogger(__name__)
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -62,12 +68,296 @@ def predict_with_archive_model(
 ) -> dict[str, float]:
     version = str(artifact.get("version", ""))
 
-    # ── v4 stacked ensemble path ──────────────────────────────────────────────
+    # --- v5 SMOTE + XGBoost stacked path ---
+    if version.startswith("archive-fusion-v5"):
+        return _predict_v5(artifact, feature_map, source_hint=source_hint)
+
+    # --- v7 ultimate clinical ensemble path ---
+    if version.startswith("archive-fusion-v7-ultimate-clinical"):
+        return _predict_v7_ultimate(artifact, feature_map, source_hint=source_hint)
+
+    if version.startswith("archive-fusion-v8-clinical-robust"):
+        from app.ml.archive_model_v8 import predict_with_archive_model_v8
+
+        return predict_with_archive_model_v8(
+            artifact,
+            feature_map,
+            source_hint=source_hint,
+        )
+
+    # --- v4 stacked ensemble path ---
     if version.startswith("stacked-ensemble-v4"):
         return _predict_stacked_v4(artifact, feature_map, source_hint=source_hint)
 
-    # ── legacy v2/v3 path (unchanged) ─────────────────────────────────────────
+    # --- archive-fusion-v4-pipeline (pipeline-aligned ExtraTrees) ---
+    if version.startswith("archive-fusion-v4"):
+        return _predict_legacy(artifact, feature_map, source_hint=source_hint)
+
+    # --- legacy v2/v3 path ---
     return _predict_legacy(artifact, feature_map, source_hint=source_hint)
+
+
+def _predict_v7_ultimate(
+    artifact: dict[str, object],
+    feature_map: dict[str, float],
+    *,
+    source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
+) -> dict[str, float]:
+    feat_names = artifact.get("feature_names")
+    if not isinstance(feat_names, list) or not feat_names:
+        feat_names = ULTIMATE_CLINICAL_FEATURE_NAMES
+
+    prepared = {name: float(feature_map.get(name, 0.0)) for name in feat_names}
+    row = np.asarray([prepared[name] for name in feat_names], dtype=np.float32).reshape(1, -1)
+
+    scaler = _resolve_ultimate_scaler(artifact)
+    if scaler is not None:
+        try:
+            row = np.asarray(scaler.transform(row), dtype=np.float32)
+        except Exception as exc:
+            log.warning("Ultimate model scaler transform failed: %s", exc)
+
+    models = artifact.get("models")
+    if not isinstance(models, dict):
+        models = {}
+
+    hb_predictions: list[float] = []
+    for model_name in ("gb_hb", "rf_hb", "ridge_hb"):
+        prediction = _safe_regression_predict(models.get(model_name), row, model_name)
+        if prediction is not None:
+            hb_predictions.append(prediction)
+
+    classifier_probabilities: list[float] = []
+    for model_name in ("gb_clf", "rf_clf", "lr_clf", "calibrated_clf"):
+        prediction = _safe_classifier_predict(models.get(model_name), row, model_name)
+        if prediction is not None:
+            classifier_probabilities.append(prediction)
+
+    if not hb_predictions and not classifier_probabilities:
+        raise RuntimeError("Ultimate clinical artifact contains no usable predictor heads.")
+
+    predicted_hb = (
+        float(np.mean(hb_predictions))
+        if hb_predictions
+        else float(np.clip(13.2 - (np.mean(classifier_probabilities) * 2.4), 6.0, 18.0))
+    )
+    predicted_hb = float(np.clip(predicted_hb, 4.5, 20.0))
+
+    classifier_probability = (
+        float(np.mean(classifier_probabilities))
+        if classifier_probabilities
+        else float(sigmoid((11.8 - predicted_hb) / 1.35))
+    )
+
+    hb_threshold = _artifact_float(artifact, "hb_threshold", 11.8)
+    hb_scale = _artifact_float(artifact, "hb_scale", 1.35)
+    blend_threshold = _artifact_float(artifact, "blend_threshold", 0.50)
+    risk_scale = _artifact_float(artifact, "risk_scale", 0.18)
+    classifier_weight = _artifact_float(artifact, "classifier_weight", 0.58)
+
+    regressor_risk = float(sigmoid((hb_threshold - predicted_hb) / max(hb_scale, 1e-6)))
+    blend_signal = float(
+        (classifier_probability * classifier_weight)
+        + (regressor_risk * (1.0 - classifier_weight))
+    )
+    risk = float(sigmoid((blend_signal - blend_threshold) / max(risk_scale, 1e-6)))
+
+    classifier_spread = float(np.std(classifier_probabilities)) if len(classifier_probabilities) > 1 else 0.0
+    hb_spread = float(np.std(hb_predictions)) if len(hb_predictions) > 1 else 0.0
+    hb_risk_signals = [float(sigmoid((hb_threshold - hb) / max(hb_scale, 1e-6))) for hb in hb_predictions]
+    blended_signals = classifier_probabilities + hb_risk_signals
+    disagreement = abs(classifier_probability - regressor_risk)
+    signal_spread = float(np.std(blended_signals)) if len(blended_signals) > 1 else disagreement * 0.5
+    margin_uncertainty = 1.0 - min(1.0, abs(blend_signal - blend_threshold) / 0.22)
+    feature_noise = float(feature_map.get("noise_level", 0.0))
+    lighting_penalty = 1.0 - float(feature_map.get("lighting_uniformity", 0.7))
+    uncertainty = clamp(
+        (classifier_spread * 0.22)
+        + (min(hb_spread / 1.8, 1.0) * 0.20)
+        + (disagreement * 0.20)
+        + (signal_spread * 0.18)
+        + (margin_uncertainty * 0.10)
+        + (feature_noise * 0.06)
+        + (lighting_penalty * 0.04)
+        + 0.06,
+        0.05,
+        0.95,
+    )
+    hb_interval_half_width = max(0.6, 0.9 + (hb_spread * 1.1) + (uncertainty * 0.45))
+
+    return {
+        "anemia_risk": risk,
+        "predicted_hemoglobin": predicted_hb,
+        "uncertainty": uncertainty,
+        "classifier_probability": classifier_probability,
+        "regressor_risk": regressor_risk,
+        "blend_signal": blend_signal,
+        "hb_interval_low": round(max(predicted_hb - hb_interval_half_width, 4.0), 1),
+        "hb_interval_high": round(min(predicted_hb + hb_interval_half_width, 22.0), 1),
+    }
+
+
+def _resolve_ultimate_scaler(artifact: dict[str, object]):
+    scaler = artifact.get("scaler")
+    if scaler is not None:
+        return scaler
+    scalers = artifact.get("scalers")
+    if isinstance(scalers, dict):
+        for key in ("main", "primary", "default", "clinical"):
+            value = scalers.get(key)
+            if value is not None:
+                return value
+        for value in scalers.values():
+            if value is not None:
+                return value
+    return None
+
+
+def _artifact_float(artifact: dict[str, object], key: str, default: float) -> float:
+    value = artifact.get(key)
+    if value is None:
+        calibration = artifact.get("calibration")
+        if isinstance(calibration, dict):
+            value = calibration.get(key)
+    if value is None:
+        return float(default)
+    try:
+        return float(value)
+    except Exception:
+        return float(default)
+
+
+def _safe_regression_predict(model, row: np.ndarray, model_name: str) -> float | None:
+    if model is None:
+        return None
+    try:
+        return float(model.predict(row)[0])
+    except Exception as exc:
+        log.warning("Ultimate regression head '%s' failed: %s", model_name, exc)
+        return None
+
+
+def _safe_classifier_predict(model, row: np.ndarray, model_name: str) -> float | None:
+    if model is None:
+        return None
+    try:
+        if hasattr(model, "predict_proba"):
+            probabilities = model.predict_proba(row)
+            return float(probabilities[0, 1])
+        if hasattr(model, "decision_function"):
+            score = float(model.decision_function(row)[0])
+            return float(sigmoid(score))
+        if hasattr(model, "predict"):
+            raw_value = float(model.predict(row)[0])
+            return clamp(raw_value)
+    except Exception as exc:
+        log.warning("Ultimate classifier head '%s' failed: %s", model_name, exc)
+    return None
+
+
+def _predict_v5(
+    artifact: dict[str, object],
+    feature_map: dict[str, float],
+    *,
+    source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
+) -> dict[str, float]:
+    """Inference for archive-fusion-v5 artifacts (ExtraTrees + XGBoost stacked)."""
+    prepared = prepare_feature_map(feature_map, source_hint=source_hint)
+    feat_names: list[str] = artifact["feature_names"]
+    row = np.asarray(
+        [prepared.get(name, 0.0) for name in feat_names], dtype=np.float32
+    ).reshape(1, -1)
+
+    et_reg = artifact["regressor"]
+    et_clf = artifact["classifier"]
+    xgb_reg = artifact.get("xgb_regressor")
+    xgb_clf = artifact.get("xgb_classifier")
+    clf_w = float(artifact.get("xgb_weight_clf", 0.55))
+    calibration = artifact["calibration"]
+
+    # Hb prediction (50/50 ET + XGB when both present)
+    et_hb = float(et_reg.predict(row)[0])
+    if xgb_reg is not None:
+        xgb_hb = float(xgb_reg.predict(row)[0])
+        predicted_hb_raw = 0.50 * et_hb + 0.50 * xgb_hb
+    else:
+        predicted_hb_raw = et_hb
+
+    HB_POPULATION_MEAN = float(calibration.get("hb_population_mean", 12.8))
+    HB_SPREAD_FACTOR = float(calibration.get("hb_spread_factor", 2.0))
+    deviation = predicted_hb_raw - HB_POPULATION_MEAN
+    predicted_hb = float(np.clip(
+        HB_POPULATION_MEAN + deviation * HB_SPREAD_FACTOR, 5.0, 20.0,
+    ))
+
+    # Risk blend
+    et_prob = float(et_clf.predict_proba(row)[0, 1])
+    if xgb_clf is not None:
+        xgb_prob = float(xgb_clf.predict_proba(row)[0, 1])
+        classifier_probability = 0.45 * et_prob + 0.55 * xgb_prob
+    else:
+        classifier_probability = et_prob
+
+    hb_scale = float(calibration["hb_scale"])
+    regressor_risk = sigmoid(
+        (float(calibration["hb_threshold"]) - predicted_hb) / hb_scale
+    )
+    blend_signal = clf_w * classifier_probability + (1.0 - clf_w) * regressor_risk
+    risk = sigmoid(
+        (blend_signal - float(calibration["blend_threshold"]))
+        / float(calibration["risk_scale"])
+    )
+
+    # Uncertainty: try embedded UncertaintyEstimator, fall back to heuristic
+    ue = artifact.get("uncertainty_estimator")
+    hb_low = predicted_hb - hb_scale
+    hb_high = predicted_hb + hb_scale
+    if ue is not None:
+        try:
+            est = ue.estimate_simple(predicted_hb, blend_signal)
+            uncertainty = float(est["uncertainty"])
+            hb_low = float(est.get("hb_low", hb_low))
+            hb_high = float(est.get("hb_high", hb_high))
+        except Exception:
+            uncertainty = _heuristic_uncertainty(
+                classifier_probability, regressor_risk, risk, predicted_hb, calibration
+            )
+    else:
+        uncertainty = _heuristic_uncertainty(
+            classifier_probability, regressor_risk, risk, predicted_hb, calibration
+        )
+
+    return {
+        "anemia_risk": risk,
+        "predicted_hemoglobin": predicted_hb,
+        "uncertainty": uncertainty,
+        "classifier_probability": classifier_probability,
+        "regressor_risk": regressor_risk,
+        "blend_signal": blend_signal,
+        "hb_interval_low": round(max(hb_low, 4.0), 1),
+        "hb_interval_high": round(min(hb_high, 22.0), 1),
+    }
+
+
+def _heuristic_uncertainty(
+    clf_prob: float,
+    reg_risk: float,
+    risk: float,
+    predicted_hb: float,
+    calibration: dict,
+) -> float:
+    """Fallback uncertainty when no UncertaintyEstimator is embedded in artifact."""
+    disagreement = abs(clf_prob - reg_risk)
+    margin_uncertainty = 1.0 - min(1.0, abs(risk - 0.5) * 2.0)
+    out_of_range_penalty = 0.08 if predicted_hb < 7.0 or predicted_hb > 18.0 else 0.0
+    return clamp(
+        (disagreement * 0.35)
+        + (margin_uncertainty * 0.30)
+        + float(calibration.get("base_uncertainty", 0.08))
+        + out_of_range_penalty,
+        0.05,
+        0.95,
+    )
 
 
 def _predict_stacked_v4(
@@ -187,7 +477,19 @@ def prepare_feature_map(
     *,
     source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original",
 ) -> dict[str, float]:
-    prepared = {name: float(feature_map[name]) for name in FEATURE_NAMES}
+    # ── v5 illumination defaults for backward compatibility ──────────────────
+    # Old cached feature maps lack the v5 illumination keys.  Neutral defaults:
+    # illumination_mean=0.5 (mid-range brightness), all others 0.0 (no bias).
+    _V5_DEFAULTS: dict[str, float] = {
+        "illumination_mean": 0.5,
+        "illumination_std": 0.12,
+        "spectral_tilt_rb": 0.0,
+        "highlight_fraction": 0.0,
+        "shadow_fraction": 0.0,
+        "clahe_gain": 0.0,
+    }
+    effective_map = {**_V5_DEFAULTS, **feature_map}
+    prepared = {name: float(effective_map[name]) for name in FEATURE_NAMES}
     prepared["source_roi_original"] = 1.0 if source_hint == "roi_original" else 0.0
     prepared["source_segmented"] = 0.0 if source_hint == "roi_original" else 1.0
     prepared["source_forniceal_palpebral"] = 1.0 if source_hint == "forniceal_palpebral" else 0.0

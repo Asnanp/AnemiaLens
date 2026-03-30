@@ -133,6 +133,10 @@ class PlattScaler:
     def calibrate(self, score: float) -> float:
         return float(_sigmoid(np.array([self.a * score + self.b]))[0])
 
+    def calibrate_array(self, scores: np.ndarray) -> np.ndarray:
+        scores = np.asarray(scores, dtype=np.float32)
+        return _sigmoid((scores * self.a) + self.b).astype(np.float32)
+
     def to_dict(self) -> dict[str, float]:
         return {"a": self.a, "b": self.b}
 

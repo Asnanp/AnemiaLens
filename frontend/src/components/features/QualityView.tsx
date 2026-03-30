@@ -1,11 +1,12 @@
 import { CheckCircle, AlertTriangle, Info, RotateCcw, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { QualityAssessment } from '../../types';
+import type { QualityAssessment, RoiPreview } from '../../types';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
 interface QualityViewProps {
   quality: QualityAssessment;
+  roiPreview: RoiPreview | null;
   onContinue: () => void;
   onBack: () => void;
   loading: boolean;
@@ -68,7 +69,12 @@ function ScoreRing({ value, color, label }: { value: number; color: string; labe
   );
 }
 
-export function QualityView({ quality, onContinue, onBack, loading }: QualityViewProps) {
+function humanizeSource(source?: string | null) {
+  if (!source) return 'full frame';
+  return source.replace(/_/g, ' ');
+}
+
+export function QualityView({ quality, roiPreview, onContinue, onBack, loading }: QualityViewProps) {
   const blocking = quality.issues.filter((issue) => issue.severity === 'blocking').length;
   const passed = blocking === 0;
   const normalizeBlur = (value: number) => Math.max(0, Math.min(100, ((value - 55) / 165) * 100));
@@ -253,6 +259,75 @@ export function QualityView({ quality, onContinue, onBack, loading }: QualityVie
             </motion.div>
           ))}
         </div>
+
+        {roiPreview && (
+          <div
+            className="roi-preview-surface"
+            style={{
+              padding: '1rem 1.1rem',
+              borderRadius: '0.9rem',
+              background: 'rgba(34,211,238,0.05)',
+              border: '1px solid rgba(34,211,238,0.14)',
+              marginBottom: '1.2rem',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.78)' }}>
+                ROI Preview
+              </span>
+              <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text)' }}>
+                {roiPreview.extracted ? humanizeSource(roiPreview.source) : 'full frame fallback'}
+              </span>
+            </div>
+
+            <div className="roi-preview-images" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
+              {[
+                { label: 'Raw ROI', src: roiPreview.original_data_url },
+                { label: 'Enhanced ROI', src: roiPreview.enhanced_data_url },
+              ].map((image) => (
+                <div key={image.label} style={{ display: 'grid', gap: '0.45rem' }}>
+                  <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+                    {image.label}
+                  </div>
+                  <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 96 }}>
+                    {image.src ? (
+                      <img
+                        src={image.src}
+                        alt={image.label}
+                        style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                      />
+                    ) : (
+                      <div style={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+                        Preview unavailable
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.8rem' }}>
+              {roiPreview.enhancement_summary}
+            </p>
+
+            <div className="roi-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
+              {[
+                { label: 'ROI confidence', value: `${Math.round(roiPreview.extraction_confidence * 100)}%`, accent: '#22D3EE' },
+                { label: 'Sharpness', value: `${Math.round(roiPreview.preview_sharpness * 100)}%`, accent: '#10B981' },
+                { label: 'Tone balance', value: `${Math.round(roiPreview.preview_tone_balance * 100)}%`, accent: '#F59E0B' },
+              ].map((metric) => (
+                <div key={metric.label} style={{ padding: '0.7rem 0.8rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.25rem' }}>
+                    {metric.label}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontFamily: 'var(--mono)', fontWeight: 700, color: metric.accent }}>
+                    {metric.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.12)', marginBottom: '1.2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap' }}>

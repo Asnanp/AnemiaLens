@@ -5,6 +5,7 @@ import type {
   PatientProfileInput,
   QualityAssessment,
   RecentScreening,
+  RoiPreview,
   RuntimeStatusResponse,
   SymptomInput,
   TriageResult,
@@ -84,6 +85,7 @@ export function useScreening() {
   const [symptoms, setSymptoms] = useState<SymptomInput>(defaultSymptoms);
   const [patientProfile, setPatientProfile] = useState<PatientProfileInput>(defaultPatientProfile);
   const [quality, setQuality] = useState<QualityAssessment | null>(null);
+  const [roiPreview, setRoiPreview] = useState<RoiPreview | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [runtime, setRuntime] = useState<RuntimeStatusResponse | null>(null);
   const [recent, setRecent] = useState<RecentScreening[]>([]);
@@ -121,6 +123,7 @@ export function useScreening() {
     setFile(nextFile);
     setPreview(URL.createObjectURL(nextFile));
     setQuality(null);
+    setRoiPreview(null);
     setAnalysis(null);
     setError(null);
     setIsOfflineMode(false);
@@ -142,7 +145,8 @@ export function useScreening() {
     setError(null);
     try {
       const result = await checkImageQuality(file);
-      setQuality(result);
+      setQuality(result.quality);
+      setRoiPreview(result.roi_preview ?? null);
       setBackendUp(true);
       setIsOfflineMode(false);
       setStep(1);
@@ -166,6 +170,7 @@ export function useScreening() {
       } catch { /* ignore */ }
       const result = await analyzeScreening(file, symptoms, patientProfile, undefined, undefined, symptomSeverity);
       setAnalysis(result);
+      setRoiPreview(result.roi_preview ?? null);
       setBackendUp(true);
       setIsOfflineMode(false);
       const item = buildRecent(result);
@@ -205,6 +210,7 @@ export function useScreening() {
       setSymptoms(sampleSymptoms);
       setPatientProfile(defaultPatientProfile);
       setQuality(null);
+      setRoiPreview(null);
       setAnalysis(null);
       setStep(0);
     } catch (err) {
@@ -221,6 +227,7 @@ export function useScreening() {
     setSymptoms(defaultSymptoms);
     setPatientProfile(defaultPatientProfile);
     setQuality(null);
+    setRoiPreview(null);
     setAnalysis(null);
     setError(null);
     setIsOfflineMode(false);
@@ -273,6 +280,7 @@ export function useScreening() {
         shadow_risk: 0,
         issues: [],
       },
+      roi_preview: null,
       prediction: null,
       decision_audit: {
         processing_path: 'quality_blocked',
@@ -441,7 +449,7 @@ export function useScreening() {
     file, previewUrl,
     symptoms, toggleSymptom, setSymptoms,
     patientProfile, updatePatientProfile,
-    quality, analysis, runtime,
+    quality, roiPreview, analysis, runtime,
     recent, loading, error, backendUp,
     isOfflineMode,
     pickFile, runQuality, runAnalysis, loadSample, reset, symptomOnlyAssess,

@@ -1,7 +1,7 @@
 import type {
   AnalyzeResponse,
   PatientProfileInput,
-  QualityAssessment,
+  QualityCheckResponse,
   RuntimeStatusResponse,
   SymptomInput
 } from './types';
@@ -113,7 +113,7 @@ export async function getRuntimeStatus(): Promise<RuntimeStatusResponse> {
   return (await r.json()) as RuntimeStatusResponse;
 }
 
-export async function checkImageQuality(file: File): Promise<QualityAssessment> {
+export async function checkImageQuality(file: File): Promise<QualityCheckResponse> {
   const compressed = await compressImage(file);
   const form = new FormData();
   form.append('image', compressed);
@@ -127,8 +127,7 @@ export async function checkImageQuality(file: File): Promise<QualityAssessment> 
     try { const b = await r.json(); if (b?.error) msg = b.error; } catch { /* use default */ }
     throw new Error(msg);
   }
-  const data = (await r.json()) as { quality: QualityAssessment };
-  return data.quality;
+  return (await r.json()) as QualityCheckResponse;
 }
 
 export async function analyzeScreening(

@@ -31,7 +31,16 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Request, UploadFile, status, Depends
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    File,
+    Form,
+    Request,
+    UploadFile,
+    status,
+    Depends,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from PIL import UnidentifiedImageError
@@ -48,6 +57,7 @@ from app.services.handoff import HandoffSummaryService
 from app.services.image_quality import ImageQualityService
 from app.services.patient_case import PatientCaseService
 from app.services.prediction import ScreeningPredictor
+from app.services.roi_preview import build_roi_preview_payload
 from app.services.request_parsing import (
     InvalidRequestPayload,
     normalize_optional_text,
@@ -65,6 +75,7 @@ load_dotenv(BACKEND_ROOT / ".env")
 # ---------------------------------------------------------------------------
 try:
     import torch
+
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
 except Exception:
@@ -73,6 +84,7 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Structured JSON Logging
 # ---------------------------------------------------------------------------
+
 
 class _JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -100,14 +112,18 @@ log = logging.getLogger("anemialens")
 # Lifespan — startup / shutdown
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("AnemiaLens starting up …")
 
     # ---------- Database ----------
-    # Tables are pre-created via supabase_schema.sql — skip DDL on startup
-    # (asyncpg + Supabase transaction pooler drops connection during DDL)
-    log.info("Database tables assumed present (pre-created via SQL).")
+    from app.database import create_tables
+
+    try:
+        await create_tables()
+    except Exception as exc:
+        log.warning("DDL sync failed or skipped: %s", exc)
 
     # ---------- ML Services ----------
     app.state.quality_service = ImageQualityService()
@@ -125,13 +141,19 @@ async def lifespan(app: FastAPI):
         try:
             from PIL import Image
             import numpy as np
+
             dummy = Image.fromarray(
                 np.random.randint(80, 200, (120, 200, 3), dtype=np.uint8), mode="RGB"
             )
             from app.schemas import QualityAssessment
+
             dummy_quality = QualityAssessment(
-                passed=True, blur_score=100.0, brightness_score=0.3,
-                contrast_score=0.15, framing_score=1.5, issues=[],
+                passed=True,
+                blur_score=100.0,
+                brightness_score=0.3,
+                contrast_score=0.15,
+                framing_score=1.5,
+                issues=[],
             )
             app.state.predictor.predict(dummy, dummy_quality)
             gc.collect()
@@ -174,6 +196,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "https://anemialens.vercel.app",
         "https://anemia-lens.vercel.app",
         "https://asnanp.github.io",
@@ -186,6 +212,7 @@ app.add_middleware(
 
 # 2. Rate limiting
 from app.middleware.rate_limit import RateLimitMiddleware
+
 app.add_middleware(
     RateLimitMiddleware,
     analyze_rpm=10,
@@ -195,12 +222,14 @@ app.add_middleware(
 
 # 3. Memory guard
 from app.middleware.memory_guard import MemoryGuardMiddleware
+
 app.add_middleware(MemoryGuardMiddleware)
 
 
 # ---------------------------------------------------------------------------
 # Middleware — request ID + timing
 # ---------------------------------------------------------------------------
+
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
@@ -260,6 +289,7 @@ app.include_router(email_report_router)
 # Error helpers
 # ---------------------------------------------------------------------------
 
+
 def _image_error_response(request_id: str) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -281,22 +311,31 @@ def _too_large_response(request_id: str, max_mb: float) -> JSONResponse:
     )
 
 
-def _attempt_raw_frame_rescue(services, image_bytes: bytes, quality):
+def _attempt_raw_frame_rescue(
+    services, image_bytes: bytes, quality, patient_profile_input=None
+):
     if quality.passed or not services.quality_service.allows_raw_frame_rescue(quality):
         return quality, None, False
 
     raw_image = load_image_bytes(image_bytes).convert("RGB")
-    raw_prediction = services.predictor.predict(raw_image, quality)
+    raw_prediction = services.predictor.predict(
+        raw_image,
+        quality,
+        patient_profile=patient_profile_input,
+    )
     if not services.predictor.should_accept_raw_frame_rescue(raw_prediction):
         return quality, None, False
 
-    rescued_quality = services.quality_service.build_raw_frame_rescue_assessment(quality)
+    rescued_quality = services.quality_service.build_raw_frame_rescue_assessment(
+        quality
+    )
     return rescued_quality, raw_prediction, True
 
 
 # ---------------------------------------------------------------------------
 # Screening persistence helper (Phase 2)
 # ---------------------------------------------------------------------------
+
 
 async def _persist_screening(
     request_id: str,
@@ -321,6 +360,7 @@ async def _persist_screening(
 # Routes — Health / Meta
 # ---------------------------------------------------------------------------
 
+
 @app.get("/", include_in_schema=False)
 async def root() -> RedirectResponse:
     """Redirect the Space root to Swagger UI so Docker Space routing has a valid landing page."""
@@ -344,7 +384,9 @@ async def readyz(request: Request) -> JSONResponse:
     guidance_status = request.app.state.guidance_service.runtime_status()
     ready = predictor.is_ready()
     return JSONResponse(
-        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        status_code=status.HTTP_200_OK
+        if ready
+        else status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
             "status": "ready" if ready else "degraded",
             "model_ready": ready,
@@ -372,6 +414,7 @@ async def runtime_status(request: Request) -> RuntimeStatusResponse:
 # Routes — Screening
 # ---------------------------------------------------------------------------
 
+
 @app.post(
     "/api/quality-check",
     response_model=QualityCheckResponse,
@@ -390,11 +433,16 @@ async def quality_check(
         return _too_large_response(rid, settings.max_image_bytes / 1024 / 1024)
 
     try:
-        quality, _ = request.app.state.quality_service.evaluate(image_bytes)
+        quality, _, roi_result = request.app.state.quality_service.evaluate_with_roi(
+            image_bytes
+        )
     except (UnidentifiedImageError, ValueError):
         return _image_error_response(rid)
 
-    return QualityCheckResponse(quality=quality)
+    return QualityCheckResponse(
+        quality=quality,
+        roi_preview=build_roi_preview_payload(roi_result),
+    )
 
 
 @app.post(
@@ -407,10 +455,19 @@ async def quality_check(
 async def analyze(
     request: Request,
     image: Annotated[UploadFile, File(description="Eye photo (JPEG or PNG).")],
-    symptoms: Annotated[str | None, Form(description="JSON-encoded symptom flags.")] = None,
-    patient_profile: Annotated[str | None, Form(description="JSON-encoded intake profile.")] = None,
-    language: Annotated[str | None, Form(description="Preferred language for guidance.")] = None,
-    region: Annotated[str | None, Form(description="Geographic region for localised guidance.")] = None,
+    symptoms: Annotated[
+        str | None, Form(description="JSON-encoded symptom flags.")
+    ] = None,
+    patient_profile: Annotated[
+        str | None, Form(description="JSON-encoded intake profile.")
+    ] = None,
+    language: Annotated[
+        str | None, Form(description="Preferred language for guidance.")
+    ] = None,
+    region: Annotated[
+        str | None, Form(description="Geographic region for localised guidance.")
+    ] = None,
+    background_tasks: BackgroundTasks = None,
 ) -> AnalyzeResponse | JSONResponse:
     """
     Full pipeline: quality gate → ML inference → triage → guidance → insight packs.
@@ -431,10 +488,12 @@ async def analyze(
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
             from app.utils.security import decode_token
+
             payload = decode_token(token)
             if payload and payload.get("type") == "access":
                 from sqlalchemy import select
                 from app.models.user import User
+
                 async with async_session_factory() as session:
                     result = await session.execute(
                         select(User).where(User.uid == payload.get("sub"))
@@ -449,7 +508,11 @@ async def analyze(
 
     # --- Scan limit enforcement (free = 10 scans) --------------------------
     FREE_SCAN_LIMIT = 10
-    if user_id is not None and user_tier == "free" and user_scan_count >= FREE_SCAN_LIMIT:
+    if (
+        user_id is not None
+        and user_tier == "free"
+        and user_scan_count >= FREE_SCAN_LIMIT
+    ):
         return JSONResponse(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             content={
@@ -478,18 +541,33 @@ async def analyze(
         return _too_large_response(rid, settings.max_image_bytes / 1024 / 1024)
 
     try:
-        quality, rgb = svc.quality_service.evaluate(image_bytes)
+        quality, rgb, roi_result = svc.quality_service.evaluate_with_roi(image_bytes)
     except (UnidentifiedImageError, ValueError):
         return _image_error_response(rid)
 
     # --- Inference (skipped on quality failure) -----------------------------
-    prediction = svc.predictor.predict(rgb, quality) if quality.passed else None
+    prediction = (
+        svc.predictor.predict(
+            rgb,
+            quality,
+            patient_profile=patient_profile_input,
+        )
+        if quality.passed
+        else None
+    )
     used_raw_frame_rescue = False
     if prediction is None:
-        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(svc, image_bytes, quality)
+        quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(
+            svc,
+            image_bytes,
+            quality,
+            patient_profile_input=patient_profile_input,
+        )
 
     # --- Triage + guidance -------------------------------------------------
-    signal_breakdown = svc.triage_service.build_signal_breakdown(quality, prediction, symptom_input)
+    signal_breakdown = svc.triage_service.build_signal_breakdown(
+        quality, prediction, symptom_input
+    )
     triage = svc.triage_service.assess(
         quality,
         prediction,
@@ -570,6 +648,7 @@ async def analyze(
     response = AnalyzeResponse(
         blocked=not quality.passed,
         quality=quality,
+        roi_preview=build_roi_preview_payload(roi_result),
         prediction=prediction,
         decision_audit=decision_audit,
         triage=triage,
@@ -587,11 +666,9 @@ async def analyze(
     )
 
     # --- Persist to database (async, non-blocking) -------------------------
-    import asyncio
-    asyncio.create_task(
-        _persist_screening(rid, response, user_id, processing_time_ms)
-    )
+    if background_tasks is not None:
+        background_tasks.add_task(
+            _persist_screening, rid, response, user_id, processing_time_ms
+        )
 
     return response
-
-

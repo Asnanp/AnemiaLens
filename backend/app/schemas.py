@@ -327,6 +327,8 @@ ModelSource = Literal[
     "efficientnet-b0-ft",
     "archive-fusion-v2",
     "archive-primary-v3",
+    "archive-fusion-v7-ultimate-clinical",
+    "archive-fusion-v8-clinical-robust",
     "archive-evidence-fusion-v4",
     "deep-stack",
     "heuristic-demo",
@@ -818,8 +820,44 @@ class RuntimeStatusResponse(BaseModel):
 # HTTP response envelopes
 # ---------------------------------------------------------------------------
 
+class RoiPreview(BaseModel):
+    source: str = Field(description="Which extraction strategy produced the preview image.")
+    extracted: bool = Field(
+        description="True when a dedicated conjunctival ROI was isolated from the frame."
+    )
+    extraction_confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        description="Confidence that the extracted region contains the exposed conjunctiva."
+    )
+    original_data_url: str | None = Field(default=None, description="Compact data URL for the raw ROI preview image.")
+    enhanced_data_url: str | None = Field(
+        default=None,
+        description="Compact data URL for the lighting-corrected, sharpened ROI preview image.",
+    )
+    preview_sharpness: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Preview sharpness score after enhancement, normalised to [0,1].",
+    )
+    preview_contrast: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Preview contrast score after enhancement, normalised to [0,1].",
+    )
+    preview_tone_balance: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="How balanced the preview exposure is after enhancement, normalised to [0,1].",
+    )
+    enhancement_summary: str = Field(
+        default="ROI preview unavailable.",
+        description="Plain-language explanation of what the ROI enhancement achieved.",
+    )
+
+
 class QualityCheckResponse(BaseModel):
     quality: QualityAssessment
+    roi_preview: RoiPreview | None = Field(
+        default=None,
+        description="Original and enhanced ROI previews used to explain what region the system focused on.",
+    )
+    roi_preview: RoiPreview | None = None
 
 
 class AnalyzeResponse(BaseModel):

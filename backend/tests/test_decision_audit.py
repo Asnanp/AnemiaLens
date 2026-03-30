@@ -49,8 +49,8 @@ def test_decision_audit_marks_full_frame_rescue_and_threshold_margin() -> None:
 
     assert audit.processing_path == "full_frame_rescue"
     assert audit.calibration_band == "strong_positive"
-    assert audit.decision_threshold == 0.435
-    assert audit.threshold_margin == 0.385
+    assert audit.decision_threshold == 0.495
+    assert audit.threshold_margin == 0.325
     assert "raw_frame_rescue" in audit.review_flags
     assert "warning:bad_framing" in audit.review_flags
 

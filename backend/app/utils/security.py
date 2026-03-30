@@ -1,18 +1,19 @@
 """
 JWT authentication and password hashing utilities.
 
-Uses passlib+bcrypt for passwords and python-jose for JWT tokens.
+Uses bcrypt for passwords and python-jose for JWT tokens.
 """
 
 from __future__ import annotations
 
 import os
+import hashlib
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(BACKEND_ROOT / ".env")
@@ -22,23 +23,49 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 JWT_REFRESH_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+PASSWORD_HASH_PREFIX = "bcrypt_sha256$"
 
 
 # ---------------------------------------------------------------------------
 # Password helpers
 # ---------------------------------------------------------------------------
 
+def _legacy_bcrypt_bytes(password: str) -> bytes:
+    """Legacy bcrypt compatibility path for previously stored hashes."""
+    return password.encode("utf-8")[:72]
+
+
+def _sha256_bcrypt_bytes(password: str) -> bytes:
+    """
+    Stable password material for new hashes.
+
+    Bcrypt only accepts up to 72 bytes. We pre-hash with SHA-256 so new
+    passwords can be arbitrary length/Unicode without truncation.
+    """
+    return hashlib.sha256(password.encode("utf-8")).hexdigest().encode("ascii")
+
+
 def hash_password(password: str) -> str:
-    """Hash a plaintext password (truncated to 72 bytes for bcrypt compatibility)."""
-    truncated = password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-    return pwd_context.hash(truncated)
+    """Hash a plaintext password using SHA-256 + bcrypt."""
+    hashed = bcrypt.hashpw(_sha256_bcrypt_bytes(password), bcrypt.gensalt())
+    return f"{PASSWORD_HASH_PREFIX}{hashed.decode('utf-8')}"
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plaintext password against its hash (truncated to 72 bytes)."""
-    truncated = plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-    return pwd_context.verify(truncated, hashed)
+    """
+    Verify a plaintext password against its stored hash.
+
+    Supports:
+    - new `bcrypt_sha256$...` hashes
+    - legacy raw bcrypt hashes already stored in the database
+    """
+    try:
+        if hashed.startswith(PASSWORD_HASH_PREFIX):
+            encoded_hash = hashed[len(PASSWORD_HASH_PREFIX):].encode("utf-8")
+            return bcrypt.checkpw(_sha256_bcrypt_bytes(plain), encoded_hash)
+        return bcrypt.checkpw(_legacy_bcrypt_bytes(plain), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------

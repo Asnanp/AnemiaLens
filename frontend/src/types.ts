@@ -40,6 +40,23 @@ export type QualityAssessment = {
   issues: QualityIssue[];
 };
 
+export type RoiPreview = {
+  source: string;
+  extracted: boolean;
+  extraction_confidence: number;
+  original_data_url: string | null;
+  enhanced_data_url: string | null;
+  preview_sharpness: number;
+  preview_contrast: number;
+  preview_tone_balance: number;
+  enhancement_summary: string;
+};
+
+export type QualityCheckResponse = {
+  quality: QualityAssessment;
+  roi_preview?: RoiPreview | null;
+};
+
 export type PredictionResult = {
   anemia_risk: number;
   predicted_hemoglobin: number | null;
@@ -262,6 +279,7 @@ export type RuntimeStatusResponse = {
 export type AnalyzeResponse = {
   blocked: boolean;
   quality: QualityAssessment;
+  roi_preview?: RoiPreview | null;
   prediction: PredictionResult | null;
   decision_audit: DecisionAudit;
   triage: TriageResult;

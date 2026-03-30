@@ -8,6 +8,7 @@ _RUNTIME_STACK_SOURCES = {
     RUNTIME_STACK_VERSION,
     "archive-primary-v3",
     "archive-fusion-v2",
+    "archive-fusion-v7-ultimate-clinical",
 }
 
 
@@ -33,7 +34,7 @@ def build_decision_audit(
             summary="Image quality blocked model inference before a screening result could be produced.",
         )
 
-    threshold = _decision_threshold(prediction.model_source)
+    threshold = _decision_threshold(prediction)
     margin = round(prediction.anemia_risk - threshold, 3)
     calibration_band = _calibration_band(prediction, margin)
 
@@ -70,7 +71,13 @@ def build_decision_audit(
     )
 
 
-def _decision_threshold(model_source: str) -> float:
+def _decision_threshold(prediction: PredictionResult) -> float:
+    confidence_breakdown = prediction.confidence_breakdown or {}
+    if isinstance(confidence_breakdown, dict):
+        threshold_value = confidence_breakdown.get("decision_threshold")
+        if isinstance(threshold_value, (int, float)):
+            return float(threshold_value)
+    model_source = prediction.model_source
     if model_source in _RUNTIME_STACK_SOURCES:
         return float(decision_threshold_for_source("roi_original"))
     return 0.5

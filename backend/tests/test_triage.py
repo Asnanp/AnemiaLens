@@ -198,8 +198,8 @@ def test_signal_breakdown_exposes_fusion_components() -> None:
     breakdown = SERVICE.build_signal_breakdown(quality, prediction, symptoms)
 
     assert breakdown.image_risk == 0.64
-    assert breakdown.symptom_score == pytest.approx(0.34)
-    assert breakdown.fused_score == pytest.approx((0.64 * 0.72) + (0.34 * 0.28))
-    assert breakdown.image_weight == 0.72
-    assert breakdown.symptom_weight == 0.28
+    assert breakdown.symptom_score == pytest.approx(0.42)
+    assert breakdown.fused_score == pytest.approx((0.64 * 0.55) + (0.42 * 0.45))
+    assert breakdown.image_weight == 0.55
+    assert breakdown.symptom_weight == 0.45
     assert breakdown.reliability_flag == "medium"

@@ -78,6 +78,12 @@ type ReliabilityStatus = {
   detail: string;
 };
 
+type HemoglobinPresentation = {
+  headline: string;
+  detail: string;
+  preview: string;
+};
+
 function isSevereLightingCase(analysis: AnalyzeResponse): boolean {
   const breakdown = analysis.prediction?.confidence_breakdown;
   return (
@@ -331,6 +337,152 @@ function SignalBar({ label, value, color, delay = 0 }: { label: string; value: n
   );
 }
 
+function getHemoglobinPresentation(analysis: AnalyzeResponse): HemoglobinPresentation {
+  const value = analysis.prediction?.predicted_hemoglobin;
+  if (value != null) {
+    return {
+      headline: `${value.toFixed(1)} g/dL`,
+      detail: 'This estimate was shown because the scan quality and model trust checks were strong enough.',
+      preview: `${value.toFixed(1)} g/dL`,
+    };
+  }
+
+  const lighting = analysis.quality.lighting_condition;
+  const reviewFlags = analysis.decision_audit?.review_flags ?? [];
+  const reliability = analysis.prediction?.reliability_flag ?? 'low';
+
+  if (lighting === 'overexposed') {
+    return {
+      headline: 'Estimate held back',
+      detail: 'The image is brighter than ideal, so the app held back the hemoglobin number instead of showing a shaky value.',
+      preview: 'Held back for this scan',
+    };
+  }
+
+  if (lighting === 'glare_heavy') {
+    return {
+      headline: 'Estimate held back',
+      detail: 'Glare washed out part of the inner eyelid, so the app kept the screening result but did not show a hemoglobin number.',
+      preview: 'Held back for this scan',
+    };
+  }
+
+  if (lighting === 'shadow_heavy' || lighting === 'dim') {
+    return {
+      headline: 'Estimate held back',
+      detail: 'The inner eyelid was too shadowed for a stable hemoglobin estimate, so the app held that number back.',
+      preview: 'Held back for this scan',
+    };
+  }
+
+  if (reviewFlags.includes('raw_frame_rescue')) {
+    return {
+      headline: 'Estimate held back',
+      detail: 'The app had to rescue this result from the full image because the eyelid crop was weak, so it kept the hemoglobin number hidden.',
+      preview: 'Held back for this scan',
+    };
+  }
+
+  if (reliability === 'low') {
+    return {
+      headline: 'Estimate held back',
+      detail: 'The screening result still ran, but the scan was not repeatable enough for the app to show a hemoglobin number confidently.',
+      preview: 'Held back for this scan',
+    };
+  }
+
+  return {
+    headline: 'Estimate held back',
+    detail: 'The app kept the screening label, but held the hemoglobin number back because this scan did not pass the trust checks for that value.',
+    preview: 'Held back for this scan',
+  };
+}
+
+function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
+  const preview = analysis.roi_preview;
+  if (!preview) return null;
+
+  const sourceLabel = preview.extracted
+    ? humanizeToken(preview.source, 'roi crop')
+    : 'full frame fallback';
+
+  return (
+    <div
+      className="roi-preview-panel"
+      style={{
+        padding: '1rem 1.1rem',
+        borderRadius: '0.95rem',
+        background: 'rgba(34,211,238,0.04)',
+        border: '1px solid rgba(34,211,238,0.14)',
+        display: 'grid',
+        gap: '0.85rem',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.78)', marginBottom: '0.25rem' }}>
+            ROI Preview
+          </div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            The model focuses on this extracted inner-eyelid region rather than the whole frame.
+          </div>
+        </div>
+        <div style={{ padding: '0.32rem 0.72rem', borderRadius: '999px', border: `1px solid ${bandColor}33`, background: `${bandColor}12`, color: bandColor, fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700 }}>
+          {sourceLabel}
+        </div>
+      </div>
+
+      <div className="roi-preview-images" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        {[
+          { label: 'Raw ROI', src: preview.original_data_url },
+          { label: 'Enhanced ROI', src: preview.enhanced_data_url },
+        ].map((item) => (
+          <div key={item.label} style={{ display: 'grid', gap: '0.42rem' }}>
+            <div style={{ fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
+              {item.label}
+            </div>
+            <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 112 }}>
+              {item.src ? (
+                <img
+                  src={item.src}
+                  alt={item.label}
+                  style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+                  Preview unavailable
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+        {preview.enhancement_summary}
+      </div>
+
+      <div className="roi-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.6rem' }}>
+        {[
+          { label: 'ROI confidence', value: `${Math.round(preview.extraction_confidence * 100)}%`, accent: '#22D3EE' },
+          { label: 'Sharpness', value: `${Math.round(preview.preview_sharpness * 100)}%`, accent: '#10B981' },
+          { label: 'Contrast', value: `${Math.round(preview.preview_contrast * 100)}%`, accent: '#F59E0B' },
+          { label: 'Tone balance', value: `${Math.round(preview.preview_tone_balance * 100)}%`, accent: '#FB7185' },
+        ].map((metric) => (
+          <div key={metric.label} style={{ padding: '0.72rem 0.8rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: '0.52rem', fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.22rem' }}>
+              {metric.label}
+            </div>
+            <div style={{ fontSize: '0.76rem', fontFamily: 'var(--mono)', fontWeight: 700, color: metric.accent }}>
+              {metric.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
   const reliability = getReliabilityStatus(analysis);
   const activeSymptoms = activeSymptomLabels(analysis.symptoms);
@@ -386,6 +538,8 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
       <div style={{ padding: '1rem 1.125rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.75 }}>
         {mandatorySummary}
       </div>
+
+      <RoiPreviewPanel analysis={analysis} bandColor={bandColor} />
 
       <div className="result-fact-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
         {factPills.map((pill) => (
@@ -953,10 +1107,8 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
   const riskPct = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const summaryPreview = analysis.handoff_summary.headline || analysis.triage.summary;
   const nextStepPreview = analysis.guidance.next_steps.slice(0, 2);
-  const hbPreview =
-    analysis.prediction?.predicted_hemoglobin == null
-      ? 'Unavailable'
-      : `${analysis.prediction.predicted_hemoglobin.toFixed(1)} g/dL`;
+  const hemoglobinPresentation = getHemoglobinPresentation(analysis);
+  const hbPreview = hemoglobinPresentation.preview;
 
   useEffect(() => {
     if (user?.email) {
@@ -1148,6 +1300,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
   const hbValue = analysis.prediction?.predicted_hemoglobin ?? null;
   const hasHbEstimate = hbValue !== null;
+  const hemoglobinPresentation = getHemoglobinPresentation(analysis);
   const hbRaw  = hbValue ?? 0;
   const risk   = Math.round((analysis.prediction?.anemia_risk ?? analysis.triage.score ?? 0) * 100);
   const hbAnim = useCountUp(hbRaw, 1600, 200);
@@ -1216,7 +1369,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
       {/* ── FLASH OVERLAY ── */}
       <AnimatePresence>
-        {!flashDone && (
+        {!flashDone && isHigh && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: [0, 0.5, 0] }} exit={{ opacity: 0 }}
               transition={{ duration: 0.6, times: [0, 0.3, 1] }}
@@ -1234,29 +1387,37 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
       {/* ── MAIN CONTENT ── */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: revealed ? 1 : 0 }} transition={{ duration: 0.4 }}
-        style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
         {/* ── ROW 1: HERO CARD ── */}
-        <motion.div className="glass result-hero-card" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div className="glass result-hero-card result-hero-surface" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: E }}
-          style={{ padding: 'clamp(1.5rem,4vw,3rem)', borderLeft: `4px solid ${bandColor}`, background: bandBg, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), -8px 0 80px ${bandGlow}`, position: 'relative', overflow: 'hidden' }}>
-          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.18, 0.1] }} transition={{ duration: 6, repeat: Infinity }}
-            style={{ position: 'absolute', top: -120, right: -120, width: 500, height: 500, borderRadius: '50%', background: bandColor, filter: 'blur(160px)', pointerEvents: 'none' }} />
+          style={{
+            padding: 'clamp(1.35rem,3vw,2.35rem)',
+            border: `1px solid ${bandBorder}`,
+            borderLeft: `3px solid ${bandColor}`,
+            background: `linear-gradient(180deg, rgba(18,18,28,0.9), rgba(18,18,28,0.82)), ${bandBg}`,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 22px 44px rgba(0,0,0,0.28)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+          <motion.div animate={{ scale: [1, 1.12, 1], opacity: [0.06, 0.1, 0.06] }} transition={{ duration: 7, repeat: Infinity }}
+            style={{ position: 'absolute', top: -100, right: -100, width: 360, height: 360, borderRadius: '50%', background: bandColor, filter: 'blur(140px)', pointerEvents: 'none' }} />
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             {/* Badges row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
               <span style={{ padding: '0.4rem 1.125rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', background: bandBg, border: `1px solid ${bandBorder}`, color: bandColor }}>
                 {analysis.triage.label}
               </span>
             </div>
 
             {/* Metrics row */}
-            <div className="result-hero-metrics" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(1.5rem,4vw,3.5rem)', flexWrap: 'wrap', marginBottom: '2rem' }}>
+            <div className="result-hero-metrics" style={{ display: 'flex', alignItems: 'center', gap: 'clamp(1.35rem,3vw,2.8rem)', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
               <div>
                 {hasHbEstimate ? (
                   <>
-                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(3.5rem,8vw,7rem)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.04em', color: bandColor, textShadow: `0 0 80px ${bandColor}40` }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(3.2rem,7vw,5.75rem)', fontWeight: 300, lineHeight: 1, letterSpacing: '-0.04em', color: bandColor, textShadow: `0 0 50px ${bandColor}25` }}>
                       {hbAnim.toFixed(1)}
                     </div>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-dim)', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '0.5rem' }}>g/dL Hemoglobin</div>
@@ -1266,11 +1427,11 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: bandColor, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
                       Hemoglobin estimate
                     </div>
-                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2rem,5vw,3.6rem)', fontWeight: 600, lineHeight: 1.05, letterSpacing: '-0.03em', color: 'var(--text)' }}>
-                      Unavailable
+                    <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2rem,4.2vw,3.2rem)', fontWeight: 600, lineHeight: 1.05, letterSpacing: '-0.03em', color: 'var(--text)' }}>
+                      {hemoglobinPresentation.headline}
                     </div>
-                    <div style={{ maxWidth: 280, fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.65rem' }}>
-                      The model kept the screening label, but withheld a hemoglobin estimate because this capture was not clean enough for a trustworthy number.
+                    <div style={{ maxWidth: 320, fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, marginTop: '0.65rem' }}>
+                      {hemoglobinPresentation.detail}
                     </div>
                   </>
                 )}
@@ -1278,7 +1439,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
               <RiskArc value={risk} color={bandColor} />
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
-              <div className="result-metric-cluster" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              <div className="result-metric-cluster" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {[
                   { label: 'Triage Score', val: `${Math.round((analysis.triage.score ?? 0) * 100)}%` },
                   { label: 'Confidence', val: `${Math.round((analysis.prediction?.confidence ?? 0) * 100)}%` },
@@ -1292,12 +1453,12 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
               </div>
             </div>
 
-            <p style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.75, maxWidth: 720, marginBottom: '1.75rem' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.72, maxWidth: 720, marginBottom: '1.35rem' }}>
               {analysis.triage.summary}
             </p>
 
             {/* WHO band + Confidence + Action — 3 col */}
-            <div className="result-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="result-summary-grid result-summary-grid-clean" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem', marginBottom: '1.35rem' }}>
               {hasHbEstimate && (
                 <div style={{ padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', gridColumn: 'span 1' }}>
                   <HbReferenceBand hb={hbRaw} />
@@ -1324,8 +1485,8 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
 
         <WhyThisResultPanel analysis={analysis} bandColor={bandColor} />
 
-        <div className="result-core-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.5rem' }}>
-          <motion.div className="glass result-section-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
+        <div className="result-core-grid result-core-grid-clean" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.1rem' }}>
+          <motion.div className="glass result-section-card result-section-card-clean" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
             <div className="section-eyebrow">Next steps</div>
 
@@ -1376,7 +1537,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             )}
           </motion.div>
 
-          <motion.div className="glass result-section-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
+          <motion.div className="glass result-section-card result-section-card-clean" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: `3px solid ${bandColor}` }}>
             <div className="section-eyebrow">Case tools</div>
             {!isAuthenticated && onOpenAuth && (

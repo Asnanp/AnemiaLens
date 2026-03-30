@@ -18,6 +18,7 @@ class RuntimeRiskCalibrator:
     calibrator: CompositeCalibrator = field(
         default_factory=lambda: CompositeCalibrator(method="temperature")
     )
+    blend_alpha: float = 1.0
     source_thresholds: dict[str, float] = field(default_factory=dict)
     report: dict[str, object] = field(default_factory=dict)
 
@@ -28,7 +29,26 @@ class RuntimeRiskCalibrator:
         source_hint: SourceHint = "roi_original",
     ) -> float:
         _ = source_hint
-        return clamp(float(self.calibrator.calibrate(probability)), 0.0, 1.0)
+        calibrated = float(self.calibrator.calibrate(probability))
+        blended = ((1.0 - float(self.blend_alpha)) * float(probability)) + (
+            float(self.blend_alpha) * calibrated
+        )
+        return clamp(blended, 0.0, 1.0)
+
+    def calibrate_array(self, probabilities):
+        import numpy as np
+
+        probabilities = np.asarray(probabilities, dtype=np.float32)
+        calibrated = np.asarray(
+            self.calibrator.calibrate_array(probabilities),
+            dtype=np.float32,
+        )
+        return np.clip(
+            ((1.0 - float(self.blend_alpha)) * probabilities)
+            + (float(self.blend_alpha) * calibrated),
+            0.0,
+            1.0,
+        )
 
     def threshold_for_source(
         self,

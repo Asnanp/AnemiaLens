@@ -5,7 +5,7 @@ from PIL import Image
 from app.config import settings
 from app.ml.features import edge_blur_baseline, extract_eye_features, load_image_bytes, framing_score
 from app.schemas import QualityAssessment, QualityIssue
-from app.services.conjunctiva_roi import ConjunctivaRoiExtractor
+from app.services.conjunctiva_roi import ConjunctivaRoiExtractor, RoiExtractionResult
 
 
 class ImageQualityService:
@@ -31,6 +31,13 @@ class ImageQualityService:
         self.full_contrast_warning = settings.min_contrast + 0.04
 
     def evaluate(self, image_bytes: bytes) -> tuple[QualityAssessment, Image.Image]:
+        quality, image, _ = self.evaluate_with_roi(image_bytes)
+        return quality, image
+
+    def evaluate_with_roi(
+        self,
+        image_bytes: bytes,
+    ) -> tuple[QualityAssessment, Image.Image, RoiExtractionResult]:
         raw_image = load_image_bytes(image_bytes)
         roi = self.roi_extractor.extract(raw_image)
         image = roi.image
@@ -111,7 +118,7 @@ class ImageQualityService:
                 shadow_risk=round(shadow_risk, 3),
                 issues=issues,
             )
-            return assessment, image
+            return assessment, image, roi
 
         if blur_score < self.blur_block_threshold:
             issues.append(
@@ -251,7 +258,7 @@ class ImageQualityService:
             shadow_risk=round(shadow_risk, 3),
             issues=issues,
         )
-        return assessment, image
+        return assessment, image, roi
 
     def _lighting_intelligence(
         self,

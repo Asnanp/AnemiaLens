@@ -213,7 +213,28 @@ def test_email_report_service_requires_configuration(monkeypatch: pytest.MonkeyP
 
     service = EmailReportService()
 
-    with pytest.raises(EmailReportNotConfiguredError, match="configured"):
+    with pytest.raises(EmailReportNotConfiguredError, match="ANEMIALENS_SMTP_USERNAME"):
+        service.send_report(
+            EmailReportContent(
+                recipient="person@example.com",
+                share_text="Moderate risk summary.\nPlease follow up with a CBC test.",
+                triage_label="Moderate Risk",
+                predicted_hemoglobin=10.6,
+                anemia_risk=0.54,
+            )
+        )
+
+
+def test_email_report_service_surfaces_missing_gmail_smtp_password(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "email_provider", "smtp")
+    monkeypatch.setattr(settings, "smtp_host", "smtp.gmail.com")
+    monkeypatch.setattr(settings, "smtp_username", "asnanp875@gmail.com")
+    monkeypatch.setattr(settings, "smtp_password", "")
+    monkeypatch.setattr(settings, "email_from_email", "asnanp875@gmail.com")
+
+    service = EmailReportService()
+
+    with pytest.raises(EmailReportNotConfiguredError, match="ANEMIALENS_SMTP_PASSWORD"):
         service.send_report(
             EmailReportContent(
                 recipient="person@example.com",

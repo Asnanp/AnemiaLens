@@ -8,6 +8,8 @@ from app.config import (
     DEFAULT_RUNTIME_REFINEMENT_REPORT_PATH,
     DEFAULT_RUNTIME_STACK_REPORT_PATH,
     DEFAULT_TRAINING_REPORT_PATH,
+    DEFAULT_ULTIMATE_REFINEMENT_REPORT_PATH,
+    DEFAULT_V8_RUNTIME_CALIBRATION_REPORT_PATH,
 )
 from app.schemas import ModelRuntimeStatus, RuntimeStatusResponse
 from app.services.guidance import GuidanceService
@@ -18,16 +20,45 @@ def build_runtime_status(
     predictor: ScreeningPredictor, guidance_service: GuidanceService
 ) -> RuntimeStatusResponse:
     model_status = predictor.runtime_status()
-    report = _load_training_report()
+    primary_model = str(model_status.primary_model)
+    is_v8_archive = primary_model.startswith("archive-fusion-v8-clinical-robust")
+    is_ultimate_archive = primary_model.startswith("archive-fusion-v7-ultimate-clinical")
+
+    try:
+        report = _load_training_report(
+            prefer_training_report=is_v8_archive or is_ultimate_archive
+        )
+    except TypeError:
+        report = _load_training_report()
     deployed_report = _load_json_report(DEFAULT_DEPLOYED_SCREENING_REPORT_PATH)
-    calibration_report = _load_json_report(DEFAULT_RUNTIME_CALIBRATION_REPORT_PATH)
-    refinement_report = _load_json_report(DEFAULT_RUNTIME_REFINEMENT_REPORT_PATH)
+    calibration_report = (
+        None
+        if is_ultimate_archive
+        else _load_json_report(
+            DEFAULT_V8_RUNTIME_CALIBRATION_REPORT_PATH
+            if is_v8_archive
+            else DEFAULT_RUNTIME_CALIBRATION_REPORT_PATH
+        )
+    )
+    refinement_report = (
+        _load_json_report(
+            DEFAULT_ULTIMATE_REFINEMENT_REPORT_PATH
+            if is_ultimate_archive
+            else DEFAULT_RUNTIME_REFINEMENT_REPORT_PATH
+        )
+    )
 
     if report is not None:
         metrics = report.get("metrics", {})
+        report_primary_model = report.get("primary_model", model_status.primary_model)
+        primary_model = (
+            model_status.primary_model
+            if is_ultimate_archive or is_v8_archive
+            else report_primary_model
+        )
         model_status = model_status.model_copy(
             update={
-                "primary_model": report.get("primary_model", model_status.primary_model),
+                "primary_model": primary_model,
                 "record_count": report.get("record_count"),
                 "validation_accuracy": metrics.get("accuracy"),
                 "validation_f1": metrics.get("f1"),
@@ -68,7 +99,11 @@ def build_runtime_status(
         )
 
     if refinement_report is not None:
-        metrics = refinement_report.get("metrics_after", {})
+        metrics = (
+            refinement_report.get("stage_metrics_after", {})
+            if is_v8_archive
+            else refinement_report.get("metrics_after", {})
+        )
         model_status = model_status.model_copy(
             update={
                 "runtime_refiner_ready": True,
@@ -88,8 +123,13 @@ def build_runtime_status(
     )
 
 
-def _load_training_report() -> dict[str, object] | None:
-    for path in (DEFAULT_RUNTIME_STACK_REPORT_PATH, DEFAULT_TRAINING_REPORT_PATH):
+def _load_training_report(*, prefer_training_report: bool = False) -> dict[str, object] | None:
+    paths = (
+        (DEFAULT_TRAINING_REPORT_PATH, DEFAULT_RUNTIME_STACK_REPORT_PATH)
+        if prefer_training_report
+        else (DEFAULT_RUNTIME_STACK_REPORT_PATH, DEFAULT_TRAINING_REPORT_PATH)
+    )
+    for path in paths:
         report = _load_json_report(path)
         if report is not None:
             return report

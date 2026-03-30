@@ -28,14 +28,20 @@ MODELS_DIR = BACKEND_ROOT / "models"
 DEFAULT_MODEL_PATH = MODELS_DIR / "anemia_model.pt"
 DEFAULT_ENSEMBLE_PATH = MODELS_DIR / "ensemble_model.json"
 DEFAULT_DEEP_STACK_PATH = MODELS_DIR / "deep_stack_model.joblib"
-DEFAULT_ARCHIVE_MODEL_PATH = MODELS_DIR / "archive_screening_model.joblib"
+DEFAULT_ARCHIVE_MODEL_PATH = MODELS_DIR / "archive-fusion-v8-clinical-robust.joblib"
 DEFAULT_EFFICIENTNET_MODEL_PATH = MODELS_DIR / "efficientnet_anemia.pth"
 DEFAULT_EFFICIENTNET_REPORT_PATH = MODELS_DIR / "efficientnet_report.json"
 DEFAULT_RUNTIME_STACK_REPORT_PATH = MODELS_DIR / "runtime_stack_report.json"
 DEFAULT_RUNTIME_CALIBRATOR_PATH = MODELS_DIR / "runtime_risk_calibrator.pkl"
 DEFAULT_RUNTIME_CALIBRATION_REPORT_PATH = MODELS_DIR / "runtime_calibration_report.json"
+DEFAULT_V8_RUNTIME_CALIBRATOR_PATH = MODELS_DIR / "runtime_risk_calibrator_v8.pkl"
+DEFAULT_V8_RUNTIME_CALIBRATION_REPORT_PATH = MODELS_DIR / "runtime_calibration_report_v8.json"
+DEFAULT_V8_RUNTIME_HB_CALIBRATOR_PATH = MODELS_DIR / "runtime_hemoglobin_calibrator_v8.pkl"
+DEFAULT_V8_RUNTIME_HB_REPORT_PATH = MODELS_DIR / "runtime_hemoglobin_report_v8.json"
 DEFAULT_RUNTIME_REFINER_PATH = MODELS_DIR / "runtime_screening_refiner.pkl"
 DEFAULT_RUNTIME_REFINEMENT_REPORT_PATH = MODELS_DIR / "runtime_refinement_report.json"
+DEFAULT_ULTIMATE_REFINER_PATH = MODELS_DIR / "ultimate_runtime_refiner.pkl"
+DEFAULT_ULTIMATE_REFINEMENT_REPORT_PATH = MODELS_DIR / "ultimate_runtime_refinement_report.json"
 DEFAULT_DEPLOYED_SCREENING_REPORT_PATH = MODELS_DIR / "deployed_screening_report.json"
 DEFAULT_TRAINING_REPORT_PATH = MODELS_DIR / "training_report.json"
 
@@ -99,6 +105,20 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "ANEMIALENS_ENABLE_EFFICIENTNET_FALLBACK",
             "ENABLE_EFFICIENTNET_FALLBACK",
+        ),
+    )
+    enable_production_ensemble: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_ENABLE_PRODUCTION_ENSEMBLE",
+            "ENABLE_PRODUCTION_ENSEMBLE",
+        ),
+    )
+    enable_demographic_calibration: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "ANEMIALENS_ENABLE_DEMOGRAPHIC_CALIBRATION",
+            "ENABLE_DEMOGRAPHIC_CALIBRATION",
         ),
     )
     cors_origins: list[str] = Field(

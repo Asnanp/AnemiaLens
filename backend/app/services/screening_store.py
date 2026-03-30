@@ -33,7 +33,10 @@ async def persist_screening_result(
         processing_path=analysis.decision_audit.processing_path,
         guidance_source=analysis.guidance.source,
         symptoms_json=json.dumps(analysis.symptoms.model_dump()),
-        full_response_json=json.dumps(analysis.model_dump(), default=str),
+        full_response_json=json.dumps(
+            analysis.model_dump(exclude={"roi_preview"}),
+            default=str,
+        ),
         share_text=analysis.handoff_summary.share_text,
         urgency_label=analysis.handoff_summary.urgency_label,
         headline=analysis.handoff_summary.headline,

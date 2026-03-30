@@ -9,12 +9,25 @@ from app.config import (
     DEFAULT_ARCHIVE_MODEL_PATH,
     DEFAULT_EFFICIENTNET_MODEL_PATH,
     DEFAULT_RUNTIME_CALIBRATOR_PATH,
+    DEFAULT_V8_RUNTIME_CALIBRATOR_PATH,
+    DEFAULT_V8_RUNTIME_HB_CALIBRATOR_PATH,
     DEFAULT_RUNTIME_REFINER_PATH,
+    DEFAULT_ULTIMATE_REFINER_PATH,
     settings,
 )
 from app.ml.archive_model import clamp
-from app.ml.features import extract_eye_features
-from app.schemas import ModelRuntimeStatus, PredictionResult, QualityAssessment
+from app.ml.features import (
+    extract_eye_features,
+    extract_ultimate_clinical_features,
+    extract_v8_clinical_features,
+    framing_score as estimate_framing_score,
+)
+from app.schemas import (
+    ModelRuntimeStatus,
+    PatientProfileInput,
+    PredictionResult,
+    QualityAssessment,
+)
 
 
 def _runtime_stack_version() -> str:
@@ -49,10 +62,22 @@ def _load_runtime_risk_calibrator_artifact(path: Path):
     return RuntimeRiskCalibrator.load(path)
 
 
+def _load_runtime_hb_calibrator_artifact(path: Path):
+    from app.ml.runtime_hemoglobin import RuntimeHemoglobinCalibrator
+
+    return RuntimeHemoglobinCalibrator.load(path)
+
+
 def _load_runtime_screening_refiner_artifact(path: Path):
     from app.ml.runtime_refinement import RuntimeScreeningRefiner
 
     return RuntimeScreeningRefiner.load(path)
+
+
+def _load_ultimate_runtime_refiner_artifact(path: Path):
+    from app.ml.ultimate_runtime_refinement import UltimateRuntimeRefiner
+
+    return UltimateRuntimeRefiner.load(path)
 
 
 def _predict_archive_model(
@@ -64,6 +89,129 @@ def _predict_archive_model(
     from app.ml.archive_model import predict_with_archive_model
 
     return predict_with_archive_model(artifact, feature_map, source_hint=source_hint)
+
+
+def _archive_model_version(artifact: dict[str, object] | None) -> str:
+    if artifact is None:
+        return ""
+    version = artifact.get("version")
+    return str(version or "")
+
+
+def _uses_ultimate_archive_features(artifact: dict[str, object] | None) -> bool:
+    return _archive_model_version(artifact).startswith("archive-fusion-v7-ultimate-clinical")
+
+
+def _uses_v8_archive_features(artifact: dict[str, object] | None) -> bool:
+    return _archive_model_version(artifact).startswith("archive-fusion-v8-clinical-robust")
+
+
+def _ultimate_feature_names(artifact: dict[str, object]) -> list[str]:
+    feature_names = artifact.get("feature_names")
+    if isinstance(feature_names, list) and feature_names:
+        return [str(name) for name in feature_names]
+    return []
+
+
+def _ultimate_expected_scaler_stats(
+    artifact: dict[str, object],
+) -> tuple[dict[str, float], dict[str, float]]:
+    feature_names = _ultimate_feature_names(artifact)
+    scaler = artifact.get("scaler")
+    if not feature_names:
+        return {}, {}
+    if scaler is None or not hasattr(scaler, "mean_") or not hasattr(scaler, "scale_"):
+        return (
+            {name: 0.0 for name in feature_names},
+            {name: 1.0 for name in feature_names},
+        )
+    return (
+        {
+            name: float(value)
+            for name, value in zip(feature_names, scaler.mean_, strict=False)
+        },
+        {
+            name: max(float(value), 1e-6)
+            for name, value in zip(feature_names, scaler.scale_, strict=False)
+        },
+    )
+
+
+def _infer_default_lighting_condition(feature_map: dict[str, float]) -> str:
+    highlight_fraction = float(feature_map.get("highlight_fraction", 0.0))
+    shadow_fraction = float(feature_map.get("shadow_fraction", 0.0))
+    brightness = float(feature_map.get("brightness", 0.35))
+    contrast = float(feature_map.get("contrast", 0.18))
+    if highlight_fraction >= 0.18:
+        return "glare_heavy"
+    if shadow_fraction >= 0.18:
+        return "shadow_heavy"
+    if brightness >= 0.78:
+        return "overexposed"
+    if brightness <= 0.18:
+        return "dim"
+    if contrast <= 0.10:
+        return "flat_contrast"
+    return "balanced"
+
+
+def _build_default_quality_assessment(
+    feature_map: dict[str, float],
+) -> QualityAssessment:
+    lighting_condition = _infer_default_lighting_condition(feature_map)
+    lighting_score = clamp(
+        1.0
+        - (
+            float(feature_map.get("illumination_std", 0.12)) * 2.2
+            + float(feature_map.get("highlight_fraction", 0.0)) * 0.55
+            + float(feature_map.get("shadow_fraction", 0.0)) * 0.55
+        ),
+        0.0,
+        1.0,
+    )
+    blur_score = float(feature_map.get("blur_score", 120.0))
+    brightness_score = clamp(float(feature_map.get("brightness", 0.35)), 0.0, 1.0)
+    contrast_score = clamp(float(feature_map.get("contrast", 0.16)), 0.0, 1.0)
+    center_blur_score = float(feature_map.get("center_blur_score", blur_score))
+    center_contrast = float(
+        feature_map.get("center_contrast", max(contrast_score, 0.12))
+    )
+    center_red_green_gap = float(feature_map.get("center_red_green_gap", 0.0))
+    safe_framing_map = {
+        **feature_map,
+        "center_blur_score": center_blur_score,
+        "center_contrast": center_contrast,
+        "center_red_green_gap": center_red_green_gap,
+        "contrast": max(contrast_score, 1e-6),
+        "blur_score": max(blur_score, 1e-6),
+    }
+    framing = max(float(estimate_framing_score(safe_framing_map)), 0.0)
+    passed = (
+        blur_score >= 45.0
+        and 0.12 <= brightness_score <= 0.95
+        and contrast_score >= 0.05
+    )
+    summary_map = {
+        "glare_heavy": "Strong glare is washing out detail, so the capture should be repeated.",
+        "shadow_heavy": "Heavy shadow is hiding useful detail, so the capture should be repeated.",
+        "overexposed": "The image is brighter than ideal, which reduces usable tissue detail.",
+        "dim": "The image is dim, which can hide subtle pallor cues.",
+        "flat_contrast": "The image has flatter contrast than ideal, so the signal is less reliable.",
+        "balanced": "Lighting looks usable for screening.",
+    }
+    return QualityAssessment(
+        passed=passed,
+        blur_score=blur_score,
+        brightness_score=brightness_score,
+        contrast_score=contrast_score,
+        framing_score=framing,
+        lighting_score=lighting_score,
+        lighting_condition=lighting_condition,
+        lighting_summary=summary_map[lighting_condition],
+        glare_risk=clamp(float(feature_map.get("highlight_fraction", 0.0)) * 2.4, 0.0, 1.0),
+        shadow_risk=clamp(float(feature_map.get("shadow_fraction", 0.0)) * 2.2, 0.0, 1.0),
+        issues=[],
+    )
 
 
 def _build_runtime_stack(
@@ -102,75 +250,275 @@ class ScreeningPredictor:
     def __init__(self, model_path: str | Path | None = None) -> None:
         self.efficientnet_path = Path(DEFAULT_EFFICIENTNET_MODEL_PATH)
         self.model_path = Path(model_path or DEFAULT_ARCHIVE_MODEL_PATH)
-        self.runtime_calibrator_path = Path(DEFAULT_RUNTIME_CALIBRATOR_PATH)
+        self.runtime_calibrator_path = Path(
+            DEFAULT_V8_RUNTIME_CALIBRATOR_PATH
+            if self.model_path.stem.startswith("archive-fusion-v8-clinical-robust")
+            else DEFAULT_RUNTIME_CALIBRATOR_PATH
+        )
+        self.runtime_hb_calibrator_path = Path(DEFAULT_V8_RUNTIME_HB_CALIBRATOR_PATH)
         self.runtime_refiner_path = Path(DEFAULT_RUNTIME_REFINER_PATH)
+        self.ultimate_refiner_path = Path(DEFAULT_ULTIMATE_REFINER_PATH)
         self.enable_efficientnet_fallback = settings.enable_efficientnet_fallback
         self.load_error: str | None = None
         self.efficientnet_bundle: dict[str, object] | None = None
         self.archive_model: dict[str, object] | None = None
         self.runtime_risk_calibrator = None
+        self.runtime_hb_calibrator = None
         self.runtime_screening_refiner = None
+        self.ultimate_runtime_refiner = None
         self._archive_model_load_attempted = False
         self._efficientnet_model_load_attempted = False
         self._runtime_risk_calibrator_load_attempted = False
+        self._runtime_hb_calibrator_load_attempted = False
         self._runtime_screening_refiner_load_attempted = False
+        self._ultimate_runtime_refiner_load_attempted = False
 
     def preload(self) -> None:
         self._ensure_archive_model_loaded()
         self._ensure_runtime_risk_calibrator_loaded()
+        self._ensure_runtime_hb_calibrator_loaded()
         self._ensure_runtime_screening_refiner_loaded()
+        self._ensure_ultimate_runtime_refiner_loaded()
         if self.enable_efficientnet_fallback:
             self._ensure_efficientnet_model_loaded()
 
-    def predict(self, image: Image.Image, quality: QualityAssessment) -> PredictionResult:
+    def predict(
+        self,
+        image: Image.Image,
+        quality: QualityAssessment | None = None,
+        patient_profile: PatientProfileInput | None = None,
+    ) -> PredictionResult:
         prediction: dict[str, float] | None = None
         model_source = "missing-model"
         decision_threshold = 0.5
-        feature_map = extract_eye_features(image)
         source_hint: Literal["roi_original", "palpebral", "forniceal_palpebral"] = "roi_original"
 
         archive_model = self._ensure_archive_model_loaded()
+        use_v8_archive = _uses_v8_archive_features(archive_model)
+        use_ultimate_archive = _uses_ultimate_archive_features(archive_model)
+        base_feature_map = extract_eye_features(image)
+        quality = quality or _build_default_quality_assessment(base_feature_map)
+        feature_map = (
+            extract_v8_clinical_features(
+                image,
+                quality,
+                age=patient_profile.age if patient_profile is not None else None,
+                sex=patient_profile.sex if patient_profile is not None else "not_specified",
+                source_hint=source_hint,
+            )
+            if use_v8_archive
+            else
+            extract_ultimate_clinical_features(
+                image,
+                quality,
+                age=patient_profile.age if patient_profile is not None else None,
+                sex=patient_profile.sex if patient_profile is not None else "not_specified",
+            )
+            if use_ultimate_archive
+            else base_feature_map
+        )
         if archive_model is not None:
             try:
-                efficientnet_secondary: dict[str, float] | None = None
-                if self.enable_efficientnet_fallback:
-                    efficientnet_bundle = self._ensure_efficientnet_model_loaded()
-                    if efficientnet_bundle is not None:
-                        try:
-                            efficientnet_secondary = _predict_efficientnet_bundle(
-                                efficientnet_bundle,
-                                image,
-                                mc_passes=4,
-                            )
-                        except Exception:
-                            efficientnet_secondary = None
-
                 archive_prediction = _predict_archive_model(
                     archive_model,
                     feature_map,
                     source_hint=source_hint,
                 )
-                prediction = _build_runtime_stack(
-                    archive_prediction,
-                    efficientnet_prediction=efficientnet_secondary,
-                    source_hint=source_hint,
-                )
-                runtime_risk_calibrator = self._ensure_runtime_risk_calibrator_loaded()
-                if runtime_risk_calibrator is not None:
-                    raw_runtime_risk = float(prediction["anemia_risk"])
-                    prediction["raw_anemia_risk"] = raw_runtime_risk
-                    prediction["calibrated_anemia_risk"] = runtime_risk_calibrator.calibrate(
-                        raw_runtime_risk,
+                if use_v8_archive:
+                    runtime_risk_calibrator = self._ensure_runtime_risk_calibrator_loaded()
+                    raw_archive_risk = float(archive_prediction["anemia_risk"])
+                    calibrated_archive_risk = (
+                        runtime_risk_calibrator.calibrate(
+                            raw_archive_risk,
+                            source_hint=source_hint,
+                        )
+                        if runtime_risk_calibrator is not None
+                        else raw_archive_risk
+                    )
+                    prediction = {
+                        **archive_prediction,
+                        "anemia_risk": calibrated_archive_risk,
+                        "raw_anemia_risk": raw_archive_risk,
+                        "calibrated_anemia_risk": calibrated_archive_risk,
+                        "decision_threshold": float(
+                            runtime_risk_calibrator.threshold_for_source(
+                                source_hint,
+                                fallback=float(
+                                    archive_prediction.get("decision_threshold", 0.5)
+                                ),
+                            )
+                            if runtime_risk_calibrator is not None
+                            else archive_prediction.get("decision_threshold", 0.5)
+                        ),
+                        "calibration_method": (
+                            runtime_risk_calibrator.method
+                            if runtime_risk_calibrator is not None
+                            else "none"
+                        ),
+                    }
+                    model_source = _archive_model_version(archive_model)
+                    decision_threshold = float(prediction["decision_threshold"])
+                elif use_ultimate_archive:
+                    ultimate_runtime_refiner = self._ensure_ultimate_runtime_refiner_loaded()
+                    compatibility_prediction = archive_prediction
+                    if ultimate_runtime_refiner is not None:
+                        expected_means, expected_stds = _ultimate_expected_scaler_stats(
+                            archive_model
+                        )
+                        archive_feature_names = _ultimate_feature_names(archive_model)
+                        if expected_means and expected_stds and archive_feature_names:
+                            compatibility_feature_map = (
+                                ultimate_runtime_refiner.remap_ultimate_features(
+                                    feature_map,
+                                    archive_feature_names=archive_feature_names,
+                                    expected_means=expected_means,
+                                    expected_stds=expected_stds,
+                                )
+                            )
+                            compatibility_prediction = _predict_archive_model(
+                                archive_model,
+                                compatibility_feature_map,
+                                source_hint=source_hint,
+                            )
+                            corrected_risk = ultimate_runtime_refiner.refine(
+                                base_prediction=compatibility_prediction,
+                                quality=quality,
+                                base_feature_map=base_feature_map,
+                            )
+                            compatibility_delta = abs(
+                                float(compatibility_prediction["anemia_risk"])
+                                - corrected_risk
+                            )
+                            raw_correction_delta = abs(
+                                float(archive_prediction["anemia_risk"]) - corrected_risk
+                            )
+                            compatibility_prediction = {
+                                **compatibility_prediction,
+                                "anemia_risk": corrected_risk,
+                                "uncertainty": clamp(
+                                    max(
+                                        float(compatibility_prediction["uncertainty"]),
+                                        0.16 + (compatibility_delta * 0.6),
+                                    ),
+                                    0.05,
+                                    0.92,
+                                ),
+                                "compatibility_aligned_anemia_risk": float(
+                                    compatibility_prediction["anemia_risk"]
+                                ),
+                                "ultimate_correction_delta": raw_correction_delta,
+                                "ultimate_compatibility_delta": compatibility_delta,
+                                "calibration_method": "ultimate-compatibility-remap",
+                                "refinement_method": ultimate_runtime_refiner.method,
+                            }
+                            aligned_predicted_hb = compatibility_prediction.get(
+                                "predicted_hemoglobin"
+                            )
+                            raw_predicted_hb = archive_prediction.get(
+                                "predicted_hemoglobin"
+                            )
+                            if (
+                                compatibility_prediction["anemia_risk"]
+                                < ultimate_runtime_refiner.threshold
+                                and aligned_predicted_hb is not None
+                                and (
+                                    float(aligned_predicted_hb) < 11.8
+                                    or float(aligned_predicted_hb) > 16.5
+                                    or (
+                                        raw_predicted_hb is not None
+                                        and abs(
+                                            float(aligned_predicted_hb)
+                                            - float(raw_predicted_hb)
+                                        )
+                                        >= 3.0
+                                    )
+                                )
+                                and (
+                                    compatibility_delta >= 0.22
+                                    or raw_correction_delta >= 0.45
+                                )
+                            ):
+                                compatibility_prediction["predicted_hemoglobin"] = None
+                                compatibility_prediction["hb_suppressed"] = True
+                        else:
+                            corrected_risk = ultimate_runtime_refiner.refine(
+                                base_prediction=archive_prediction,
+                                quality=quality,
+                                base_feature_map=base_feature_map,
+                            )
+                            compatibility_prediction = {
+                                **archive_prediction,
+                                "anemia_risk": corrected_risk,
+                                "compatibility_aligned_anemia_risk": float(
+                                    archive_prediction["anemia_risk"]
+                                ),
+                                "ultimate_correction_delta": abs(
+                                    float(archive_prediction["anemia_risk"])
+                                    - corrected_risk
+                                ),
+                                "calibration_method": "ultimate-direct-refinement",
+                                "refinement_method": ultimate_runtime_refiner.method,
+                            }
+                            direct_predicted_hb = compatibility_prediction.get(
+                                "predicted_hemoglobin"
+                            )
+                            if (
+                                corrected_risk < ultimate_runtime_refiner.threshold
+                                and direct_predicted_hb is not None
+                                and (
+                                    float(direct_predicted_hb) < 11.8
+                                    or float(direct_predicted_hb) > 16.5
+                                )
+                            ):
+                                compatibility_prediction["predicted_hemoglobin"] = None
+                                compatibility_prediction["hb_suppressed"] = True
+                    prediction = {
+                        **compatibility_prediction,
+                        "raw_anemia_risk": float(archive_prediction["anemia_risk"]),
+                        "calibrated_anemia_risk": float(
+                            compatibility_prediction["anemia_risk"]
+                        ),
+                        "decision_threshold": float(
+                            getattr(ultimate_runtime_refiner, "threshold", 0.5)
+                        ),
+                    }
+                    model_source = _archive_model_version(archive_model)
+                    decision_threshold = float(prediction["decision_threshold"])
+                else:
+                    efficientnet_secondary: dict[str, float] | None = None
+                    if self.enable_efficientnet_fallback:
+                        efficientnet_bundle = self._ensure_efficientnet_model_loaded()
+                        if efficientnet_bundle is not None:
+                            try:
+                                efficientnet_secondary = _predict_efficientnet_bundle(
+                                    efficientnet_bundle,
+                                    image,
+                                    mc_passes=10,
+                                )
+                            except Exception:
+                                efficientnet_secondary = None
+
+                    prediction = _build_runtime_stack(
+                        archive_prediction,
+                        efficientnet_prediction=efficientnet_secondary,
                         source_hint=source_hint,
                     )
-                    prediction["calibration_method"] = runtime_risk_calibrator.method
-                model_source = _runtime_stack_version()
-                decision_threshold = float(
-                    prediction.get(
-                        "decision_threshold",
-                        _decision_threshold_for_source(source_hint),
+                    runtime_risk_calibrator = self._ensure_runtime_risk_calibrator_loaded()
+                    if runtime_risk_calibrator is not None:
+                        raw_runtime_risk = float(prediction["anemia_risk"])
+                        prediction["raw_anemia_risk"] = raw_runtime_risk
+                        prediction["calibrated_anemia_risk"] = runtime_risk_calibrator.calibrate(
+                            raw_runtime_risk,
+                            source_hint=source_hint,
+                        )
+                        prediction["calibration_method"] = runtime_risk_calibrator.method
+                    model_source = _runtime_stack_version()
+                    decision_threshold = float(
+                        prediction.get(
+                            "decision_threshold",
+                            _decision_threshold_for_source(source_hint),
+                        )
                     )
-                )
             except Exception as exc:
                 self.load_error = f"Archive inference failed: {type(exc).__name__}: {exc}"
 
@@ -181,7 +529,7 @@ class ScreeningPredictor:
                     prediction = _predict_efficientnet_bundle(
                         efficientnet_bundle,
                         image,
-                        mc_passes=4,
+                        mc_passes=10,
                     )
                     model_source = str(
                         efficientnet_bundle.get("version", _efficientnet_version())
@@ -219,11 +567,69 @@ class ScreeningPredictor:
         risk = float(prediction["anemia_risk"])
         raw_uncertainty = float(prediction["uncertainty"])
         uncertainty = raw_uncertainty
-        predicted_hemoglobin_raw = float(prediction["predicted_hemoglobin"])
-        predicted_hemoglobin = round(predicted_hemoglobin_raw, 2)
+        predicted_hemoglobin_value = prediction.get("predicted_hemoglobin")
+        predicted_hemoglobin_raw = (
+            None
+            if predicted_hemoglobin_value is None
+            else float(predicted_hemoglobin_value)
+        )
+        predicted_hemoglobin = (
+            None
+            if predicted_hemoglobin_raw is None
+            else round(predicted_hemoglobin_raw, 2)
+        )
         calibrated_risk = float(prediction.get("calibrated_anemia_risk", risk))
         capture_quality_score = self._capture_quality_score(quality)
         model_stability = clamp(1.0 - raw_uncertainty, 0.0, 1.0)
+        v8_live_threshold_override = False
+        v8_image_signal_rescue = False
+        v8_hb_suppressed = False
+        v8_hb_calibrated = False
+        v8_hb_hidden_for_trust = False
+        v8_positive_risk_floor_applied = False
+
+        if use_v8_archive and predicted_hemoglobin_raw is not None:
+            calibrated_hb = self._calibrate_v8_hemoglobin(
+                prediction=prediction,
+                quality=quality,
+                patient_profile=patient_profile,
+            )
+            if calibrated_hb is not None:
+                prediction["raw_predicted_hemoglobin"] = predicted_hemoglobin_raw
+                prediction["predicted_hemoglobin"] = calibrated_hb
+                predicted_hemoglobin_raw = calibrated_hb
+                predicted_hemoglobin = round(calibrated_hb, 2)
+                v8_hb_calibrated = True
+
+        if use_v8_archive and source_hint == "roi_original":
+            adjusted_threshold = self._v8_live_decision_threshold(decision_threshold)
+            v8_live_threshold_override = adjusted_threshold != decision_threshold
+            decision_threshold = adjusted_threshold
+            risk, v8_image_signal_rescue = self._apply_v8_classifier_rescue(
+                risk=risk,
+                decision_threshold=decision_threshold,
+                prediction=prediction,
+                feature_map=feature_map,
+                quality=quality,
+            )
+            if v8_image_signal_rescue:
+                prediction["anemia_risk"] = risk
+            if self._should_suppress_v8_conflicted_hemoglobin(
+                risk=risk,
+                decision_threshold=decision_threshold,
+                prediction=prediction,
+                feature_map=feature_map,
+                quality=quality,
+            ):
+                predicted_hemoglobin_raw = None
+                predicted_hemoglobin = None
+                v8_hb_suppressed = True
+                prediction["hb_suppressed"] = True
+                rescued_risk = max(risk, decision_threshold + 0.10)
+                v8_positive_risk_floor_applied = rescued_risk > risk
+                risk = rescued_risk
+                prediction["anemia_risk"] = risk
+
         quality_delta = 0.0
         if quality.framing_score < 1.15:
             quality_delta += 0.08
@@ -293,6 +699,7 @@ class ScreeningPredictor:
             quality_delta = min(quality_delta, 0.12)
         elif (
             risk < decision_threshold
+            and predicted_hemoglobin_raw is not None
             and predicted_hemoglobin_raw >= 12.8
             and quality.passed
             and capture_quality_score >= 0.42
@@ -307,7 +714,7 @@ class ScreeningPredictor:
         guardrail_triggered = self._dark_signal_guardrail(
             risk=risk,
             predicted_hemoglobin=predicted_hemoglobin,
-            feature_map=feature_map,
+            feature_map=base_feature_map,
             threshold=decision_threshold,
         )
         if guardrail_triggered:
@@ -323,7 +730,11 @@ class ScreeningPredictor:
             predicted_hemoglobin=predicted_hemoglobin_raw,
             signal_guardrail_triggered=guardrail_triggered,
         )
-        runtime_screening_refiner = self._ensure_runtime_screening_refiner_loaded()
+        runtime_screening_refiner = (
+            None
+            if (use_ultimate_archive or use_v8_archive)
+            else self._ensure_runtime_screening_refiner_loaded()
+        )
         refined_risk = risk
         if runtime_screening_refiner is not None:
             refined_risk = runtime_screening_refiner.refine(
@@ -332,6 +743,19 @@ class ScreeningPredictor:
                 predicted_hemoglobin=predicted_hemoglobin,
                 quality=quality,
                 base_likely=(base_screening_label == "anemia_likely"),
+            )
+        if use_v8_archive:
+            risk_harmonization_reason = None
+        else:
+            refined_risk, risk_harmonization_reason = self._harmonize_positive_hb_conflict(
+                base_risk=risk,
+                refined_risk=refined_risk,
+                threshold=decision_threshold,
+                predicted_hemoglobin=predicted_hemoglobin_raw,
+                uncertainty=uncertainty,
+                quality=quality,
+                capture_quality_score=capture_quality_score,
+                base_screening_label=base_screening_label,
             )
 
         threshold_stability = clamp(
@@ -425,15 +849,30 @@ class ScreeningPredictor:
             "guardrail_applied": guardrail_triggered,
             "calibration_applied": bool(prediction.get("calibration_method")),
             "calibration_method": str(prediction.get("calibration_method", "none")),
-            "refinement_applied": runtime_screening_refiner is not None,
-            "refinement_method": (
-                getattr(runtime_screening_refiner, "method", "none")
-                if runtime_screening_refiner is not None
-                else "none"
+            "hb_calibration_method": str(prediction.get("hb_calibration_method", "none")),
+            "refinement_applied": bool(prediction.get("refinement_method"))
+            or runtime_screening_refiner is not None,
+            "refinement_method": str(
+                prediction.get(
+                    "refinement_method",
+                    getattr(runtime_screening_refiner, "method", "none")
+                    if runtime_screening_refiner is not None
+                    else "none",
+                )
             ),
             "raw_anemia_risk": round(
                 float(prediction.get("raw_anemia_risk", risk)),
                 3,
+            ),
+            "raw_predicted_hemoglobin": (
+                "unavailable"
+                if prediction.get("raw_predicted_hemoglobin") is None
+                else round(float(prediction["raw_predicted_hemoglobin"]), 2)
+            ),
+            "calibrated_predicted_hemoglobin": (
+                "unavailable"
+                if predicted_hemoglobin_raw is None
+                else round(float(predicted_hemoglobin_raw), 2)
             ),
             "calibrated_anemia_risk": round(
                 float(prediction.get("calibrated_anemia_risk", risk)),
@@ -442,6 +881,15 @@ class ScreeningPredictor:
             "refined_anemia_risk": round(refined_risk, 3),
             "decision_threshold": round(decision_threshold, 3),
             "base_screening_label": base_screening_label,
+            "risk_harmonized": risk_harmonization_reason is not None,
+            "risk_harmonization_reason": risk_harmonization_reason or "none",
+            "v8_live_threshold_override": v8_live_threshold_override,
+            "v8_image_signal_rescue": v8_image_signal_rescue,
+            "v8_hb_suppressed": v8_hb_suppressed,
+            "v8_hb_calibrated": v8_hb_calibrated,
+            "v8_hb_hidden_for_trust": v8_hb_hidden_for_trust,
+            "v8_positive_risk_floor_applied": v8_positive_risk_floor_applied,
+            "v8_hb_display_disabled": False,
             "lighting_condition": quality.lighting_condition,
             "glare_risk": round(quality.glare_risk, 3),
             "shadow_risk": round(quality.shadow_risk, 3),
@@ -463,6 +911,18 @@ class ScreeningPredictor:
             predicted_hemoglobin=predicted_hemoglobin_raw,
             signal_guardrail_triggered=guardrail_triggered,
         )
+        if use_v8_archive and not self._should_display_v8_hemoglobin(
+            risk=refined_risk,
+            threshold=decision_threshold,
+            predicted_hemoglobin=predicted_hemoglobin_raw,
+            uncertainty=uncertainty,
+            quality=quality,
+            capture_quality_score=capture_quality_score,
+            prediction=prediction,
+        ):
+            predicted_hemoglobin = None
+            v8_hb_hidden_for_trust = predicted_hemoglobin_raw is not None
+            confidence_breakdown["v8_hb_hidden_for_trust"] = v8_hb_hidden_for_trust
 
         return PredictionResult(
             anemia_risk=round(refined_risk, 3),
@@ -538,6 +998,28 @@ class ScreeningPredictor:
         except Exception:
             return None
 
+    def _ensure_runtime_hb_calibrator_loaded(self):
+        runtime_hb_calibrator = getattr(self, "runtime_hb_calibrator", None)
+        if runtime_hb_calibrator is not None:
+            return runtime_hb_calibrator
+        if getattr(self, "_runtime_hb_calibrator_load_attempted", False):
+            return None
+
+        self._runtime_hb_calibrator_load_attempted = True
+        path = getattr(
+            self,
+            "runtime_hb_calibrator_path",
+            Path(DEFAULT_V8_RUNTIME_HB_CALIBRATOR_PATH),
+        )
+        if not path.exists():
+            return None
+
+        try:
+            self.runtime_hb_calibrator = _load_runtime_hb_calibrator_artifact(path)
+            return self.runtime_hb_calibrator
+        except Exception:
+            return None
+
     def _ensure_runtime_screening_refiner_loaded(self):
         runtime_screening_refiner = getattr(self, "runtime_screening_refiner", None)
         if runtime_screening_refiner is not None:
@@ -553,6 +1035,30 @@ class ScreeningPredictor:
         try:
             self.runtime_screening_refiner = _load_runtime_screening_refiner_artifact(path)
             return self.runtime_screening_refiner
+        except Exception:
+            return None
+
+    def _ensure_ultimate_runtime_refiner_loaded(self):
+        ultimate_runtime_refiner = getattr(self, "ultimate_runtime_refiner", None)
+        if ultimate_runtime_refiner is not None:
+            return ultimate_runtime_refiner
+        if getattr(self, "_ultimate_runtime_refiner_load_attempted", False):
+            return None
+
+        self._ultimate_runtime_refiner_load_attempted = True
+        path = getattr(
+            self,
+            "ultimate_refiner_path",
+            Path(DEFAULT_ULTIMATE_REFINER_PATH),
+        )
+        if not path.exists():
+            return None
+
+        try:
+            self.ultimate_runtime_refiner = _load_ultimate_runtime_refiner_artifact(
+                path
+            )
+            return self.ultimate_runtime_refiner
         except Exception:
             return None
 
@@ -573,7 +1079,16 @@ class ScreeningPredictor:
         )
 
         if archive_ready:
-            primary_model = _runtime_stack_version()
+            archive_version = _archive_model_version(self.archive_model)
+            primary_model = (
+                archive_version
+                if archive_version.startswith("archive-fusion-v7-ultimate-clinical")
+                or archive_version.startswith("archive-fusion-v8-clinical-robust")
+                else self.model_path.stem
+                if self.model_path.stem.startswith("archive-fusion-v7-ultimate-clinical")
+                or self.model_path.stem.startswith("archive-fusion-v8-clinical-robust")
+                else _runtime_stack_version()
+            )
             artifact_path = str(self.model_path)
         elif efficientnet_ready:
             primary_model = (
@@ -586,12 +1101,30 @@ class ScreeningPredictor:
             primary_model = "missing-model"
             artifact_path = None
 
-        runtime_calibration_ready = self.runtime_risk_calibrator is not None or (
-            getattr(self, "runtime_calibrator_path", Path(DEFAULT_RUNTIME_CALIBRATOR_PATH)).exists()
+        is_v8_archive = (
+            primary_model.startswith("archive-fusion-v8-clinical-robust")
+            or _archive_model_version(self.archive_model).startswith("archive-fusion-v8-clinical-robust")
         )
-        runtime_refiner_ready = self.runtime_screening_refiner is not None or (
-            getattr(self, "runtime_refiner_path", Path(DEFAULT_RUNTIME_REFINER_PATH)).exists()
+        is_ultimate_archive = (
+            primary_model.startswith("archive-fusion-v7-ultimate-clinical")
+            or _archive_model_version(self.archive_model).startswith("archive-fusion-v7-ultimate-clinical")
         )
+        runtime_calibration_ready = (
+            False
+            if is_ultimate_archive
+            else self.runtime_risk_calibrator is not None
+            or getattr(self, "runtime_calibrator_path", Path(DEFAULT_RUNTIME_CALIBRATOR_PATH)).exists()
+        )
+        runtime_refiner_ready = (
+            False
+            if is_ultimate_archive
+            else self.runtime_screening_refiner is not None
+            or getattr(self, "runtime_refiner_path", Path(DEFAULT_RUNTIME_REFINER_PATH)).exists()
+        )
+        ultimate_refiner_ready = (
+            self.ultimate_runtime_refiner is not None
+            or getattr(self, "ultimate_refiner_path", Path(DEFAULT_ULTIMATE_REFINER_PATH)).exists()
+        ) if is_ultimate_archive else False
 
         return ModelRuntimeStatus(
             primary_model=primary_model,
@@ -601,7 +1134,7 @@ class ScreeningPredictor:
             artifact_path=artifact_path,
             load_error=self.load_error,
             runtime_calibration_ready=runtime_calibration_ready,
-            runtime_refiner_ready=runtime_refiner_ready,
+            runtime_refiner_ready=(runtime_refiner_ready or ultimate_refiner_ready),
         )
 
     def should_accept_raw_frame_rescue(self, prediction: PredictionResult) -> bool:
@@ -628,12 +1161,23 @@ class ScreeningPredictor:
             and prediction.anemia_risk >= 0.84
             and prediction.uncertainty <= 0.9
         )
+        v8_signal_positive = (
+            prediction.model_source == "archive-fusion-v8-clinical-robust"
+            and prediction.predicted_hemoglobin is None
+            and prediction.anemia_risk >= 0.4
+            and prediction.uncertainty <= 0.72
+            and bool(
+                prediction.confidence_breakdown
+                and prediction.confidence_breakdown.get("v8_positive_risk_floor_applied")
+            )
+        )
         return (
             prediction.screening_label == "anemia_likely"
             and (
                 strong_hb_positive
                 or strong_signal_only_positive
                 or overwhelming_signal_only_positive
+                or v8_signal_positive
             )
         )
 
@@ -692,6 +1236,20 @@ class ScreeningPredictor:
             return (
                 "uncertain",
                 "The screening signal is only mildly positive while the hemoglobin estimate stays near normal, so the safest interpretation is uncertain.",
+            )
+        strong_positive_hb_conflict = (
+            predicted_hemoglobin is not None
+            and predicted_hemoglobin >= 13.6
+            and risk >= threshold
+            and (
+                uncertainty >= 0.22
+                or risk < (threshold + 0.2)
+            )
+        )
+        if strong_positive_hb_conflict:
+            return (
+                "uncertain",
+                "The image risk and hemoglobin estimate do not agree strongly enough to treat this as likely anemia, so the safest interpretation is uncertain.",
             )
         strict_runtime_borderline = (
             threshold >= 0.6
@@ -774,8 +1332,6 @@ class ScreeningPredictor:
         self, predicted_hemoglobin: float | None, uncertainty: float
     ) -> float | None:
         if predicted_hemoglobin is None:
-            return None
-        if uncertainty >= 0.70:
             return None
         return round(clamp(predicted_hemoglobin, 6.0, 18.0), 2)
 
@@ -978,6 +1534,195 @@ class ScreeningPredictor:
             bonus *= 0.35
 
         return clamp(bonus, 0.0, 0.14)
+
+    def _calibrate_v8_hemoglobin(
+        self,
+        *,
+        prediction: dict[str, float],
+        quality: QualityAssessment,
+        patient_profile: PatientProfileInput | None,
+    ) -> float | None:
+        runtime_hb_calibrator = self._ensure_runtime_hb_calibrator_loaded()
+        predicted_hemoglobin = prediction.get("predicted_hemoglobin")
+        if predicted_hemoglobin is None:
+            return None
+        if runtime_hb_calibrator is None:
+            return float(predicted_hemoglobin)
+
+        from app.ml.runtime_hemoglobin import build_v8_runtime_hb_features
+
+        features = build_v8_runtime_hb_features(
+            archive_prediction=prediction,
+            quality=quality,
+            age=patient_profile.age if patient_profile is not None else None,
+            sex=patient_profile.sex if patient_profile is not None else "not_specified",
+        )
+        calibrated_hb = runtime_hb_calibrator.predict(features)
+        prediction["hb_calibration_method"] = getattr(runtime_hb_calibrator, "method", "unknown")
+        prediction["hb_calibrated"] = True
+        return round(calibrated_hb, 2)
+
+    def _should_display_v8_hemoglobin(
+        self,
+        *,
+        risk: float,
+        threshold: float,
+        predicted_hemoglobin: float | None,
+        uncertainty: float,
+        quality: QualityAssessment,
+        capture_quality_score: float,
+        prediction: dict[str, float],
+    ) -> bool:
+        if predicted_hemoglobin is None or not quality.passed:
+            return False
+        if not 4.5 <= float(predicted_hemoglobin) <= 19.0:
+            return False
+        if capture_quality_score < 0.08:
+            return False
+        if quality.glare_risk > 0.97 or quality.shadow_risk > 0.97:
+            return False
+        if quality.blur_score < 20:
+            return False
+
+        classifier_probability = float(prediction.get("classifier_probability", 0.0))
+        regressor_risk = float(prediction.get("regressor_risk", 0.0))
+        disagreement = abs(classifier_probability - regressor_risk)
+        if (
+            disagreement > 0.92
+            and uncertainty > 0.72
+            and (
+                (risk >= threshold and float(predicted_hemoglobin) >= 14.2)
+                or (risk < threshold and float(predicted_hemoglobin) <= 9.5)
+            )
+        ):
+            return False
+        return True
+
+    def _v8_live_decision_threshold(self, threshold: float) -> float:
+        return min(float(threshold), 0.30)
+
+    def _apply_v8_classifier_rescue(
+        self,
+        *,
+        risk: float,
+        decision_threshold: float,
+        prediction: dict[str, float],
+        feature_map: dict[str, float],
+        quality: QualityAssessment,
+    ) -> tuple[float, bool]:
+        classifier_probability = float(prediction.get("classifier_probability", 0.0))
+        clinical_pallor_score = float(feature_map.get("clinical_pallor_score", 0.0))
+
+        rescue_triggered = (
+            risk < decision_threshold
+            and (
+                (
+                    classifier_probability >= 0.24
+                    and clinical_pallor_score >= 0.50
+                    and quality.lighting_condition != "balanced"
+                )
+                or (
+                    classifier_probability >= 0.34
+                    and clinical_pallor_score >= 0.62
+                )
+            )
+        )
+        if not rescue_triggered:
+            return risk, False
+
+        rescued_risk = max(risk, decision_threshold + 0.01)
+        return clamp(rescued_risk, 0.0, 1.0), True
+
+    def _should_suppress_v8_conflicted_hemoglobin(
+        self,
+        *,
+        risk: float,
+        decision_threshold: float,
+        prediction: dict[str, float],
+        feature_map: dict[str, float],
+        quality: QualityAssessment,
+    ) -> bool:
+        predicted_hemoglobin = prediction.get("predicted_hemoglobin")
+        if predicted_hemoglobin is None:
+            return False
+
+        classifier_probability = float(prediction.get("classifier_probability", 0.0))
+        regressor_risk = float(prediction.get("regressor_risk", 0.0))
+        clinical_pallor_score = float(feature_map.get("clinical_pallor_score", 0.0))
+
+        return (
+            risk >= decision_threshold
+            and float(predicted_hemoglobin) >= 13.4
+            and (
+                (
+                    classifier_probability >= 0.30
+                    and regressor_risk <= 0.15
+                    and clinical_pallor_score >= 0.56
+                )
+                or (
+                    classifier_probability >= 0.24
+                    and clinical_pallor_score >= 0.50
+                    and quality.lighting_condition != "balanced"
+                )
+            )
+        )
+
+    def _harmonize_positive_hb_conflict(
+        self,
+        *,
+        base_risk: float,
+        refined_risk: float,
+        threshold: float,
+        predicted_hemoglobin: float | None,
+        uncertainty: float,
+        quality: QualityAssessment,
+        capture_quality_score: float,
+        base_screening_label: str,
+    ) -> tuple[float, str | None]:
+        if predicted_hemoglobin is None or refined_risk < threshold:
+            return refined_risk, None
+        if predicted_hemoglobin < 13.2:
+            return refined_risk, None
+
+        risk_jump = refined_risk - base_risk
+        severe_capture_limitation = (
+            quality.lighting_condition in {"overexposed", "glare_heavy", "shadow_heavy", "flat_contrast"}
+            or quality.glare_risk > 0.45
+            or quality.shadow_risk > 0.45
+            or capture_quality_score < 0.72
+        )
+        base_non_positive = base_screening_label != "anemia_likely" or base_risk < threshold
+        clearly_normal_hb = predicted_hemoglobin >= 13.6
+        strongly_normal_hb = predicted_hemoglobin >= 14.4
+
+        if base_non_positive and (
+            risk_jump >= 0.12
+            or (clearly_normal_hb and refined_risk >= (threshold + 0.08))
+        ):
+            cap = min(base_risk, threshold - (0.08 if severe_capture_limitation else 0.05))
+            return clamp(cap, 0.0, 1.0), "refiner_conflict_with_normal_hb"
+
+        if clearly_normal_hb and risk_jump >= 0.18:
+            cap = min(
+                max(base_risk, threshold - (0.07 if severe_capture_limitation else 0.04)),
+                threshold - 0.03,
+            )
+            return clamp(cap, 0.0, 1.0), "normal_hb_refiner_overshoot"
+
+        if strongly_normal_hb and refined_risk >= (threshold + 0.18) and uncertainty >= 0.18:
+            cap = threshold - (0.08 if severe_capture_limitation else 0.04)
+            return clamp(cap, 0.0, 1.0), "very_normal_hb_positive_conflict"
+
+        if (
+            predicted_hemoglobin >= 13.2
+            and risk_jump >= 0.3
+            and refined_risk >= (threshold + 0.25)
+            and uncertainty >= 0.18
+        ):
+            cap = threshold - (0.06 if severe_capture_limitation else 0.03)
+            return clamp(cap, 0.0, 1.0), "strong_refiner_jump_with_normal_hb"
+
+        return refined_risk, None
 
     def _dark_signal_guardrail(
         self,

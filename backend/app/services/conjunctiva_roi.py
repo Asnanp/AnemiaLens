@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageStat
 
+from app.ml.lighting_norm import normalize_illumination
 from app.ml.roi_confidence import RoiConfidenceScorer
 
 _roi_scorer = RoiConfidenceScorer()
@@ -16,6 +17,12 @@ class RoiExtractionResult:
     image: Image.Image
     extracted: bool
     confidence: float = 0.5  # ROI extraction quality score [0, 1]
+    source: str = "full_frame"
+    enhanced_image: Image.Image | None = None
+    preview_sharpness: float = 0.0
+    preview_contrast: float = 0.0
+    preview_tone_balance: float = 0.0
+    enhancement_summary: str = ""
 
 
 class ConjunctivaRoiExtractor:
@@ -24,20 +31,59 @@ class ConjunctivaRoiExtractor:
         array = np.asarray(rgb)
         iris = self._detect_iris(array)
         crop: np.ndarray | None = None
+        source = "full_frame"
 
         if iris is not None and iris[2] / max(min(array.shape[:2]), 1) < 0.13:
             candidate = self._crop_lower_eyelid(array, iris)
             crop = self._finalize_crop(candidate)
+            if crop is not None:
+                source = "iris_guided"
 
         if crop is None:
             crop = self._fallback_conjunctiva_crop(array)
+            if crop is not None:
+                source = "heuristic_roi"
 
         if crop is None:
-            return RoiExtractionResult(image=rgb, extracted=False, confidence=0.0)
+            enhanced_image, preview_sharpness, preview_contrast, preview_tone_balance = (
+                self._build_enhanced_preview(rgb)
+            )
+            return RoiExtractionResult(
+                image=rgb,
+                extracted=False,
+                confidence=0.0,
+                source="full_frame",
+                enhanced_image=enhanced_image,
+                preview_sharpness=preview_sharpness,
+                preview_contrast=preview_contrast,
+                preview_tone_balance=preview_tone_balance,
+                enhancement_summary=(
+                    "The system could not isolate the inner eyelid ROI cleanly, so the preview falls back to the "
+                    "full frame with gentle lighting cleanup only."
+                ),
+            )
 
         roi_image = Image.fromarray(crop.astype(np.uint8), mode="RGB")
         confidence = _roi_scorer.score(roi_image, original=rgb)
-        return RoiExtractionResult(image=roi_image, extracted=True, confidence=confidence)
+        enhanced_image, preview_sharpness, preview_contrast, preview_tone_balance = (
+            self._build_enhanced_preview(roi_image)
+        )
+        return RoiExtractionResult(
+            image=roi_image,
+            extracted=True,
+            confidence=confidence,
+            source=source,
+            enhanced_image=enhanced_image,
+            preview_sharpness=preview_sharpness,
+            preview_contrast=preview_contrast,
+            preview_tone_balance=preview_tone_balance,
+            enhancement_summary=self._build_enhancement_summary(
+                source=source,
+                sharpness=preview_sharpness,
+                contrast=preview_contrast,
+                tone_balance=preview_tone_balance,
+            ),
+        )
 
     def _detect_iris(self, image: np.ndarray) -> tuple[float, float, float] | None:
         height, width = image.shape[:2]
@@ -240,3 +286,81 @@ class ConjunctivaRoiExtractor:
         if crop.shape[0] < 40 or crop.shape[1] < 110:
             return None
         return crop
+
+    def _build_enhanced_preview(self, image: Image.Image) -> tuple[Image.Image, float, float, float]:
+        corrected, _ = normalize_illumination(
+            image,
+            clahe_strength=1.08,
+            grey_world_alpha=0.30,
+        )
+        corrected = Image.blend(corrected, image.convert("RGB"), 0.28)
+        corrected = self._rebalance_preview_tone(corrected)
+        enhanced = ImageEnhance.Contrast(corrected).enhance(1.08)
+        enhanced = ImageEnhance.Color(enhanced).enhance(1.06)
+        enhanced = enhanced.filter(ImageFilter.UnsharpMask(radius=1.25, percent=148, threshold=2))
+        enhanced = ImageEnhance.Sharpness(enhanced).enhance(1.05)
+
+        gray = image.convert("L")
+        enhanced_gray = enhanced.convert("L")
+        enhanced_contrast_raw = ImageStat.Stat(enhanced_gray).stddev[0] / 255.0
+        enhanced_mean = ImageStat.Stat(enhanced_gray).mean[0] / 255.0
+
+        preview_sharpness = _clamp01((self._edge_variance(enhanced_gray) - 38.0) / 210.0)
+        preview_contrast = _clamp01((enhanced_contrast_raw - 0.045) / 0.22)
+        preview_tone_balance = _clamp01(1.0 - (abs(enhanced_mean - 0.46) / 0.32))
+
+        # Keep the enhancement stable if the original crop is already very crisp and balanced.
+        original_sharpness = _clamp01((self._edge_variance(gray) - 38.0) / 210.0)
+        if original_sharpness >= 0.82 and preview_tone_balance >= 0.8:
+            return corrected, original_sharpness, preview_contrast, preview_tone_balance
+
+        return enhanced, preview_sharpness, preview_contrast, preview_tone_balance
+
+    def _rebalance_preview_tone(self, image: Image.Image) -> Image.Image:
+        array = np.asarray(image.convert("RGB"), dtype=np.float32)
+        channel_means = array.mean(axis=(0, 1))
+        red_mean, green_mean, blue_mean = [float(value) for value in channel_means]
+
+        cool_bias = _clamp01((blue_mean - red_mean) / 42.0)
+        green_bias = _clamp01((green_mean - red_mean) / 52.0)
+        warm_lift = 1.0 + (cool_bias * 0.08) + (green_bias * 0.04)
+        blue_trim = 1.0 - (cool_bias * 0.10)
+        green_trim = 1.0 - (green_bias * 0.05)
+
+        array[:, :, 0] = np.clip(array[:, :, 0] * warm_lift, 0, 255)
+        array[:, :, 1] = np.clip(array[:, :, 1] * green_trim, 0, 255)
+        array[:, :, 2] = np.clip(array[:, :, 2] * blue_trim, 0, 255)
+
+        # Preserve clinically relevant redness without making the crop look artificially neon.
+        red_mask = (array[:, :, 0] > array[:, :, 1] * 1.05) & (array[:, :, 0] > array[:, :, 2] * 1.08)
+        array[:, :, 0] = np.where(red_mask, np.clip(array[:, :, 0] * 1.02, 0, 255), array[:, :, 0])
+        return Image.fromarray(array.astype(np.uint8), mode="RGB")
+
+    def _build_enhancement_summary(
+        self,
+        *,
+        source: str,
+        sharpness: float,
+        contrast: float,
+        tone_balance: float,
+    ) -> str:
+        source_text = {
+            "iris_guided": "The iris-guided crop isolated the exposed lower inner eyelid.",
+            "heuristic_roi": "A heuristic ROI crop isolated the strongest conjunctival band from the frame.",
+            "full_frame": "The preview falls back to the full frame because no stable ROI was isolated.",
+        }.get(source, "The crop focuses on the exposed inner eyelid region.")
+
+        if sharpness >= 0.78 and contrast >= 0.68 and tone_balance >= 0.72:
+            return f"{source_text} Lighting was balanced and vessel detail was sharpened for a cleaner conjunctival preview."
+        if tone_balance < 0.5:
+            return f"{source_text} The preview corrected uneven exposure, but lighting is still limiting how much conjunctival detail can be recovered."
+        if sharpness < 0.45:
+            return f"{source_text} Tone was corrected, but blur still limits the amount of recoverable vessel detail."
+        return f"{source_text} The preview applies lighting cleanup and gentle local sharpening so the conjunctival tissue is easier to inspect."
+
+    def _edge_variance(self, grayscale: Image.Image) -> float:
+        return float(ImageStat.Stat(grayscale.filter(ImageFilter.FIND_EDGES)).var[0])
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
