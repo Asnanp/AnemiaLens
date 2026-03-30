@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { EyeScanner } from '../components/features/VisualSystem';
 import { E, GlassCard } from '../components/screening/SharedUI';
+import { ScrollReveal } from '../components/ScrollReveal';
+import { AnimatedCounter } from '../components/AnimatedCounter';
 
 // ── COUNT-UP ──────────────────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 1400, start = false) {
@@ -27,20 +29,15 @@ function useCountUp(target: number, duration = 1400, start = false) {
 }
 
 function HeroStat({ raw, suffix, label, target, div }: { raw: string; suffix: string; label: string; target: number; div: number }) {
-  const [started, setStarted] = useState(false);
-  const count = useCountUp(target, 1600, started);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setStarted(true), 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const display = div > 1 ? (count / div).toFixed(2) : String(count);
+  const decimals = div > 1 ? 2 : 0;
+  const finalTarget = div > 1 ? target / div : target;
 
   return (
     <div className="hero-stat glass-border-animate" style={{ padding:'0.75rem 1rem', borderRadius:'0.875rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ fontFamily:'var(--serif)', fontSize:'2.2rem', fontWeight:300, color:'var(--text)', lineHeight:1 }}>
-        <span className="stat-number">{display}</span>
+        <span className="stat-number">
+          <AnimatedCounter end={finalTarget} decimals={decimals} />
+        </span>
         <span className="text-crimson-gold" style={{ fontSize:'1.4rem' }}>{suffix}</span>
       </div>
       <div className="label-tag" style={{ marginTop:'0.4rem' }}>{label}</div>

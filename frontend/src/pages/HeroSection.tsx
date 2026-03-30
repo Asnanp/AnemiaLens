@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ScanEye } from 'lucide-react';
+import { AnimatedCounter } from '../components/AnimatedCounter';
 
 import { E } from '../components/screening/SharedUI';
 
@@ -9,27 +10,6 @@ const EyeScanner = lazy(async () => {
   const module = await loadVisualSystem();
   return { default: module.EyeScanner };
 });
-
-function useCountUp(target: number, duration = 1400, start = false) {
-  const [val, setVal] = useState(0);
-
-  useEffect(() => {
-    if (!start) return;
-
-    let startTime: number | null = null;
-    const step = (ts: number) => {
-      if (!startTime) startTime = ts;
-      const progress = Math.min((ts - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setVal(Math.floor(ease * target));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-
-    requestAnimationFrame(step);
-  }, [duration, start, target]);
-
-  return val;
-}
 
 function HeroStat({
   suffix,
@@ -42,15 +22,8 @@ function HeroStat({
   target: number;
   div: number;
 }) {
-  const [started, setStarted] = useState(false);
-  const count = useCountUp(target, 1600, started);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setStarted(true), 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const display = div > 1 ? (count / div).toFixed(2) : String(count);
+  const decimals = div > 1 ? 2 : 0;
+  const finalTarget = div > 1 ? target / div : target;
 
   return (
     <div
@@ -71,7 +44,9 @@ function HeroStat({
           lineHeight: 1,
         }}
       >
-        <span className="stat-number">{display}</span>
+        <span className="stat-number">
+          <AnimatedCounter end={finalTarget} decimals={decimals} />
+        </span>
         <span className="text-crimson-gold" style={{ fontSize: '1.4rem' }}>
           {suffix}
         </span>

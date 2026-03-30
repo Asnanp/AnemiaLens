@@ -15,6 +15,9 @@ import {
 } from './components/screening/SharedUI';
 import { Hero } from './pages/HeroSection';
 import { ArrowRight, ChevronRight, User } from 'lucide-react';
+import { SmoothScroll } from './components/SmoothScroll';
+import { ScrollProgress } from './components/ScrollProgress';
+import { Enhanced3DBackground } from './components/Enhanced3DBackground';
 
 import { toast, ToastContainer } from './components/Toast';
 import { saveScreeningToAccount } from './api';
@@ -695,13 +698,13 @@ function AppContent() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--void)' }}>
+      <ScrollProgress />
       <AnimatePresence><WakeBanner /></AnimatePresence>
       {!compactVisualMode && <Cursor />}
       {!compactVisualMode && <LuxuryParticles />}
       {!compactVisualMode && (
         <Suspense fallback={null}>
-          <AuroraCanvas />
-          <ThreeBackground />
+          <Enhanced3DBackground />
         </Suspense>
       )}
       <Navbar backendUp={backendUp} />
@@ -744,7 +747,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <SmoothScroll>
+          <AppContent />
+        </SmoothScroll>
       </AuthProvider>
     </ErrorBoundary>
   );
