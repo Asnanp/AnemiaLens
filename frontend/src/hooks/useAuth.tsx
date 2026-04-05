@@ -6,12 +6,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { setTokenAccessor } from '../api';
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-function endpoint(path: string): string {
-  return API_BASE ? `${API_BASE}${path}` : path;
-}
+import { endpoint, setTokenAccessor } from '../api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

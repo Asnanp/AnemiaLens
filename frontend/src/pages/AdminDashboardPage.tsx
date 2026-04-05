@@ -20,11 +20,11 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { endpoint } from '../api';
 import { toast } from '../components/Toast';
 import { useAuth } from '../hooks/useAuth';
 
 const E = [0.22, 1, 0.36, 1] as const;
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const monoStyle = {
   fontFamily: 'var(--mono)',
   fontSize: '0.66rem',
@@ -38,10 +38,6 @@ const panelStyle = {
   background: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.08)',
 } as const;
-
-function endpoint(path: string): string {
-  return API_BASE ? `${API_BASE}${path}` : path;
-}
 
 type Tab = 'overview' | 'users';
 type PlanFilter = 'all' | 'pro' | 'free';
