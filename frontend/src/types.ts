@@ -46,6 +46,14 @@ export type RoiPreview = {
   extraction_confidence: number;
   original_data_url: string | null;
   enhanced_data_url: string | null;
+  frame_width: number | null;
+  frame_height: number | null;
+  roi_box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
   preview_sharpness: number;
   preview_contrast: number;
   preview_tone_balance: number;
@@ -110,6 +118,18 @@ export type GuidanceResult = {
   urgency_guidance: string;
   food_advice: string;
   next_steps: string[];
+};
+
+export type GuidanceChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type GuidanceChatResponse = {
+  source: GuidanceResult['source'];
+  model_used?: string | null;
+  provider_used?: string | null;
+  message: string;
 };
 
 export type HandoffSummary = {

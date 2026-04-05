@@ -41,6 +41,7 @@ class ImageQualityService:
         raw_image = load_image_bytes(image_bytes)
         roi = self.roi_extractor.extract(raw_image)
         image = roi.image
+        roi_confidence = float(roi.confidence)
         feature_map = extract_eye_features(image)
         blur_score = float(feature_map["blur_score"])
         brightness_score = float(feature_map["brightness"])
@@ -64,6 +65,25 @@ class ImageQualityService:
 
         issues: list[QualityIssue] = []
 
+        if not roi.extracted:
+            issues.append(
+                QualityIssue(
+                    code="inner_eye_not_detected",
+                    severity="blocking",
+                    title="Inner eyelid was not isolated",
+                    message="The app could not locate a trustworthy lower inner-eyelid region. Retake with one exposed inner eyelid filling the frame.",
+                )
+            )
+        elif roi_confidence < 0.62:
+            issues.append(
+                QualityIssue(
+                    code="inner_eye_not_detected",
+                    severity="blocking",
+                    title="Inner eyelid crop was not trustworthy",
+                    message="The detected crop did not look enough like exposed inner eyelid tissue, so screening stopped instead of using the wrong region.",
+                )
+            )
+
         if image.size[0] < 110 or image.size[1] < 40:
             issues.append(
                 QualityIssue(
@@ -84,7 +104,7 @@ class ImageQualityService:
             )
 
         eye_visibility_score = self._eye_visibility_score(feature_map, frame_score, roi_extracted=roi.extracted)
-        visibility_threshold = 0.4 if roi.extracted else 0.52
+        visibility_threshold = 0.52 if roi.extracted else 0.66
         if eye_visibility_score < visibility_threshold:
             issues.append(
                 QualityIssue(
@@ -98,6 +118,7 @@ class ImageQualityService:
         issues = self._soften_salvageable_roi_blocks(
             issues,
             roi_extracted=roi.extracted,
+            roi_confidence=roi_confidence,
             blur_score=blur_score,
             brightness_score=brightness_score,
             contrast_score=contrast_score,
@@ -237,6 +258,7 @@ class ImageQualityService:
         issues = self._soften_salvageable_roi_blocks(
             issues,
             roi_extracted=roi.extracted,
+            roi_confidence=roi_confidence,
             blur_score=blur_score,
             brightness_score=brightness_score,
             contrast_score=contrast_score,
@@ -399,6 +421,7 @@ class ImageQualityService:
         issues: list[QualityIssue],
         *,
         roi_extracted: bool,
+        roi_confidence: float,
         blur_score: float,
         brightness_score: float,
         contrast_score: float,
@@ -407,6 +430,7 @@ class ImageQualityService:
         if not self._should_salvage_roi_capture(
             issues,
             roi_extracted=roi_extracted,
+            roi_confidence=roi_confidence,
             blur_score=blur_score,
             brightness_score=brightness_score,
             contrast_score=contrast_score,
@@ -433,10 +457,13 @@ class ImageQualityService:
         return softened
 
     def allows_raw_frame_rescue(self, assessment: QualityAssessment) -> bool:
+        if any(
+            issue.code == "inner_eye_not_detected" and issue.severity == "blocking"
+            for issue in assessment.issues
+        ):
+            return False
         blocking_codes = {issue.code for issue in assessment.issues if issue.severity == "blocking"}
-        return bool(blocking_codes) and (
-            blocking_codes.issubset({"bad_framing", "eye_not_visible", "poor_lighting"})
-        )
+        return blocking_codes == {"poor_lighting"}
 
     def build_raw_frame_rescue_assessment(self, assessment: QualityAssessment) -> QualityAssessment:
         if not self.allows_raw_frame_rescue(assessment):
@@ -466,16 +493,17 @@ class ImageQualityService:
         issues: list[QualityIssue],
         *,
         roi_extracted: bool,
+        roi_confidence: float,
         blur_score: float,
         brightness_score: float,
         contrast_score: float,
         framing_score: float,
     ) -> bool:
-        if not roi_extracted:
+        if not roi_extracted or roi_confidence < 0.74:
             return False
 
         blocking_codes = {issue.code for issue in issues if issue.severity == "blocking"}
-        if not blocking_codes or not blocking_codes.issubset({"bad_framing", "eye_not_visible"}):
+        if blocking_codes != {"bad_framing"}:
             return False
 
         standard_salvage = (

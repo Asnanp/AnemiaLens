@@ -1,5 +1,7 @@
 import type {
   AnalyzeResponse,
+  GuidanceChatMessage,
+  GuidanceChatResponse,
   PatientProfileInput,
   QualityCheckResponse,
   RuntimeStatusResponse,
@@ -164,6 +166,35 @@ export async function analyzeScreening(
     throw new Error(msg);
   }
   return (await r.json()) as AnalyzeResponse;
+}
+
+export async function sendGuidanceChat(
+  analysis: AnalyzeResponse,
+  message: string,
+  history: GuidanceChatMessage[],
+): Promise<GuidanceChatResponse> {
+  const r = await fetch(endpoint('/api/guidance/chat'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ analysis, message, history }),
+    signal: AbortSignal.timeout(45000),
+  });
+
+  if (!r.ok) {
+    let msg = 'Guidance chat request failed.';
+    try {
+      const b = await r.json();
+      msg = b.detail || b.error || msg;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+
+  return (await r.json()) as GuidanceChatResponse;
 }
 
 export async function upgradeToProDemo(): Promise<void> {

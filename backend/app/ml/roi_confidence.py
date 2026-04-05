@@ -21,9 +21,11 @@ class RoiConfidenceScorer:
 
     Metrics:
     - Red channel dominance (conjunctiva should be reddish)
+    - Saturation balance (tissue should not look greyed out)
     - Aspect ratio validity (wide strip, not square)
-    - Size relative to a reference (too small = unreliable)
+    - Size relative to a reference (too small/too large = unreliable)
     - Texture sharpness (blurry ROI = bad extraction)
+    - Center-tissue bias (core should look more conjunctival than the edges)
     """
 
     # Minimum acceptable ROI dimensions
@@ -44,19 +46,26 @@ class RoiConfidenceScorer:
         # 1. Red channel dominance
         scores.append(self._red_dominance(roi))
 
-        # 2. Aspect ratio (conjunctiva strip is wide)
+        # 2. Tissue saturation
+        scores.append(self._saturation_score(roi))
+
+        # 3. Aspect ratio (conjunctiva strip is wide)
         scores.append(self._aspect_ratio_score(width, height))
 
-        # 3. Size relative to original (if available)
+        # 4. Size relative to original (if available)
         if original is not None:
             scores.append(self._relative_size_score(roi, original))
         else:
             scores.append(0.6)  # neutral if no reference
 
-        # 4. Texture sharpness
+        # 5. Texture sharpness
         scores.append(self._sharpness_score(roi))
 
-        return float(np.clip(np.mean(scores), 0.0, 1.0))
+        # 6. Center tissue bias
+        scores.append(self._center_bias_score(roi))
+
+        weights = np.array([0.24, 0.16, 0.18, 0.14, 0.14, 0.14], dtype=np.float32)
+        return float(np.clip(np.average(scores, weights=weights), 0.0, 1.0))
 
     def _red_dominance(self, roi: Image.Image) -> float:
         """R channel should be notably higher than G and B in conjunctiva."""
@@ -93,6 +102,18 @@ class RoiConfidenceScorer:
         # Too large → probably grabbed the whole image
         return float(np.clip(1.0 - (ratio - 0.35) / 0.35, 0.0, 1.0))
 
+    def _saturation_score(self, roi: Image.Image) -> float:
+        rgb = np.asarray(roi.convert("RGB"), dtype=np.float32) / 255.0
+        channel_max = rgb.max(axis=2)
+        channel_min = rgb.min(axis=2)
+        denom = np.where(channel_max > 1e-6, channel_max, 1.0)
+        saturation = float(np.mean((channel_max - channel_min) / denom))
+        if 0.12 <= saturation <= 0.42:
+            return 1.0
+        if saturation < 0.12:
+            return float(np.clip(saturation / 0.12, 0.0, 1.0))
+        return float(np.clip(1.0 - ((saturation - 0.42) / 0.4), 0.0, 1.0))
+
     def _sharpness_score(self, roi: Image.Image) -> float:
         """Laplacian variance as a proxy for sharpness."""
         from PIL import ImageFilter
@@ -103,6 +124,35 @@ class RoiConfidenceScorer:
         lap_var = ImageStat.Stat(gray.filter(kernel)).var[0]
         # Typical sharp ROI: var > 50; blurry: var < 10
         return float(np.clip(lap_var / 80.0, 0.0, 1.0))
+
+    def _center_bias_score(self, roi: Image.Image) -> float:
+        width, height = roi.size
+        if width < 12 or height < 12:
+            return 0.0
+
+        rgb = np.asarray(roi.convert("RGB"), dtype=np.float32)
+        center = rgb[
+            int(height * 0.2): int(height * 0.8),
+            int(width * 0.18): int(width * 0.82),
+        ]
+        outer_mask = np.ones((height, width), dtype=bool)
+        outer_mask[
+            int(height * 0.2): int(height * 0.8),
+            int(width * 0.18): int(width * 0.82),
+        ] = False
+        outer = rgb[outer_mask]
+
+        if center.size == 0 or outer.size == 0:
+            return 0.0
+
+        center_gap = float(np.mean(center[:, :, 0] - center[:, :, 1]))
+        outer_gap = float(np.mean(outer[:, 0] - outer[:, 1]))
+        delta = center_gap - outer_gap
+        if delta >= 16.0:
+            return 1.0
+        if delta <= 0.0:
+            return 0.0
+        return float(np.clip(delta / 16.0, 0.0, 1.0))
 
 
 def blend_roi_fullframe(

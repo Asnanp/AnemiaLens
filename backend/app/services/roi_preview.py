@@ -21,6 +21,18 @@ def build_roi_preview_payload(roi_result: RoiExtractionResult) -> RoiPreview | N
         extraction_confidence=float(roi_result.confidence),
         original_data_url=_image_to_data_url(original),
         enhanced_data_url=_image_to_data_url(enhanced),
+        frame_width=roi_result.frame_size[0] if roi_result.frame_size else None,
+        frame_height=roi_result.frame_size[1] if roi_result.frame_size else None,
+        roi_box=(
+            {
+                "x": int(roi_result.bbox[0]),
+                "y": int(roi_result.bbox[1]),
+                "width": int(roi_result.bbox[2]),
+                "height": int(roi_result.bbox[3]),
+            }
+            if roi_result.bbox
+            else None
+        ),
         preview_sharpness=float(roi_result.preview_sharpness),
         preview_contrast=float(roi_result.preview_contrast),
         preview_tone_balance=float(roi_result.preview_tone_balance),

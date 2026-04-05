@@ -18,6 +18,8 @@ class RoiExtractionResult:
     extracted: bool
     confidence: float = 0.5  # ROI extraction quality score [0, 1]
     source: str = "full_frame"
+    bbox: tuple[int, int, int, int] | None = None
+    frame_size: tuple[int, int] | None = None
     enhanced_image: Image.Image | None = None
     preview_sharpness: float = 0.0
     preview_contrast: float = 0.0
@@ -29,19 +31,25 @@ class ConjunctivaRoiExtractor:
     def extract(self, image: Image.Image) -> RoiExtractionResult:
         rgb = image.convert("RGB")
         array = np.asarray(rgb)
+        frame_size = (rgb.width, rgb.height)
         iris = self._detect_iris(array)
         crop: np.ndarray | None = None
+        bbox: tuple[int, int, int, int] | None = None
         source = "full_frame"
 
         if iris is not None and iris[2] / max(min(array.shape[:2]), 1) < 0.13:
-            candidate = self._crop_lower_eyelid(array, iris)
+            candidate, candidate_bbox = self._crop_lower_eyelid(array, iris)
             crop = self._finalize_crop(candidate)
+            if crop is None and candidate.size > 0 and candidate.shape[0] >= 120 and candidate.shape[1] >= 220:
+                crop = candidate
             if crop is not None:
                 source = "iris_guided"
+                bbox = candidate_bbox
 
         if crop is None:
-            crop = self._fallback_conjunctiva_crop(array)
-            if crop is not None:
+            fallback = self._fallback_conjunctiva_crop(array)
+            if fallback is not None:
+                crop, bbox = fallback
                 source = "heuristic_roi"
 
         if crop is None:
@@ -53,6 +61,8 @@ class ConjunctivaRoiExtractor:
                 extracted=False,
                 confidence=0.0,
                 source="full_frame",
+                bbox=None,
+                frame_size=frame_size,
                 enhanced_image=enhanced_image,
                 preview_sharpness=preview_sharpness,
                 preview_contrast=preview_contrast,
@@ -65,6 +75,27 @@ class ConjunctivaRoiExtractor:
 
         roi_image = Image.fromarray(crop.astype(np.uint8), mode="RGB")
         confidence = _roi_scorer.score(roi_image, original=rgb)
+        minimum_confidence = 0.66 if source == "heuristic_roi" else 0.56
+        if confidence < minimum_confidence:
+            enhanced_image, preview_sharpness, preview_contrast, preview_tone_balance = (
+                self._build_enhanced_preview(rgb)
+            )
+            return RoiExtractionResult(
+                image=rgb,
+                extracted=False,
+                confidence=confidence,
+                source="roi_rejected",
+                bbox=None,
+                frame_size=frame_size,
+                enhanced_image=enhanced_image,
+                preview_sharpness=preview_sharpness,
+                preview_contrast=preview_contrast,
+                preview_tone_balance=preview_tone_balance,
+                enhancement_summary=(
+                    "The system found a possible crop, but it did not look enough like the exposed lower inner eyelid "
+                    "to trust it for screening."
+                ),
+            )
         enhanced_image, preview_sharpness, preview_contrast, preview_tone_balance = (
             self._build_enhanced_preview(roi_image)
         )
@@ -73,6 +104,8 @@ class ConjunctivaRoiExtractor:
             extracted=True,
             confidence=confidence,
             source=source,
+            bbox=bbox,
+            frame_size=frame_size,
             enhanced_image=enhanced_image,
             preview_sharpness=preview_sharpness,
             preview_contrast=preview_contrast,
@@ -135,7 +168,7 @@ class ConjunctivaRoiExtractor:
         self,
         image: np.ndarray,
         iris: tuple[float, float, float],
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, tuple[int, int, int, int]]:
         height, width = image.shape[:2]
         center_x, center_y, radius = iris
 
@@ -144,11 +177,11 @@ class ConjunctivaRoiExtractor:
         top = int(max(0, center_y + (0.16 * radius)))
         bottom = int(min(height, center_y + (1.95 * radius)))
         if right - left < 110 or bottom - top < 40:
-            return np.empty((0, 0, 3), dtype=np.uint8)
+            return np.empty((0, 0, 3), dtype=np.uint8), (left, top, 0, 0)
 
-        return image[top:bottom, left:right].copy()
+        return image[top:bottom, left:right].copy(), (left, top, right - left, bottom - top)
 
-    def _fallback_conjunctiva_crop(self, image: np.ndarray) -> np.ndarray | None:
+    def _fallback_conjunctiva_crop(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int, int, int]] | None:
         height, width = image.shape[:2]
         if height < 80 or width < 160 or min(height, width) < 700:
             return None
@@ -188,7 +221,7 @@ class ConjunctivaRoiExtractor:
             if area < min_area:
                 continue
             aspect_ratio = box_width / max(box_height, 1)
-            if aspect_ratio < 1.1:
+            if aspect_ratio < 1.45 or aspect_ratio > 6.2:
                 continue
 
             component_mask = labels == index
@@ -196,6 +229,10 @@ class ConjunctivaRoiExtractor:
             mean_sat = float(hsv[:, :, 1][component_mask].mean()) if np.any(component_mask) else 0.0
             center_x = (x + (box_width / 2.0)) / max(search.shape[1], 1)
             center_y = (y + (box_height / 2.0)) / max(search.shape[0], 1)
+            if not (0.18 <= center_x <= 0.82 and 0.28 <= center_y <= 0.74):
+                continue
+            if mean_red < 14.0 or mean_sat < 24.0:
+                continue
             horizontal_bonus = 1.0 - abs(center_x - 0.5) * 1.6
             vertical_bonus = 1.0 - abs(center_y - 0.55) * 1.8
             score = (
@@ -220,13 +257,14 @@ class ConjunctivaRoiExtractor:
             candidate = search[top:bottom, left:right].copy()
             crop = self._finalize_crop(candidate)
             if crop is not None:
-                return crop
+                return crop, (
+                    search_left + left,
+                    search_top + top,
+                    right - left,
+                    bottom - top,
+                )
 
-        heuristic = image[
-            int(height * 0.42): int(height * 0.78),
-            int(width * 0.16): int(width * 0.84),
-        ].copy()
-        return self._finalize_crop(heuristic)
+        return None
 
     def _refine_conjunctiva_band(self, crop: np.ndarray) -> np.ndarray | None:
         height, width = crop.shape[:2]
@@ -280,8 +318,9 @@ class ConjunctivaRoiExtractor:
             return None
 
         refined = self._refine_conjunctiva_band(crop)
-        if refined is not None and refined.size > 0:
-            crop = refined
+        if refined is None or refined.size == 0:
+            return None
+        crop = refined
 
         if crop.shape[0] < 40 or crop.shape[1] < 110:
             return None

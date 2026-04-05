@@ -47,7 +47,13 @@ from PIL import UnidentifiedImageError
 
 from app.config import BACKEND_ROOT, settings
 from app.ml.features import load_image_bytes
-from app.schemas import AnalyzeResponse, QualityCheckResponse, RuntimeStatusResponse
+from app.schemas import (
+    AnalyzeResponse,
+    GuidanceChatRequest,
+    GuidanceChatResponse,
+    QualityCheckResponse,
+    RuntimeStatusResponse,
+)
 from app.services.analysis_meta import build_analysis_meta
 from app.services.case_insight import CaseInsightService
 from app.services.clinical_brief import ClinicalBriefService
@@ -413,6 +419,31 @@ async def runtime_status(request: Request) -> RuntimeStatusResponse:
 # ---------------------------------------------------------------------------
 # Routes — Screening
 # ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/api/guidance/chat",
+    response_model=GuidanceChatResponse,
+    tags=["screening"],
+    summary="Ask a follow-up question about the current screening result",
+    status_code=status.HTTP_200_OK,
+)
+async def guidance_chat(
+    request: Request,
+    payload: GuidanceChatRequest,
+) -> GuidanceChatResponse | JSONResponse:
+    rid = request.state.request_id
+    try:
+        return request.app.state.guidance_service.reply_to_message(
+            payload.analysis,
+            payload.message,
+            payload.history,
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"error": str(exc), "request_id": rid},
+        )
 
 
 @app.post(

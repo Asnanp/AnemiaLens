@@ -236,6 +236,7 @@ class PatientProfileInput(BaseModel):
 IssueCode = Literal[
     "blur_detected",
     "eye_not_visible",
+    "inner_eye_not_detected",
     "poor_lighting",
     "resolution_too_low",
     "overexposed",
@@ -820,6 +821,13 @@ class RuntimeStatusResponse(BaseModel):
 # HTTP response envelopes
 # ---------------------------------------------------------------------------
 
+class RoiBox(BaseModel):
+    x: int = Field(ge=0, description="Left coordinate of the ROI box in the original image.")
+    y: int = Field(ge=0, description="Top coordinate of the ROI box in the original image.")
+    width: int = Field(ge=0, description="Width of the ROI box in the original image.")
+    height: int = Field(ge=0, description="Height of the ROI box in the original image.")
+
+
 class RoiPreview(BaseModel):
     source: str = Field(description="Which extraction strategy produced the preview image.")
     extracted: bool = Field(
@@ -832,6 +840,18 @@ class RoiPreview(BaseModel):
     enhanced_data_url: str | None = Field(
         default=None,
         description="Compact data URL for the lighting-corrected, sharpened ROI preview image.",
+    )
+    frame_width: int | None = Field(
+        default=None,
+        description="Original uploaded image width.",
+    )
+    frame_height: int | None = Field(
+        default=None,
+        description="Original uploaded image height.",
+    )
+    roi_box: RoiBox | None = Field(
+        default=None,
+        description="Detected lower-inner-eyelid rectangle in original-image coordinates.",
     )
     preview_sharpness: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         default=0.0,
@@ -857,7 +877,6 @@ class QualityCheckResponse(BaseModel):
         default=None,
         description="Original and enhanced ROI previews used to explain what region the system focused on.",
     )
-    roi_preview: RoiPreview | None = None
 
 
 class AnalyzeResponse(BaseModel):
@@ -872,6 +891,10 @@ class AnalyzeResponse(BaseModel):
         description="True if image quality failed and analysis was skipped."
     )
     quality: QualityAssessment
+    roi_preview: RoiPreview | None = Field(
+        default=None,
+        description="Original and enhanced ROI previews used to explain what region the system focused on.",
+    )
     prediction: PredictionResult | None = Field(
         default=None,
         description="ML prediction — None when blocked=True.",
@@ -894,3 +917,21 @@ class AnalyzeResponse(BaseModel):
     symptoms: SymptomInput
     language: str | None = Field(default=None, description="BCP-47 language tag or plain name.")
     region: str | None = Field(default=None, description="Geographic region for localised guidance.")
+
+
+class GuidanceChatMessage(BaseModel):
+    role: Literal["user", "assistant"] = Field(description="Speaker role in the chat exchange.")
+    content: str = Field(min_length=1, description="Plain text message content.")
+
+
+class GuidanceChatRequest(BaseModel):
+    analysis: AnalyzeResponse = Field(description="Current screening analysis context to ground the reply.")
+    message: str = Field(min_length=1, description="User follow-up question about this screening.")
+    history: list[GuidanceChatMessage] = Field(default_factory=list, description="Prior chat turns for continuity.")
+
+
+class GuidanceChatResponse(BaseModel):
+    source: GuidanceSource = Field(default="fallback", description="Which guidance strategy produced this reply.")
+    model_used: str | None = Field(default=None, description="LLM model identifier, if available.")
+    provider_used: str | None = Field(default=None, description="Inference provider, if applicable.")
+    message: str = Field(description="Assistant reply grounded in the screening result.")

@@ -16,9 +16,9 @@ import { E } from '../components/screening/SharedUI';
 import { scrollToId } from '../utils/scroll';
 
 const HERO_METRICS = [
-  { value: '1', eyebrow: 'Capture', label: 'guided lower-eyelid frame', signal: 0.94 },
-  { value: '4', eyebrow: 'Flow', label: 'capture, quality, intake, result', signal: 0.82 },
-  { value: 'Care', eyebrow: 'Output', label: 'risk, trust, and next step together', signal: 0.9 },
+  { value: 'One image', eyebrow: 'Capture', label: 'Lower inner eyelid only', signal: 0.94 },
+  { value: '4 care steps', eyebrow: 'Flow', label: 'Capture, quality, intake, result', signal: 0.82 },
+  { value: 'Share-ready', eyebrow: 'Output', label: 'Risk, trust, and next step together', signal: 0.9 },
 ] as const;
 
 const HERO_SIGNALS = [
@@ -32,19 +32,19 @@ const HERO_SUPPORT = [
     icon: ShieldCheck,
     kicker: 'Safety layer',
     title: 'Weak captures are stopped early',
-    copy: 'The experience checks framing, blur, and lighting before the model is allowed to speak loudly.',
+    copy: 'Framing, blur, and light are checked before the model is allowed to shape the result.',
   },
   {
     icon: Activity,
     kicker: 'Decision layer',
-    title: 'Image signal stays grounded in context',
-    copy: 'Symptoms and patient details support the triage story after the image clears the trust gate.',
+    title: 'Image signal stays grounded',
+    copy: 'Symptoms support the triage story only after the image has earned enough trust.',
   },
   {
     icon: FileText,
     kicker: 'Follow-up layer',
-    title: 'The result is built to survive after the screen',
-    copy: 'Risk, reliability, and handoff guidance stay together for the person, family, or clinician.',
+    title: 'The result stays useful after the screen',
+    copy: 'Risk, trust, and next-step guidance stay together for the person or clinician.',
   },
 ] as const;
 
@@ -59,7 +59,7 @@ const HERO_STAGE_DETAILS = [
   {
     eyebrow: 'Capture live',
     title: 'Guide the lower inner eyelid before scoring starts',
-    detail: 'The first step watches framing and light before the image is allowed into the screening flow.',
+    detail: 'The first step checks framing and light before the image is allowed into the screening flow.',
     checks: ['Indirect daylight preferred', 'Lower inner eyelid fully visible', 'Single calm capture'],
     metrics: [
       { label: 'Framing lock', value: 86, tone: 'rose' },
@@ -216,11 +216,9 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: E }}
         >
-          Safer anemia screening
-          <br />
-          from one guided
-          <br />
-          <span>lower-eyelid image.</span>
+          <span className="home-hero-title-line">Safer anemia screening</span>
+          <span className="home-hero-title-line">from one guided</span>
+          <span className="home-hero-title-line home-hero-title-accent">lower-eyelid image.</span>
         </motion.h1>
 
         <motion.div
@@ -362,13 +360,13 @@ export function Hero() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeStageDetail.eyebrow}
-              className="home-hero-stage-card-row"
+              className="home-hero-stage-card-row home-hero-stage-card-row-single"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.38, ease: E }}
             >
-              <div className="home-hero-stage-card">
+              <div className="home-hero-stage-card home-hero-stage-card-wide">
                 <div className="home-hero-stage-card-eyebrow">{activeStageDetail.eyebrow}</div>
                 <div className="home-hero-stage-card-title">{activeStageDetail.title}</div>
                 <div className="home-hero-stage-card-detail">{activeStageDetail.detail}</div>
@@ -380,20 +378,16 @@ export function Hero() {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="home-hero-stage-card home-hero-stage-card-metrics">
-                <div className="home-hero-stage-card-eyebrow">Live metrics</div>
-                <div className="home-hero-stage-meter-grid">
+                <div className="home-hero-stage-note-grid">
                   {activeStageDetail.metrics.map((metric, index) => (
-                    <div key={metric.label} className="home-hero-stage-meter">
-                      <div className="home-hero-stage-meter-head">
+                    <div key={metric.label} className="home-hero-stage-note-card">
+                      <div className="home-hero-stage-note-head">
                         <span>{metric.label}</span>
                         <span>{metric.value}%</span>
                       </div>
-                      <div className="home-hero-stage-meter-track">
+                      <div className="home-hero-stage-note-track">
                         <motion.span
-                          className={`home-hero-stage-meter-fill ${metric.tone}`}
+                          className={`home-hero-stage-note-fill ${metric.tone}`}
                           initial={{ width: 0 }}
                           animate={{ width: `${metric.value}%` }}
                           transition={{ duration: 0.75, delay: index * 0.06, ease: E }}

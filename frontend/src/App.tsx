@@ -331,10 +331,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                     title={accountBadge.hint}
                   >
                     <span className="nav-account-avatar" aria-hidden="true">{accountBadge.initial}</span>
-                    <span className="nav-account-copy">
-                      <span className="nav-account-label">{accountBadge.label}</span>
-                      <span className="nav-account-meta">{accountBadge.hint}</span>
-                    </span>
+                    <span className="nav-account-label nav-account-label-solo">{accountBadge.label}</span>
                   </button>
                 </>
               )}
@@ -697,6 +694,7 @@ function ScreeningSection() {
                 <QualityView
                   quality={quality}
                   roiPreview={roiPreview}
+                  previewUrl={previewUrl}
                   onContinue={() => setStep(2)}
                   onBack={() => setStep(0)}
                   loading={loading}

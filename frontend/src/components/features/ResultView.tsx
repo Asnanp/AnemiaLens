@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from 'react';
-import { Download, Info, Share2, AlertCircle, RefreshCw, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap } from 'lucide-react';
+import { Download, Info, Share2, AlertCircle, RefreshCw, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AnalyzeResponse, InsightDriver, RuntimeStatusResponse } from '../../types';
-import { getRuntimeStatus, sendEmailReport } from '../../api';
+import type { AnalyzeResponse, GuidanceChatMessage, InsightDriver, RuntimeStatusResponse } from '../../types';
+import { getRuntimeStatus, sendEmailReport, sendGuidanceChat } from '../../api';
 import { useAuth } from '../../hooks/useAuth';
 
 const E = [0.22, 1, 0.36, 1] as const;
@@ -419,6 +419,67 @@ function getSystemResultState(analysis: AnalyzeResponse): SystemResultState {
   return 'normal';
 }
 
+function FramedCapturePreview({
+  src,
+  alt,
+  roiPreview,
+}: {
+  src?: string | null;
+  alt: string;
+  roiPreview?: AnalyzeResponse['roi_preview'] | null;
+}) {
+  const box = roiPreview?.roi_box;
+  const frameWidth = roiPreview?.frame_width ?? 0;
+  const frameHeight = roiPreview?.frame_height ?? 0;
+  const hasBox = Boolean(
+    box
+    && frameWidth > 0
+    && frameHeight > 0
+    && box.width > 0
+    && box.height > 0
+  );
+
+  const overlayStyle = hasBox
+    ? {
+        left: `${(box!.x / frameWidth) * 100}%`,
+        top: `${(box!.y / frameHeight) * 100}%`,
+        width: `${(box!.width / frameWidth) * 100}%`,
+        height: `${(box!.height / frameHeight) * 100}%`,
+      }
+    : null;
+
+  return (
+    <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 112, position: 'relative' }}>
+      {src ? (
+        <>
+          <img
+            src={src}
+            alt={alt}
+            style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
+          />
+          {overlayStyle && (
+            <div
+              style={{
+                position: 'absolute',
+                border: '2px solid rgba(34,211,238,0.95)',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.35), 0 0 18px rgba(34,211,238,0.45)',
+                borderRadius: '0.7rem',
+                background: 'rgba(34,211,238,0.08)',
+                pointerEvents: 'none',
+                ...overlayStyle,
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+          Preview unavailable
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RoiPreviewPanel({
   analysis,
   bandColor,
@@ -439,7 +500,10 @@ function RoiPreviewPanel({
       ? {
           label: 'Captured image',
           src: capturedImageUrl,
-          detail: 'The original photo you uploaded for this screening run.',
+          detail: preview.roi_box
+            ? 'The rectangle marks the lower inner-eyelid region accepted for screening.'
+            : 'The original photo you uploaded for this screening run.',
+          overlay: true,
         }
       : null,
     {
@@ -448,13 +512,15 @@ function RoiPreviewPanel({
       detail: preview.extracted
         ? 'The extracted lower inner-eyelid region used for image-led analysis.'
         : 'The app could not isolate the inner eyelid, so it fell back to the full frame.',
+      overlay: false,
     },
     {
       label: 'Enhanced focus',
       src: preview.enhanced_data_url,
       detail: 'A cleaned preview with tone and contrast adjusted for easier review.',
+      overlay: false,
     },
-  ].filter((item): item is { label: string; src: string | null; detail: string } => Boolean(item));
+  ].filter((item): item is { label: string; src: string | null; detail: string; overlay: boolean } => Boolean(item));
 
   return (
     <div
@@ -495,19 +561,11 @@ function RoiPreviewPanel({
             <div style={{ fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
               {item.label}
             </div>
-            <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 112 }}>
-              {item.src ? (
-                <img
-                  src={item.src}
-                  alt={item.label}
-                  style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-                />
-              ) : (
-                <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-                  Preview unavailable
-                </div>
-              )}
-            </div>
+            <FramedCapturePreview
+              src={item.src}
+              alt={item.label}
+              roiPreview={item.overlay ? analysis.roi_preview : null}
+            />
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>
               {item.detail}
             </div>
@@ -519,11 +577,10 @@ function RoiPreviewPanel({
         {preview.enhancement_summary}
       </div>
 
-      <div className="roi-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.6rem' }}>
+      <div className="roi-preview-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' }}>
         {[
           { label: 'ROI confidence', value: `${Math.round(preview.extraction_confidence * 100)}%`, accent: '#22D3EE' },
           { label: 'Sharpness', value: `${Math.round(preview.preview_sharpness * 100)}%`, accent: '#10B981' },
-          { label: 'Contrast', value: `${Math.round(preview.preview_contrast * 100)}%`, accent: '#F59E0B' },
           { label: 'Tone balance', value: `${Math.round(preview.preview_tone_balance * 100)}%`, accent: '#FB7185' },
         ].map((metric) => (
           <div key={metric.label} style={{ padding: '0.72rem 0.8rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -551,32 +608,16 @@ function WhyThisResultPanel({
 }) {
   const reliability = getReliabilityStatus(analysis);
   const activeSymptoms = activeSymptomLabels(analysis.symptoms);
-  const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
   const mandatorySummary = buildMandatoryWhySummary(analysis);
   const confidenceBreakdown = analysis.prediction?.confidence_breakdown;
-  const confidenceRows = confidenceBreakdown
-    ? [
-        { label: 'Capture quality', value: `${Math.round(confidenceBreakdown.capture_quality * 100)}%` },
-        { label: 'Lighting', value: humanizeToken(confidenceBreakdown.lighting_condition, 'balanced') },
-      ]
-    : [];
+  const systemState = getSystemResultState(analysis);
   const nextMoveSummary = analysis.quality.lighting_summary;
-  const factPills = [
-    {
-      label: 'Image signal',
-      value: analysis.prediction
-        ? `${Math.round(analysis.prediction.anemia_risk * 100)}% image-led risk`
-        : 'Retake required before scoring',
-    },
-    {
-      label: 'Symptom context',
-      value: activeSymptoms.length > 0 ? joinHuman(activeSymptoms) : 'No symptoms added',
-    },
-    {
-      label: 'Capture check',
-      value: nextMoveSummary || humanizeToken(analysis.quality.lighting_condition, 'Quality checked'),
-    },
-  ];
+
+  const compactReason = systemState === 'runtime_unavailable'
+    ? 'The screening runtime was not fully available, so the app held back normal risk storytelling and is showing a system-safe state instead.'
+    : systemState === 'offline_symptom_only'
+      ? 'This result is symptom-led because the live image model was not available for a full screening run.'
+      : mandatorySummary;
   return (
     <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08, duration: 0.5, ease: E }}
@@ -601,32 +642,10 @@ function WhyThisResultPanel({
       </div>
 
       <div style={{ padding: '1rem 1.125rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.75 }}>
-        {mandatorySummary}
+        {compactReason}
       </div>
 
       <RoiPreviewPanel analysis={analysis} bandColor={bandColor} capturedImageUrl={previewUrl} />
-
-      <div className="result-fact-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-        {factPills.map((pill) => (
-          <div
-            key={pill.label}
-            className="result-fact-pill"
-            style={{
-              padding: '0.9rem 1rem',
-              borderRadius: '0.875rem',
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div style={{ fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.38rem' }}>
-              {pill.label}
-            </div>
-            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.6, textTransform: pill.label === 'Symptom context' ? 'capitalize' : 'none' }}>
-              {pill.value}
-            </div>
-          </div>
-        ))}
-      </div>
 
       <div className="result-explanation-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
         <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
@@ -634,23 +653,35 @@ function WhyThisResultPanel({
             Confidence + reliability
           </div>
           <div style={{ display: 'grid', gap: '0.55rem', marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
-              <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{confidencePct}%</span>
-            </div>
+            {systemState === 'normal' ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{Math.round((analysis.prediction?.confidence ?? 0) * 100)}%</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Prediction confidence</span>
+                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>Unavailable</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
               <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
               <span style={{ fontFamily: 'var(--mono)', color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
             </div>
-            {confidenceRows.map((row) => (
+            {systemState === 'normal' && confidenceBreakdown ? [
+              { label: 'Capture quality', value: `${Math.round(confidenceBreakdown.capture_quality * 100)}%` },
+              { label: 'Lighting', value: humanizeToken(confidenceBreakdown.lighting_condition, 'balanced') },
+            ].map((row) => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.76rem' }}>
                 <span style={{ color: 'var(--text-dim)' }}>{row.label}</span>
                 <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)', fontWeight: 700 }}>{row.value}</span>
               </div>
-            ))}
+            )) : null}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            {confidenceBreakdown?.summary ?? reliability.detail}
+            {systemState === 'runtime_unavailable'
+              ? 'The model runtime was unavailable for this result, so the app avoided showing misleading confidence numbers.'
+              : confidenceBreakdown?.summary ?? reliability.detail}
           </div>
         </div>
 
@@ -660,7 +691,9 @@ function WhyThisResultPanel({
               Best next move
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              {nextMoveSummary} {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
+              {activeSymptoms.length > 0
+                ? `Symptoms reported: ${joinHuman(activeSymptoms)}. ${nextMoveSummary}`
+                : nextMoveSummary} {analysis.insight_pack.capture_improvements[0] ?? 'A cleaner retake would mainly improve confidence, not replace medical follow-up.'}
             </div>
           </div>
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -674,6 +707,111 @@ function WhyThisResultPanel({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function GuidanceChatPanel({ analysis }: { analysis: AnalyzeResponse }) {
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<GuidanceChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSend = async () => {
+    const message = input.trim();
+    if (!message || loading) return;
+
+    const nextHistory: GuidanceChatMessage[] = [...messages, { role: 'user', content: message }];
+    setMessages(nextHistory);
+    setInput('');
+    setLoading(true);
+    setError(null);
+    try {
+      const reply = await sendGuidanceChat(analysis, message, messages);
+      setMessages([...nextHistory, { role: 'assistant', content: reply.message }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reach the live guidance assistant.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.35rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>
+          Ask the live guidance assistant
+        </div>
+        <div style={{ padding: '0.28rem 0.72rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.85)' }}>
+          Live follow-up
+        </div>
+      </div>
+
+      <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+        Ask a follow-up question about this screening. The reply is generated when you ask, using the current screening result as context.
+      </div>
+
+      {messages.length > 0 && (
+        <div style={{ display: 'grid', gap: '0.55rem', maxHeight: 240, overflowY: 'auto', paddingRight: '0.2rem' }}>
+          {messages.map((message, index) => (
+            <div
+              key={`${message.role}-${index}`}
+              style={{
+                padding: '0.8rem 0.95rem',
+                borderRadius: '0.85rem',
+                background: message.role === 'assistant' ? 'rgba(0,194,255,0.05)' : 'rgba(255,255,255,0.03)',
+                border: message.role === 'assistant' ? '1px solid rgba(0,194,255,0.14)' : '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              <div style={{ fontSize: '0.52rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: message.role === 'assistant' ? 'rgba(0,194,255,0.82)' : 'var(--text-dim)', marginBottom: '0.38rem' }}>
+                {message.role === 'assistant' ? 'Assistant reply' : 'You'}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                {message.content}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'stretch' }}>
+        <input
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void handleSend();
+            }
+          }}
+          placeholder="Ask why the result looks this way, whether a retake matters, or what follow-up means."
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '0.9rem 1rem',
+            borderRadius: '0.85rem',
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            color: 'var(--text)',
+            fontSize: '0.78rem',
+          }}
+        />
+        <button
+          className="btn btn-glass"
+          onClick={() => void handleSend()}
+          disabled={loading || !input.trim()}
+          style={{ padding: '0.85rem 1rem', borderRadius: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem', opacity: loading || !input.trim() ? 0.55 : 1 }}
+        >
+          <Send size={13} />
+          {loading ? 'Sending' : 'Ask'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontSize: '0.72rem', color: '#F59E0B', lineHeight: 1.55 }}>
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1655,28 +1793,27 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
         <div className="result-core-grid result-core-grid-clean" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.1rem' }}>
           <motion.div className="glass result-section-card result-section-card-clean" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1.25rem', borderLeft: '3px solid rgba(0,194,255,0.4)' }}>
-            <div className="section-eyebrow">Next steps</div>
+            <div className="section-eyebrow">Care guidance</div>
 
-            <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+            <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)', display: 'grid', gap: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>
-                  Care guidance
+                  Guidance summary
                 </div>
                 <div style={{ padding: '0.28rem 0.72rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.85)' }}>
                   {analysis.guidance.source === 'mistral' ? 'Live guidance layer' : 'Fallback guidance'}
                 </div>
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.68 }}>
                 {analysis.guidance.explanation}
               </div>
-            </div>
-
-            <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.16)' }}>
-              <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)', marginBottom: '0.45rem' }}>
-                Action now
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-                {analysis.guidance.urgency_guidance}
+              <div style={{ padding: '0.85rem 0.95rem', borderRadius: '0.8rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.38rem' }}>
+                  Action now
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.62 }}>
+                  {analysis.guidance.urgency_guidance}
+                </div>
               </div>
             </div>
 
@@ -1697,11 +1834,13 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
                 {analysis.guidance.food_advice}
               </div>
             )}
+
+            <GuidanceChatPanel analysis={analysis} />
           </motion.div>
 
           <motion.div className="glass result-section-card result-section-card-clean" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, ease: E }}
             style={{ padding: 'clamp(1.25rem,3vw,2rem)', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: `3px solid ${bandColor}` }}>
-            <div className="section-eyebrow">Case tools</div>
+            <div className="section-eyebrow">Share or save</div>
             {!isAuthenticated && onOpenAuth && (
               <div style={{ padding: '1rem 1.1rem', borderRadius: '0.9rem', background: 'rgba(200,0,30,0.05)', border: '1px solid rgba(200,0,30,0.16)', display: 'grid', gap: '0.8rem' }}>
                 <div>
@@ -1709,7 +1848,7 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
                     Account save
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-                    Save this screening to your account so it shows up in history, dashboard trends, and future follow-up tracking.
+                    Save this screening to your account so it shows up in history and future follow-up.
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

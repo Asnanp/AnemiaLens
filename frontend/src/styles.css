@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Figtree:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 /* ── DESIGN TOKENS — luxury upgrade ────────────────────────────────────────── */
@@ -3196,7 +3196,10 @@ html {
 }
 
 .nav-dashboard-action {
-  min-width: 10.5rem;
+  min-width: 12rem;
+  min-height: 3.2rem;
+  gap: 0.72rem;
+  align-items: center !important;
   justify-content: flex-start !important;
   padding-inline: 0.7rem 1rem !important;
 }
@@ -3220,26 +3223,35 @@ html {
 .nav-account-copy {
   min-width: 0;
   display: grid;
-  gap: 0.08rem;
+  gap: 0.14rem;
   text-align: left;
+  line-height: normal;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .nav-account-label {
   color: var(--text);
-  font-size: 0.66rem;
+  display: block;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  text-transform: none;
 }
 
 .nav-account-meta {
   color: var(--text-dim);
+  display: block;
   font-size: 0.56rem;
-  line-height: 1;
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: normal;
+  text-transform: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 5.5rem;
+  max-width: 6.6rem;
 }
 
 .nav-mobile-account-note {
@@ -3734,18 +3746,27 @@ textarea,
 
 .home-hero-title {
   margin: 0;
-  font-family: var(--serif);
+  display: grid;
+  justify-items: center;
+  gap: 0.085em;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-size: clamp(3.35rem, 7vw, 6.35rem);
-  line-height: 0.92;
-  letter-spacing: -0.05em;
-  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 400;
   text-wrap: balance;
   color: var(--text);
 }
 
-.home-hero-title span {
+.home-hero-title-line {
+  display: block;
+  line-height: 0.92;
+}
+
+.home-hero-title-accent {
   color: #f3a6b3;
   font-style: italic;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-weight: 400;
 }
 
@@ -5310,9 +5331,17 @@ textarea,
 
 .home-hero-title {
   max-width: none;
+  display: grid;
+  justify-items: center;
+  gap: 0.02em;
   font-size: clamp(3.1rem, 6.6vw, 5.9rem);
-  line-height: 0.9;
+  line-height: 1;
   text-wrap: balance;
+}
+
+.home-hero-title-line {
+  display: block;
+  line-height: 0.94;
 }
 
 .home-hero-summary {
@@ -7209,5 +7238,293 @@ body {
   50% {
     transform: translate3d(20px, 18px, 0) scale(1.08);
     opacity: 0.36;
+  }
+}
+
+/* Final surface overrides to stop cascade drift on the live landing and result UI. */
+.nav-dashboard-action {
+  min-width: auto;
+  gap: 0.72rem;
+  padding: 0.55rem 0.95rem;
+  align-items: center;
+}
+
+.nav-account-label-solo {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1;
+}
+
+.home-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  width: 100%;
+  align-items: stretch;
+}
+
+.home-hero-metric-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0.95rem;
+  min-height: 8.25rem;
+  padding: 1.05rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(15, 20, 30, 0.96), rgba(15, 20, 30, 0.88));
+}
+
+.home-hero-metric-value {
+  flex-shrink: 0;
+  min-width: 2.25rem;
+  line-height: 1;
+}
+
+.home-hero-metric-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.home-hero-metric-label {
+  line-height: 1.45;
+}
+
+.home-hero-metric-bar {
+  margin-top: auto;
+  width: 100%;
+  overflow: hidden;
+}
+
+.workflow-static-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 1.15rem;
+  align-items: start;
+}
+
+.workflow-static-preview {
+  padding: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(12, 18, 28, 0.98), rgba(12, 18, 28, 0.94));
+}
+
+.workflow-static-preview-stage-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.workflow-static-preview-stage {
+  min-height: 4rem;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.75rem 0.65rem;
+}
+
+.workflow-static-preview-surface {
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.workflow-static-preview-surface-shell {
+  min-height: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.workflow-static-preview-card-grid,
+.workflow-static-preview-support-row {
+  gap: 0.7rem;
+}
+
+.workflow-static-steps-panel {
+  gap: 0.95rem;
+}
+
+.workflow-static-step {
+  padding: 1.1rem 1.15rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(14, 18, 28, 0.94), rgba(14, 18, 28, 0.9));
+}
+
+.workflow-static-step::before {
+  top: 1.1rem;
+  bottom: 1.1rem;
+  width: 2px;
+}
+
+.result-core-grid-clean {
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .home-hero-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-static-grid,
+  .workflow-static-preview-stage-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Final stabilization overrides for the live local build */
+.nav-dashboard-action {
+  min-width: auto;
+  max-width: 13rem;
+  justify-content: center;
+}
+
+.nav-account-avatar {
+  flex-shrink: 0;
+}
+
+.nav-account-label-solo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.1em;
+}
+
+.home-hero-metrics {
+  gap: 0.85rem;
+}
+
+.home-hero-metric-card {
+  grid-template-columns: 1fr;
+  align-items: start;
+  min-height: auto;
+  gap: 0.7rem;
+}
+
+.home-hero-metric-value {
+  min-width: 0;
+  color: #f3b8c0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.home-hero-metric-copy {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.home-hero-metric-label {
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.home-hero-stage-board {
+  gap: 0.8rem;
+}
+
+.home-hero-stage-track {
+  margin-bottom: 0.75rem;
+}
+
+.home-hero-stage-track::before,
+.home-hero-stage-trace {
+  display: none;
+}
+
+.home-hero-stage-pill {
+  min-height: 4.1rem;
+  align-content: start;
+}
+
+.home-hero-stage-card-row-single {
+  grid-template-columns: 1fr;
+}
+
+.home-hero-stage-card-wide {
+  padding: 1rem 1.05rem;
+}
+
+.home-hero-stage-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.95rem;
+}
+
+.home-hero-stage-note-card {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.82rem 0.86rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.home-hero-stage-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.home-hero-stage-note-head span:last-child {
+  color: var(--text);
+}
+
+.home-hero-stage-note-track {
+  position: relative;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.home-hero-stage-note-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.16);
+}
+
+.home-hero-stage-note-fill.rose {
+  background: linear-gradient(90deg, rgba(255, 79, 114, 0.96), rgba(255, 185, 197, 0.96));
+}
+
+.home-hero-stage-note-fill.teal {
+  background: linear-gradient(90deg, rgba(46, 196, 182, 0.94), rgba(180, 244, 236, 0.94));
+}
+
+.home-hero-stage-note-fill.violet {
+  background: linear-gradient(90deg, rgba(129, 140, 248, 0.94), rgba(220, 184, 255, 0.94));
+}
+
+.result-explanation-grid {
+  align-items: start;
+}
+
+.result-core-grid-clean {
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .home-hero-stage-note-grid {
+    grid-template-columns: 1fr;
   }
 }

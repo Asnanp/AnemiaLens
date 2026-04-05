@@ -7,9 +7,71 @@ const E = [0.22, 1, 0.36, 1] as const;
 interface QualityViewProps {
   quality: QualityAssessment;
   roiPreview: RoiPreview | null;
+  previewUrl?: string | null;
   onContinue: () => void;
   onBack: () => void;
   loading: boolean;
+}
+
+function RoiOverlayPreview({
+  src,
+  alt,
+  roiPreview,
+}: {
+  src: string | null | undefined;
+  alt: string;
+  roiPreview: RoiPreview | null;
+}) {
+  const box = roiPreview?.roi_box;
+  const frameWidth = roiPreview?.frame_width ?? 0;
+  const frameHeight = roiPreview?.frame_height ?? 0;
+  const hasBox = Boolean(
+    box
+    && frameWidth > 0
+    && frameHeight > 0
+    && box.width > 0
+    && box.height > 0
+  );
+
+  const overlayStyle = hasBox
+    ? {
+        left: `${(box!.x / frameWidth) * 100}%`,
+        top: `${(box!.y / frameHeight) * 100}%`,
+        width: `${(box!.width / frameWidth) * 100}%`,
+        height: `${(box!.height / frameHeight) * 100}%`,
+      }
+    : null;
+
+  return (
+    <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 96, position: 'relative' }}>
+      {src ? (
+        <>
+          <img
+            src={src}
+            alt={alt}
+            style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+          />
+          {overlayStyle && (
+            <div
+              style={{
+                position: 'absolute',
+                border: '2px solid rgba(34,211,238,0.95)',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.35), 0 0 18px rgba(34,211,238,0.45)',
+                borderRadius: '0.6rem',
+                background: 'rgba(34,211,238,0.08)',
+                pointerEvents: 'none',
+                ...overlayStyle,
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <div style={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
+          Preview unavailable
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ScoreRing({ value, color, label }: { value: number; color: string; label: string }) {
@@ -74,7 +136,7 @@ function humanizeSource(source?: string | null) {
   return source.replace(/_/g, ' ');
 }
 
-export function QualityView({ quality, roiPreview, onContinue, onBack, loading }: QualityViewProps) {
+export function QualityView({ quality, roiPreview, previewUrl, onContinue, onBack, loading }: QualityViewProps) {
   const blocking = quality.issues.filter((issue) => issue.severity === 'blocking').length;
   const passed = blocking === 0;
   const normalizeBlur = (value: number) => Math.max(0, Math.min(100, ((value - 55) / 165) * 100));
@@ -282,26 +344,18 @@ export function QualityView({ quality, roiPreview, onContinue, onBack, loading }
 
             <div className="roi-preview-images" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
               {[
-                { label: 'Raw ROI', src: roiPreview.original_data_url },
-                { label: 'Enhanced ROI', src: roiPreview.enhanced_data_url },
+                { label: 'Captured image', src: previewUrl, useOverlay: true },
+                { label: roiPreview.extracted ? 'Inner-eye focus' : 'Review image', src: roiPreview.enhanced_data_url ?? roiPreview.original_data_url, useOverlay: false },
               ].map((image) => (
                 <div key={image.label} style={{ display: 'grid', gap: '0.45rem' }}>
                   <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
                     {image.label}
                   </div>
-                  <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 96 }}>
-                    {image.src ? (
-                      <img
-                        src={image.src}
-                        alt={image.label}
-                        style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
-                      />
-                    ) : (
-                      <div style={{ minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-                        Preview unavailable
-                      </div>
-                    )}
-                  </div>
+                  <RoiOverlayPreview
+                    src={image.src}
+                    alt={image.label}
+                    roiPreview={image.useOverlay ? roiPreview : null}
+                  />
                 </div>
               ))}
             </div>

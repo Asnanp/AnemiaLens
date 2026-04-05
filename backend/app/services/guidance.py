@@ -11,6 +11,9 @@ import requests as _requests
 
 from app.config import settings
 from app.schemas import (
+    AnalyzeResponse,
+    GuidanceChatMessage,
+    GuidanceChatResponse,
     GuidanceResult,
     GuidanceRuntimeStatus,
     PredictionResult,
@@ -115,6 +118,42 @@ class GuidanceService:
             prediction.confidence if prediction else None,
             symptoms,
             region,
+        )
+
+    def reply_to_message(
+        self,
+        analysis: AnalyzeResponse,
+        message: str,
+        history: list[GuidanceChatMessage] | None = None,
+    ) -> GuidanceChatResponse:
+        cleaned_message = " ".join(message.split()).strip()
+        if not cleaned_message:
+            raise ValueError("Message cannot be empty.")
+
+        if self._mistral_ready():
+            try:
+                response_text = self._call_mistral_chat_api(
+                    analysis,
+                    cleaned_message,
+                    history or [],
+                )
+                response_text = self._enforce_chat_urgency_floor(response_text, analysis)
+                return GuidanceChatResponse(
+                    source="mistral",
+                    model_used=self.mistral_model,
+                    provider_used="mistral",
+                    message=self._sanitize_text(response_text, limit=720),
+                )
+            except Exception as exc:
+                self._last_provider_error = self._summarize_error(exc)
+                log.warning("Mistral chat request failed: %s", exc)
+
+        fallback = self._build_chat_fallback(analysis, cleaned_message)
+        return GuidanceChatResponse(
+            source="fallback",
+            model_used=None,
+            provider_used=None,
+            message=self._sanitize_text(fallback, limit=720),
         )
 
     def _build_payload(
@@ -351,14 +390,164 @@ class GuidanceService:
         log.info("Mistral response length: %d chars", len(text))
         return text
 
+    def _call_mistral_chat_api(
+        self,
+        analysis: AnalyzeResponse,
+        message: str,
+        history: list[GuidanceChatMessage],
+    ) -> str:
+        headers = {
+            "Authorization": f"Bearer {settings.mistral_api_key}",
+            "Content-Type": "application/json",
+        }
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": self._mistral_chat_system_prompt()},
+            {"role": "user", "content": self._mistral_chat_context(analysis)},
+        ]
+        for item in history[-6:]:
+            messages.append({"role": item.role, "content": item.content})
+        messages.append({"role": "user", "content": message})
+
+        body = {
+            "model": self.mistral_model,
+            "messages": messages,
+            "max_tokens": min(self.guidance_max_tokens + 120, 520),
+            "temperature": 0.45,
+        }
+        log.info("POST %s model=%s chat_turns=%s", _MISTRAL_API_URL, self.mistral_model, len(messages))
+        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
+        if not resp.ok:
+            log.error("Mistral chat error body: %s", resp.text[:400])
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            text = data["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError) as exc:
+            raise ValueError(f"Unexpected Mistral chat response shape: {exc}") from exc
+        if not text:
+            raise ValueError("Mistral chat response was empty.")
+        return text
+
     def _mistral_ready(self) -> bool:
         return self.mistral_enabled and self.api_key_configured
 
     def _should_use_llm(self, triage: TriageResult, prediction: PredictionResult | None) -> bool:
-        return not (prediction is None or triage.band == "uncertain_retake_needed")
+        return prediction is not None
 
     def _cache_key(self, payload: dict[str, object]) -> str:
         return json.dumps(payload, sort_keys=True, ensure_ascii=False)
+
+    def _mistral_chat_system_prompt(self) -> str:
+        return (
+            "You are the live follow-up assistant for AnemiaLens, a screening tool that analyzes the inner lower eyelid. "
+            "You answer questions about one specific screening result. "
+            "Stay grounded in the provided case context, speak like a calm clinician, and keep every answer non-diagnostic. "
+            "Do not invent findings, lab values, treatments, or history. "
+            "If the case is uncertain or the capture was weak, say that clearly. "
+            "Keep answers practical, specific, and under 5 short sentences. "
+            "Never give a weaker urgency window than the case context allows. "
+            "Use these minimum timelines: high_concern = same day to 24-48 hours, moderate_risk = within 1-2 weeks, low_risk = routine follow-up, uncertain_retake_needed = retake first and do not overclaim."
+        )
+
+    def _mistral_chat_context(self, analysis: AnalyzeResponse) -> str:
+        prediction = analysis.prediction
+        active_symptoms = [
+            label
+            for label, active in {
+                "fatigue": analysis.symptoms.fatigue,
+                "dizziness": analysis.symptoms.dizziness,
+                "pale skin": analysis.symptoms.pale_skin,
+                "shortness of breath": analysis.symptoms.shortness_of_breath,
+                "heavy menstrual bleeding": bool(analysis.symptoms.heavy_menstrual_bleeding),
+                "low iron intake": analysis.symptoms.poor_diet_low_iron,
+            }.items()
+            if active
+        ]
+        quality_issues = [
+            issue.title for issue in analysis.quality.issues if issue.severity == "blocking"
+        ] or [
+            issue.title for issue in analysis.quality.issues if issue.severity == "warning"
+        ]
+
+        return (
+            "Screening case context:\n"
+            f"- Triage band: {analysis.triage.band} ({analysis.triage.label})\n"
+            f"- Minimum urgency window to preserve: {self._chat_urgency_floor(analysis.triage.band)}\n"
+            f"- Triage summary: {analysis.triage.summary}\n"
+            f"- Hemoglobin estimate: {prediction.predicted_hemoglobin if prediction and prediction.predicted_hemoglobin is not None else 'not shown'}\n"
+            f"- Image-led anemia risk: {round((prediction.anemia_risk if prediction else 0.0) * 100, 1)}%\n"
+            f"- Model confidence: {round((prediction.confidence if prediction else 0.0) * 100, 1)}%\n"
+            f"- Reliability: {(prediction.reliability_flag if prediction else 'unavailable')}\n"
+            f"- Quality passed: {analysis.quality.passed}\n"
+            f"- Lighting: {analysis.quality.lighting_condition}\n"
+            f"- Relevant quality issues: {', '.join(quality_issues) if quality_issues else 'none'}\n"
+            f"- Symptoms: {', '.join(active_symptoms) if active_symptoms else 'none reported'}\n"
+            f"- Existing guidance summary: {analysis.guidance.explanation}\n"
+            f"- Urgency guidance: {analysis.guidance.urgency_guidance}"
+        )
+
+    def _chat_urgency_floor(self, band: str) -> str:
+        normalized = (band or "").lower()
+        if normalized == "high_concern":
+            return "same day or within 24-48 hours"
+        if normalized == "moderate_risk":
+            return "within 1-2 weeks"
+        if normalized == "uncertain_retake_needed":
+            return "retake first; if symptoms are concerning, do not delay formal testing"
+        return "routine follow-up unless symptoms worsen"
+
+    def _enforce_chat_urgency_floor(self, text: str, analysis: AnalyzeResponse) -> str:
+        normalized = " ".join((text or "").split())
+        band = (analysis.triage.band or "").lower()
+        lowered = normalized.lower()
+
+        if band == "high_concern":
+            urgent_tokens = ("24", "48", "same day", "today", "urgent", "immediately")
+            sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+            filtered_sentences: list[str] = []
+            for sentence in sentences:
+                lower_sentence = sentence.lower()
+                has_urgent_token = any(token in lower_sentence for token in urgent_tokens)
+                has_weaker_timing = (
+                    "week" in lower_sentence
+                    or "month" in lower_sentence
+                    or "routine" in lower_sentence
+                    or bool(re.search(r"\b\d+(?:\s*[–-]\s*\d+)?\s*days?\b", lower_sentence))
+                )
+                if has_weaker_timing and not has_urgent_token:
+                    continue
+                filtered_sentences.append(sentence)
+
+            tightened = " ".join(filtered_sentences).strip() or normalized
+            if not any(token in tightened.lower() for token in urgent_tokens):
+                return (
+                    f"{tightened} Because this case is in the high concern band, arrange confirmatory blood testing the same day or within 24-48 hours."
+                ).strip()
+            return tightened
+
+        if band == "moderate_risk":
+            if any(token in lowered for token in ("3-6 months", "routine only", "routine follow-up")):
+                return (
+                    f"{normalized} Because this case is in the moderate-risk band, follow up within 1-2 weeks rather than waiting for routine monitoring."
+                ).strip()
+
+        if band == "uncertain_retake_needed":
+            if "retake" not in lowered:
+                return (
+                    f"{normalized} Because the image stayed uncertain, retake the scan first in better light before treating this as a clean result."
+                ).strip()
+
+        return normalized
+
+    def _build_chat_fallback(self, analysis: AnalyzeResponse, message: str) -> str:
+        prompt = message.lower()
+        if "why" in prompt:
+            return f"{analysis.guidance.explanation} {analysis.triage.summary}"
+        if "retake" in prompt or "photo" in prompt or "image" in prompt:
+            return f"{analysis.quality.lighting_summary} {analysis.guidance.next_steps[0] if analysis.guidance.next_steps else 'Retake the image in brighter, even light with the lower inner eyelid fully visible.'}"
+        if "doctor" in prompt or "urgent" in prompt or "worry" in prompt:
+            return analysis.guidance.urgency_guidance
+        return f"{analysis.guidance.explanation} {analysis.guidance.urgency_guidance}"
 
     def _store_cached_result(self, cache_key: str, result: GuidanceResult) -> None:
         self._response_cache[cache_key] = result
@@ -530,7 +719,7 @@ class GuidanceService:
         )
 
     def _sanitize_text(self, text: str, *, limit: int) -> str:
-        normalized = " ".join(text.split())
+        normalized = " ".join(text.replace("**", "").replace("__", "").replace("`", "").split())
         if len(normalized) <= limit:
             return normalized
         return normalized[: limit - 3].rstrip(" ,.;:") + "..."
