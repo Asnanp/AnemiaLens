@@ -48,9 +48,22 @@ def build_runtime_status(
         )
     )
 
-    if report is not None:
+    report_primary_model = str(report.get("primary_model", "")).strip() if report is not None else ""
+    should_apply_report = bool(
+        report is not None
+        and report_primary_model
+        and (
+            report_primary_model == primary_model
+            or (
+                not is_v8_archive
+                and not is_ultimate_archive
+                and not primary_model.startswith("missing-model")
+            )
+        )
+    )
+
+    if should_apply_report and report is not None:
         metrics = report.get("metrics", {})
-        report_primary_model = report.get("primary_model", model_status.primary_model)
         primary_model = (
             model_status.primary_model
             if is_ultimate_archive or is_v8_archive
@@ -65,8 +78,24 @@ def build_runtime_status(
                 "split_strategy": metrics.get("split_strategy"),
             }
         )
+    elif is_ultimate_archive and predictor.archive_model is not None:
+        test_metrics = predictor.archive_model.get("test_metrics", {})
+        training_results = predictor.archive_model.get("training_results", {})
+        cv_results = training_results.get("cv_results", {})
+        robustness = predictor.archive_model.get("robustness_results", {})
+        model_status = model_status.model_copy(
+            update={
+                "validation_accuracy": test_metrics.get("auc"),
+                "validation_f1": cv_results.get("calibrated_clf_auc"),
+                "deployed_precision": test_metrics.get("precision"),
+                "deployed_recall": test_metrics.get("recall"),
+                "deployed_accuracy": test_metrics.get("auc"),
+                "deployed_scope": "embedded_v7_test_metrics",
+                "runtime_refined_accuracy": robustness.get("robust_auc"),
+            }
+        )
 
-    if deployed_report is not None:
+    if deployed_report is not None and not (is_v8_archive or is_ultimate_archive):
         metrics = deployed_report.get("metrics", {})
         counts = deployed_report.get("operating_counts", {})
         model_status = model_status.model_copy(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -80,6 +81,26 @@ def test_predictor_preload_loads_models_once(monkeypatch, tmp_path) -> None:
     assert calls == ["archive:archive.joblib", "efficientnet:efficientnet.pth"]
     assert predictor.archive_model == {"artifact": True}
     assert predictor.efficientnet_bundle == {"bundle": True}
+
+
+def test_v7_predictor_separates_low_and_high_demo_cases() -> None:
+    model_path = ROOT / "backend" / "models" / "archive-fusion-v7-ultimate-clinical.joblib"
+    low_demo_path = ROOT / "frontend" / "public" / "demo-cases" / "low-risk-demo.jpg"
+    high_demo_path = ROOT / "frontend" / "public" / "demo-cases" / "high-concern-demo.jpg"
+
+    if not model_path.exists() or not low_demo_path.exists() or not high_demo_path.exists():
+        pytest.skip("Local v7 artifact or demo cases are unavailable.")
+
+    predictor = ScreeningPredictor(model_path)
+    patient = PatientProfileInput()
+
+    low_prediction = predictor.predict(Image.open(low_demo_path).convert("RGB"), patient_profile=patient)
+    high_prediction = predictor.predict(Image.open(high_demo_path).convert("RGB"), patient_profile=patient)
+
+    assert low_prediction.model_source == "archive-fusion-v7-ultimate-clinical"
+    assert low_prediction.screening_label == "anemia_unlikely"
+    assert low_prediction.anemia_risk < 0.5
+    assert high_prediction.anemia_risk > low_prediction.anemia_risk + 0.08
 
 
 def test_dark_signal_guardrail_triggers_on_dark_positive_with_near_normal_hb() -> None:

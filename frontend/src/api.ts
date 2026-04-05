@@ -8,10 +8,13 @@ import type {
 
 // In production (Vercel), we use relative paths so Vercel's rewrites proxy requests to the Hugging Face backend.
 const IS_PROD = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+const USE_DIRECT_DEV_API = import.meta.env.VITE_USE_DIRECT_API === 'true';
 
 const API_BASE = IS_PROD
   ? ''
-  : (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+  : USE_DIRECT_DEV_API
+    ? (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+    : '';
 
 export function endpoint(path: string): string {
   return `${API_BASE}${path}`;

@@ -63,15 +63,23 @@ class TriageService:
             )
 
         fused_score = breakdown.fused_score
+        predicted_hb = prediction.predicted_hemoglobin
+        strong_hb_flag = predicted_hb is not None and predicted_hb <= 10.5
+        moderate_hb_flag = predicted_hb is not None and predicted_hb <= 12.8
 
         # Symptom-driven escalation: severe symptoms alone can push to high concern
-        if fused_score >= 0.50 or (
-            prediction.anemia_risk >= 0.45 and symptom_score >= 0.28
+        if fused_score >= 0.52 or strong_hb_flag or (
+            prediction.anemia_risk >= 0.62 and symptom_score >= 0.28
         ) or symptom_score >= 0.55:
             band = "high_concern"
             label = "High concern"
             summary = "This screening suggests a higher level of concern. Arrange formal medical review soon, especially if symptoms are increasing."
-        elif fused_score >= 0.24 or prediction.anemia_risk >= 0.38 or symptom_score >= 0.22:
+        elif (
+            fused_score >= 0.28
+            or (prediction.anemia_risk >= 0.52 and prediction.screening_label == "anemia_likely")
+            or moderate_hb_flag
+            or symptom_score >= 0.22
+        ):
             band = "moderate_risk"
             label = "Moderate risk"
             summary = "This screening shows some concern. A routine check with a clinician or lab test would be reasonable."

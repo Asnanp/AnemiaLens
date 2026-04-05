@@ -18,7 +18,6 @@ export function Navbar({ backendUp }: { backendUp: boolean }) {
         <div className="hidden md:flex items-center gap-10">
           <a href="#" className="text-xs font-bold text-text-dim uppercase tracking-widest hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all duration-300">Screening</a>
           <a href="#" className="text-xs font-bold text-text-dim uppercase tracking-widest hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all duration-300">History</a>
-          <a href="#" className="text-xs font-bold text-text-dim uppercase tracking-widest hover:text-white hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all duration-300">Science</a>
         </div>
 
         <div className="flex items-center gap-4">

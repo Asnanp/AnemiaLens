@@ -47,7 +47,7 @@ export function UploadZone({ onFileSelect, previewUrl, onClear, onRunQuality, lo
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
           borderRadius:'1.5rem', border:'1px dashed rgba(255,255,255,0.11)',
           backdropFilter:'blur(20px)', overflow:'hidden',
-          cursor: previewUrl ? 'default' : 'none',
+          cursor: previewUrl ? 'default' : 'pointer',
           boxShadow: drag ? '0 0 40px rgba(200,0,30,0.2), inset 0 1px 0 rgba(255,255,255,0.1)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
         }}
       >
@@ -64,18 +64,23 @@ export function UploadZone({ onFileSelect, previewUrl, onClear, onRunQuality, lo
                   transition:'filter 0.4s ease', display:'block' }} />
               {/* Hover overlay */}
               <motion.div
-                animate={{ opacity: hover ? 1 : 0 }}
+                animate={{ opacity: hover ? 1 : 0.96 }}
                 transition={{ duration:0.3 }}
-                style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'0.75rem', backdropFilter:'blur(4px)' }}
+                style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'1rem', backdropFilter:'blur(4px)' }}
               >
-                <button className="btn btn-glass" style={{ padding:'0.6rem 1.4rem', fontSize:'0.65rem', borderRadius:'99px' }}
-                  onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}>
-                  <RefreshCw size={12} /> Replace
-                </button>
-                <button style={{ padding:'0.5rem 1.2rem', borderRadius:'99px', fontSize:'0.62rem', fontFamily:'var(--mono)', fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.3)', color:'#FCA5A5', cursor:'none', transition:'all 0.2s' }}
-                  onClick={e => { e.stopPropagation(); onClear(); }}>
-                  <X size={11} style={{ display:'inline', marginRight:4 }} /> Remove
-                </button>
+                <div style={{ alignSelf:'flex-end', padding:'0.35rem 0.65rem', borderRadius:'999px', background:'rgba(10,10,16,0.48)', border:'1px solid rgba(255,255,255,0.08)', color:'var(--text)', fontFamily:'var(--mono)', fontSize:'0.54rem', letterSpacing:'0.12em', textTransform:'uppercase' }}>
+                  Capture ready
+                </div>
+                <div style={{ display:'flex', gap:'0.65rem', justifyContent:'center', flexWrap:'wrap' }}>
+                  <button className="btn btn-glass" style={{ padding:'0.6rem 1.4rem', fontSize:'0.65rem', borderRadius:'99px' }}
+                    onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}>
+                    <RefreshCw size={12} /> Replace
+                  </button>
+                  <button style={{ padding:'0.5rem 1.2rem', borderRadius:'99px', fontSize:'0.62rem', fontFamily:'var(--mono)', fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.3)', color:'#FCA5A5', cursor:'pointer', transition:'all 0.2s' }}
+                    onClick={e => { e.stopPropagation(); onClear(); }}>
+                    <X size={11} style={{ display:'inline', marginRight:4 }} /> Remove
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           ) : (

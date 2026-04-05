@@ -48,11 +48,13 @@ def _prediction(
     confidence: float = 0.72,
     uncertainty: float = 0.20,
     label: str | None = None,
+    predicted_hb: float | None = None,
 ) -> PredictionResult:
     if label is None:
         label = "anemia_likely" if risk > 0.62 else ("anemia_unlikely" if risk < 0.35 else "uncertain")
     return PredictionResult(
         anemia_risk=risk,
+        predicted_hemoglobin=predicted_hb,
         confidence=confidence,
         uncertainty=uncertainty,
         reliability_flag="medium",
@@ -85,6 +87,22 @@ class TestBandRouting:
     def test_low_risk_for_weak_signal_no_symptoms(self) -> None:
         result = SERVICE.assess(_quality(), _prediction(0.18), SymptomInput())
         assert result.band == "low_risk"
+
+    def test_low_band_for_anemia_unlikely_signal_with_normal_hb(self) -> None:
+        result = SERVICE.assess(
+            _quality(),
+            _prediction(0.43, label="anemia_unlikely", predicted_hb=13.1),
+            SymptomInput(),
+        )
+        assert result.band == "low_risk"
+
+    def test_moderate_band_for_likely_signal_with_mildly_low_hb(self) -> None:
+        result = SERVICE.assess(
+            _quality(),
+            _prediction(0.55, label="anemia_likely", predicted_hb=12.4),
+            SymptomInput(),
+        )
+        assert result.band == "moderate_risk"
 
     def test_symptoms_alone_cannot_override_quality_failure(self) -> None:
         """Even with many symptoms, a quality failure must yield uncertain."""

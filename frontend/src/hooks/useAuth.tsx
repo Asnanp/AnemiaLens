@@ -38,6 +38,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
@@ -132,6 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, delay);
   }, [refreshAccessToken]);
 
+  const completeAuth = useCallback(async (tokens: TokenPair) => {
+    saveTokens(tokens);
+    const profile = await fetchProfile(tokens.access_token);
+    setUser(profile);
+    scheduleRefresh(tokens.expires_in);
+  }, [fetchProfile, scheduleRefresh]);
+
   // ── Init: restore session from stored tokens ───────────────────────────
   useEffect(() => {
     (async () => {
@@ -168,52 +176,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setIsLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const res = await fetch(endpoint('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Login failed');
 
-      const tokens = data as TokenPair;
-      saveTokens(tokens);
-      const profile = await fetchProfile(tokens.access_token);
-      setUser(profile);
-      scheduleRefresh(tokens.expires_in);
+      await completeAuth(data as TokenPair);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [fetchProfile, scheduleRefresh]);
+  }, [completeAuth]);
+
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const res = await fetch(endpoint('/api/auth/google'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Google sign-in failed');
+
+      await completeAuth(data as TokenPair);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [completeAuth]);
 
   // ── Register ───────────────────────────────────────────────────────────
   const register = useCallback(async (email: string, password: string, fullName?: string) => {
     setError(null);
     setIsLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedFullName = fullName?.trim() || null;
       const res = await fetch(endpoint('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName || null }),
+        body: JSON.stringify({ email: normalizedEmail, password, full_name: normalizedFullName }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Registration failed');
 
-      const tokens = data as TokenPair;
-      saveTokens(tokens);
-      const profile = await fetchProfile(tokens.access_token);
-      setUser(profile);
-      scheduleRefresh(tokens.expires_in);
+      await completeAuth(data as TokenPair);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [fetchProfile, scheduleRefresh]);
+  }, [completeAuth]);
 
   // ── Logout ─────────────────────────────────────────────────────────────
   const logout = useCallback(() => {
@@ -240,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       error,
       login,
+      loginWithGoogle,
       register,
       logout,
       clearError,

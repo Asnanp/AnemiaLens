@@ -20,8 +20,7 @@
 
 ---
 
-![AnemiaLens premium hero](https://github.com/user-attachments/assets/b15dbfbf-4d4a-4bd1-bcd3-5c7b742fface)
-
+![AnemiaLens premium hero](./docs/hero.png)
 
 ---
 

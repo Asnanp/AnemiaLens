@@ -25,10 +25,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = BACKEND_ROOT / "models"
 
+
+def _resolve_archive_model_path() -> Path:
+    """
+    Prefer modern local artifacts only.
+
+    The user explicitly does not want the app to silently fall back to older
+    weaker archive models when the newer clinical artifacts are missing.
+    """
+
+    candidates = (
+        MODELS_DIR / "archive-fusion-v8-clinical-robust.joblib",
+        MODELS_DIR / "archive-fusion-v7-ultimate-clinical.joblib",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
 DEFAULT_MODEL_PATH = MODELS_DIR / "anemia_model.pt"
 DEFAULT_ENSEMBLE_PATH = MODELS_DIR / "ensemble_model.json"
 DEFAULT_DEEP_STACK_PATH = MODELS_DIR / "deep_stack_model.joblib"
-DEFAULT_ARCHIVE_MODEL_PATH = MODELS_DIR / "archive-fusion-v8-clinical-robust.joblib"
+DEFAULT_ARCHIVE_MODEL_PATH = _resolve_archive_model_path()
 DEFAULT_EFFICIENTNET_MODEL_PATH = MODELS_DIR / "efficientnet_anemia.pth"
 DEFAULT_EFFICIENTNET_REPORT_PATH = MODELS_DIR / "efficientnet_report.json"
 DEFAULT_RUNTIME_STACK_REPORT_PATH = MODELS_DIR / "runtime_stack_report.json"
@@ -123,6 +141,8 @@ class Settings(BaseSettings):
     )
     cors_origins: list[str] = Field(
         default=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:5174",

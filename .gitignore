@@ -77,3 +77,9 @@ render.yaml
 presentation_script.md
 frontend/src/components/features/ResultWorkflowView.tsx
 ppt-rewrite.md
+.gemini/
+.gemini/*
+artifacts/
+brain/
+playwright-report/
+test-results/

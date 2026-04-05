@@ -1,62 +1,156 @@
-import { motion } from 'framer-motion';
+import { ClipboardList, FileText, ShieldCheck, Stethoscope, Workflow } from 'lucide-react';
+
+import {
+  ActionRow,
+  CardGrid,
+  FeatureCard,
+  MetricStrip,
+  PageSurface,
+  SectionBlock,
+  TimelineList,
+} from '../components/site/RoutePage';
+
+const PROVIDER_STEPS = [
+  {
+    number: '01',
+    title: 'Screen at the point of first contact',
+    detail:
+      'A staff member or patient can capture the lower inner eyelid before lab work is available, giving the clinical team an earlier first-pass signal.',
+  },
+  {
+    number: '02',
+    title: 'Review the capture and trust story',
+    detail:
+      'The workflow shows whether the image was strong enough to interpret instead of forcing staff to trust a weak capture.',
+  },
+  {
+    number: '03',
+    title: 'Use the result as triage support',
+    detail:
+      'Risk, reliability, and next-step guidance arrive together so the output can support prioritization and follow-up planning.',
+  },
+  {
+    number: '04',
+    title: 'Hand off or save the case summary',
+    detail:
+      'Email, PDF, and saved account history keep the screening usable after the first screen instead of leaving it trapped in the UI.',
+  },
+] as const;
 
 export default function ForProviders() {
   return (
-    <div className="pt-24 pb-16 min-h-screen">
-      <div className="max-w-5xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
+    <PageSurface
+      eyebrow="Provider workflow"
+      title={
+        <>
+          Built to support
+          <br />
+          triage, review, and
+          <br />
+          follow-up.
+        </>
+      }
+      intro="AnemiaLens is aimed at first-pass screening support. The goal is to help teams review image quality, look at a cautious risk signal, and move patients toward the right next step without presenting a phone photo as a diagnosis."
+      badges={['Screening support', 'Reviewable output', 'Share-ready summary']}
+      stats={[
+        { label: 'Capture', value: '1 image', detail: 'One guided lower-eyelid image starts the workflow.' },
+        { label: 'Review path', value: 'Risk + trust', detail: 'Clinicians can see both the screening result and how reliable the capture was.' },
+        { label: 'Handoff', value: 'Email + PDF', detail: 'Results can move into follow-up rather than staying trapped in the app.' },
+      ]}
+      actions={
+        <ActionRow
+          actions={[
+            { to: '/', children: 'Open screening', variant: 'primary' },
+            { to: '/science', children: 'Read science', variant: 'secondary' },
+          ]}
+        />
+      }
+      side={
+        <div
+          className="glass route-side-panel"
+          style={{
+            padding: '1.35rem',
+            borderRadius: '1.4rem',
+            background: 'rgba(8, 12, 20, 0.8)',
+            display: 'grid',
+            gap: '1rem',
+          }}
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight text-[var(--text-primary)]">
-            For Healthcare Providers
-          </h1>
-          <p className="text-lg text-[var(--text-secondary)] max-w-3xl mx-auto">
-            Empower your clinical practice with rapid, AI-driven triage tools. Integrate AnemiaLens into your workflow to streamline patient assessment.
-          </p>
-        </motion.div>
-
-        <div className="grid md:grid-cols-2 gap-12 mb-20">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="flex flex-col justify-center"
-          >
-            <h2 className="text-3xl font-bold mb-6">Why Partner With Us?</h2>
-            <ul className="space-y-4 text-[var(--text-muted)]">
-              <li className="flex items-start">
-                <span className="text-[var(--accent-bright)] mr-3">✓</span>
-                <span><strong>Reduce Wait Times:</strong> Instantly triage patients before lab results return.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-[var(--accent-bright)] mr-3">✓</span>
-                <span><strong>Cost Effective:</strong> Lower the barrier to initial screening in resource-limited settings.</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-[var(--accent-bright)] mr-3">✓</span>
-                <span><strong>API Integration:</strong> Connect directly with your existing EHR/EMR systems.</span>
-              </li>
-            </ul>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="glass p-8 rounded-3xl border border-[var(--glass-border)]"
-          >
-            <h3 className="text-xl font-bold mb-6 text-center">Request a Demo</h3>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert('Demo requested!'); }}>
-              <input type="text" className="w-full bg-[var(--glass-hi)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-bright)]" placeholder="Clinic / Hospital Name" required />
-              <input type="email" className="w-full bg-[var(--glass-hi)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-bright)]" placeholder="Work Email" required />
-              <button type="submit" className="w-full py-3 rounded-xl font-semibold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95" style={{ background: 'linear-gradient(135deg, var(--accent-bright), var(--accent))' }}>
-                Submit Request
-              </button>
-            </form>
-          </motion.div>
+          <div className="section-eyebrow">Where it fits</div>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.8rem, 2.8vw, 2.4rem)', lineHeight: 1.02, letterSpacing: '-0.04em' }}>
+            A calmer layer before formal blood testing.
+          </div>
+          <div className="route-mini-list">
+            <div className="route-mini-list-item">
+              <Workflow size={15} />
+              <span>Supports the front end of triage rather than replacing diagnostic work.</span>
+            </div>
+            <div className="route-mini-list-item">
+              <ClipboardList size={15} />
+              <span>Works best when the team needs a structured first-pass screen with visible uncertainty.</span>
+            </div>
+            <div className="route-mini-list-item">
+              <FileText size={15} />
+              <span>Produces a report surface that can survive beyond the first device screen.</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <SectionBlock
+        eyebrow="Use cases"
+        title="The system is strongest when it supports an existing care path."
+        intro="This is not a replacement for clinical review. It is more useful as an earlier, structured screening layer that helps teams decide whether to retake, monitor, or move toward formal testing."
+      >
+        <CardGrid>
+          <FeatureCard
+            icon={Stethoscope}
+            kicker="Triage support"
+            title="Earlier screening signal"
+            detail="A guided image can be collected before lab values are available, helping the team prioritize the next step."
+          />
+          <FeatureCard
+            icon={ShieldCheck}
+            kicker="Quality control"
+            title="Weak captures are flagged"
+            detail="The product keeps image trust visible instead of letting low-quality photos masquerade as reliable evidence."
+          />
+          <FeatureCard
+            icon={ClipboardList}
+            kicker="Context fusion"
+            title="Symptoms stay in the picture"
+            detail="Symptoms and patient context can influence the screening summary instead of leaving the image to speak alone."
+          />
+          <FeatureCard
+            icon={FileText}
+            kicker="After the screen"
+            title="Shareable summary"
+            detail="Email, PDF, and saved history help the result move into review and follow-up instead of dying in the session."
+          />
+        </CardGrid>
+      </SectionBlock>
+
+      <SectionBlock
+        eyebrow="Clinical sequence"
+        title="What a provider-facing use of the product should look like."
+        intro="The flow should stay simple enough for a real clinic or outreach setting while keeping the result honest about its limits."
+      >
+        <TimelineList steps={PROVIDER_STEPS} />
+      </SectionBlock>
+
+      <SectionBlock
+        eyebrow="Adoption posture"
+        title="Best used as a first-pass screening layer."
+        intro="The product is most defensible when it is used to guide attention and follow-up, not when it is treated like the phone image alone can close the case."
+      >
+        <MetricStrip
+          items={[
+            { label: 'Best role', value: 'Triage support', detail: 'Useful before or alongside formal testing, not instead of it.' },
+            { label: 'Most valuable output', value: 'Clear next step', detail: 'Teams can see whether the case should be retaken, monitored, or reviewed clinically.' },
+            { label: 'Safety guardrail', value: 'Clinical confirmation', detail: 'Concerning screens still need hemoglobin or CBC confirmation.' },
+          ]}
+        />
+      </SectionBlock>
+    </PageSurface>
   );
 }

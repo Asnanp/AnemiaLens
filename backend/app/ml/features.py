@@ -375,29 +375,30 @@ def extract_ultimate_clinical_features(
 ) -> dict[str, float]:
     base = extract_eye_features(image)
 
-    red_mean = float(base.get("center_mean_r", base.get("mean_r", 0.0)))
-    green_mean = float(base.get("center_mean_g", base.get("mean_g", 0.0)))
-    blue_mean = float(base.get("center_mean_b", base.get("mean_b", 0.0)))
-    red_std = float(base.get("center_std_r", base.get("std_r", 0.0)))
-    green_std = float(base.get("center_std_g", base.get("std_g", 0.0)))
-    blue_std = float(base.get("center_std_b", base.get("std_b", 0.0)))
+    red_mean = float(base.get("center_mean_r", base.get("mean_r", 0.0))) * 255.0
+    green_mean = float(base.get("center_mean_g", base.get("mean_g", 0.0))) * 255.0
+    blue_mean = float(base.get("center_mean_b", base.get("mean_b", 0.0))) * 255.0
+    red_std = float(base.get("center_std_r", base.get("std_r", 0.0))) * 255.0
+    green_std = float(base.get("center_std_g", base.get("std_g", 0.0))) * 255.0
+    blue_std = float(base.get("center_std_b", base.get("std_b", 0.0))) * 255.0
 
     pallor_intensity = _clamp01(
-        (1.0 - float(base.get("center_cpi", 0.35))) * 1.45
+        0.5 - float(base.get("center_cpi", 0.35))
     )
     pallor_gradient = _clamp01(
-        0.5 - (float(base.get("pallor_gradient", 0.0)) * 2.4)
+        (-float(base.get("pallor_gradient", 0.0))) * 2.4
     )
 
     red_green_ratio = red_mean / max(green_mean, 1e-6)
     red_blue_ratio = red_mean / max(blue_mean, 1e-6)
     green_blue_ratio = green_mean / max(blue_mean, 1e-6)
-    color_variance = _clamp01((red_std + green_std + blue_std) / 0.6)
+    color_variance = float((red_std**2 + green_std**2 + blue_std**2) / 3.0)
 
-    pallor_color_index = _clamp01(
-        (float(base.get("pallor_score", 0.0)) * 0.55)
-        + (pallor_intensity * 0.25)
-        + (pallor_gradient * 0.20)
+    pallor_color_index = (
+        (float(base.get("pallor_score", 0.0)) * 0.20)
+        + ((pallor_intensity - 0.14) * 0.35)
+        + ((pallor_gradient - 0.11) * 0.25)
+        + ((1.0 - red_green_ratio) * 0.15)
     )
 
     quality_blur_score = _quality_attr(
@@ -433,7 +434,7 @@ def extract_ultimate_clinical_features(
     texture_smoothness = _clamp01(
         1.0 - ((texture_contrast * 0.55) + (image_sharpness * 0.25))
     )
-    texture_entropy = _clamp01(float(base.get("rgb_entropy", 0.0)) / 8.0)
+    texture_entropy = float(base.get("rgb_entropy", 0.0))
 
     vessel_visibility = _clamp01(
         (float(base.get("center_red_green_gap", 0.0)) + 0.05) * 4.8
@@ -450,16 +451,17 @@ def extract_ultimate_clinical_features(
         (float(base.get("redness_ratio", 0.0)) - 0.25) * 4.2
     )
 
-    anemia_severity_score = _clamp01(
-        (pallor_intensity * 0.40)
-        + (pallor_color_index * 0.35)
-        + ((1.0 - vessel_visibility) * 0.25)
+    anemia_severity_score = (
+        ((pallor_intensity - 0.14) * 0.55)
+        + (pallor_color_index * 0.45)
+        + (((1.0 - vessel_visibility) - 0.20) * 0.20)
     )
     clinical_pallor_score = _clamp01(
-        (anemia_severity_score * 0.50)
+        0.12
+        + (anemia_severity_score * 0.55)
         + (pallor_gradient * 0.20)
-        + ((1.0 - vessel_density) * 0.15)
-        + ((1.0 - vessel_color_intensity) * 0.15)
+        + ((1.0 - vessel_density) * 0.10)
+        + ((1.0 - vessel_color_intensity) * 0.08)
     )
 
     lighting_uniformity = _clamp01(
@@ -467,23 +469,24 @@ def extract_ultimate_clinical_features(
         + ((1.0 - glare_risk) * 0.15)
         + ((1.0 - shadow_risk) * 0.20)
     )
-    noise_level = _clamp01(
-        (color_variance * 0.35)
-        + ((1.0 - image_sharpness) * 0.25)
-        + ((1.0 - lighting_uniformity) * 0.25)
+    noise_level = max(
+        0.0,
+        ((color_variance / 3000.0) * 0.20)
+        + ((1.0 - image_sharpness) * 0.22)
+        + ((1.0 - lighting_uniformity) * 0.22)
         + (abs(float(base.get("spectral_tilt_rb", 0.0))) * 0.15)
     )
 
-    age_scale = 0.0 if age is None else _clamp01((float(age) - 12.0) / 58.0)
-    age_pallor_interaction = _clamp01(age_scale * clinical_pallor_score)
+    age_scale = 0.5 if age is None else _clamp01((float(age) - 12.0) / 58.0)
+    age_pallor_interaction = age_scale * clinical_pallor_score
 
     sex_weight = {
         "female": 1.0,
         "male": 0.9,
         "other": 0.95,
-        "not_specified": 0.0,
-    }.get(str(sex).strip().lower(), 0.0)
-    gender_color_interaction = _clamp01(sex_weight * vessel_color_intensity)
+        "not_specified": 0.95,
+    }.get(str(sex).strip().lower(), 0.95)
+    gender_color_interaction = sex_weight * red_green_ratio
 
     return {
         "pallor_intensity": pallor_intensity,

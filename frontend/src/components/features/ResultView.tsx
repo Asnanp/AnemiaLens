@@ -398,13 +398,63 @@ function getHemoglobinPresentation(analysis: AnalyzeResponse): HemoglobinPresent
   };
 }
 
-function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
+type SystemResultState = 'normal' | 'runtime_unavailable' | 'offline_symptom_only' | 'quality_blocked';
+
+function getSystemResultState(analysis: AnalyzeResponse): SystemResultState {
+  const qualityWarnings = analysis.decision_audit?.quality_warning_codes ?? [];
+  const reviewFlags = analysis.decision_audit?.review_flags ?? [];
+
+  if (analysis.prediction?.model_source === 'missing-model') {
+    return 'runtime_unavailable';
+  }
+
+  if (!analysis.prediction && (qualityWarnings.includes('offline_mode') || reviewFlags.some((flag) => flag.toLowerCase().includes('offline')))) {
+    return 'offline_symptom_only';
+  }
+
+  if (!analysis.prediction) {
+    return 'quality_blocked';
+  }
+
+  return 'normal';
+}
+
+function RoiPreviewPanel({
+  analysis,
+  bandColor,
+  capturedImageUrl,
+}: {
+  analysis: AnalyzeResponse;
+  bandColor: string;
+  capturedImageUrl?: string | null;
+}) {
   const preview = analysis.roi_preview;
   if (!preview) return null;
 
   const sourceLabel = preview.extracted
     ? humanizeToken(preview.source, 'roi crop')
     : 'full frame fallback';
+  const previewCards = [
+    capturedImageUrl
+      ? {
+          label: 'Captured image',
+          src: capturedImageUrl,
+          detail: 'The original photo you uploaded for this screening run.',
+        }
+      : null,
+    {
+      label: preview.extracted ? 'Inner-eye focus' : 'Captured frame',
+      src: preview.original_data_url,
+      detail: preview.extracted
+        ? 'The extracted lower inner-eyelid region used for image-led analysis.'
+        : 'The app could not isolate the inner eyelid, so it fell back to the full frame.',
+    },
+    {
+      label: 'Enhanced focus',
+      src: preview.enhanced_data_url,
+      detail: 'A cleaned preview with tone and contrast adjusted for easier review.',
+    },
+  ].filter((item): item is { label: string; src: string | null; detail: string } => Boolean(item));
 
   return (
     <div
@@ -421,10 +471,10 @@ function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; b
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.78)', marginBottom: '0.25rem' }}>
-            ROI Preview
+            Capture + inner-eye preview
           </div>
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            The model focuses on this extracted inner-eyelid region rather than the whole frame.
+            You can compare the original captured photo with the inner-eye region the model actually used.
           </div>
         </div>
         <div style={{ padding: '0.32rem 0.72rem', borderRadius: '999px', border: `1px solid ${bandColor}33`, background: `${bandColor}12`, color: bandColor, fontSize: '0.55rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700 }}>
@@ -432,11 +482,15 @@ function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; b
         </div>
       </div>
 
-      <div className="roi-preview-images" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-        {[
-          { label: 'Raw ROI', src: preview.original_data_url },
-          { label: 'Enhanced ROI', src: preview.enhanced_data_url },
-        ].map((item) => (
+      <div
+        className="roi-preview-images"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '0.75rem',
+        }}
+      >
+        {previewCards.map((item) => (
           <div key={item.label} style={{ display: 'grid', gap: '0.42rem' }}>
             <div style={{ fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
               {item.label}
@@ -453,6 +507,9 @@ function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; b
                   Preview unavailable
                 </div>
               )}
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>
+              {item.detail}
             </div>
           </div>
         ))}
@@ -483,7 +540,15 @@ function RoiPreviewPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; b
   );
 }
 
-function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse; bandColor: string }) {
+function WhyThisResultPanel({
+  analysis,
+  bandColor,
+  previewUrl,
+}: {
+  analysis: AnalyzeResponse;
+  bandColor: string;
+  previewUrl?: string | null;
+}) {
   const reliability = getReliabilityStatus(analysis);
   const activeSymptoms = activeSymptomLabels(analysis.symptoms);
   const confidencePct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
@@ -539,7 +604,7 @@ function WhyThisResultPanel({ analysis, bandColor }: { analysis: AnalyzeResponse
         {mandatorySummary}
       </div>
 
-      <RoiPreviewPanel analysis={analysis} bandColor={bandColor} />
+      <RoiPreviewPanel analysis={analysis} bandColor={bandColor} capturedImageUrl={previewUrl} />
 
       <div className="result-fact-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
         {factPills.map((pill) => (
@@ -1237,8 +1302,30 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
   );
 }
 
-function RiskActionBadge({ band }: { band: string }) {
-  const config = band === 'high_concern'
+function RiskActionBadge({
+  band,
+  runtimeUnavailable,
+  retakeRecommended,
+}: {
+  band: string;
+  runtimeUnavailable?: boolean;
+  retakeRecommended?: boolean;
+}) {
+  const config = runtimeUnavailable
+    ? {
+        color: '#38BDF8',
+        bg: 'rgba(56,189,248,0.08)',
+        border: 'rgba(56,189,248,0.2)',
+        action: 'The screening model is temporarily unavailable. Retry this scan in a moment instead of relying on this incomplete result.',
+      }
+    : retakeRecommended || band === 'uncertain_retake_needed'
+    ? {
+        color: '#F59E0B',
+        bg: 'rgba(245,158,11,0.08)',
+        border: 'rgba(245,158,11,0.25)',
+        action: 'Retake the image in bright indirect light and keep the lower eyelid fully visible before making a follow-up decision.',
+      }
+    : band === 'high_concern'
     ? { color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', action: 'Consult a doctor immediately — seek a CBC blood test within 24–48 hours.' }
     : band === 'moderate_risk'
     ? { color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', action: 'Consider scheduling a blood test soon. Monitor symptoms and maintain iron-rich diet.' }
@@ -1284,13 +1371,16 @@ function ConfidenceGauge({ analysis, color }: { analysis: AnalyzeResponse; color
 
 interface ResultViewProps {
   analysis: AnalyzeResponse;
+  previewUrl?: string | null;
   onReset: () => void;
   onDownload: () => void;
   onOpenAuth?: (mode?: 'login' | 'register') => void;
 }
 
-export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: ResultViewProps) {
+export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAuth }: ResultViewProps) {
   const { isAuthenticated } = useAuth();
+  const systemState = getSystemResultState(analysis);
+  const runtimeUnavailable = systemState !== 'normal';
   const isHigh     = analysis.triage.band === 'high_concern';
   const isModerate = analysis.triage.band === 'moderate_risk';
   const bandColor  = isHigh ? '#EF4444' : isModerate ? '#F59E0B' : '#10B981';
@@ -1333,6 +1423,83 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
     }
     setTimeout(() => setShareToast(null), 3000);
   };
+
+  if (runtimeUnavailable) {
+    const copy = systemState === 'offline_symptom_only'
+      ? {
+          badge: 'Offline symptom-only result',
+          title: 'This run did not analyze the image.',
+          detail:
+            'The app stayed in offline symptom-only mode for this run, so it should not present a normal image-based risk story or hemoglobin estimate. Reconnect and retake the screening with an eyelid image for a real model-backed result.',
+          action: 'Reconnect and retake',
+          accent: '#F59E0B',
+        }
+      : systemState === 'quality_blocked'
+        ? {
+            badge: 'Retake required',
+            title: 'The image did not pass the capture gate.',
+            detail:
+              'The screening stopped before prediction because the capture was not strong enough to interpret safely. A cleaner image is needed before the normal result layout should appear.',
+            action: 'Retake image',
+            accent: '#F59E0B',
+          }
+        : {
+            badge: 'Model temporarily unavailable',
+            title: 'This scan could not be completed.',
+            detail:
+              'The app did not have a working screening model for this run, so it should not present a normal risk story, confidence score, or follow-up action. Retry the scan once the model reconnects.',
+            action: 'Retry screening',
+            accent: '#38BDF8',
+          };
+
+    return (
+      <motion.div
+        className="glass result-hero-card result-hero-surface"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: E }}
+        style={{
+          padding: 'clamp(1.35rem,3vw,2.25rem)',
+          border: `1px solid ${copy.accent}33`,
+          borderLeft: `3px solid ${copy.accent}`,
+          background: 'linear-gradient(180deg, rgba(18,18,28,0.9), rgba(18,18,28,0.82))',
+        }}
+      >
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.6rem', fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', background: `${copy.accent}14`, border: `1px solid ${copy.accent}33`, color: copy.accent }}>
+              {copy.badge}
+            </span>
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: copy.accent, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+              Screening runtime
+            </div>
+            <div style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2rem,4.2vw,3.2rem)', fontWeight: 600, lineHeight: 1.05, letterSpacing: '-0.03em', color: 'var(--text)' }}>
+              {copy.title}
+            </div>
+            <div style={{ maxWidth: 620, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.75, marginTop: '0.8rem' }}>
+              {copy.detail}
+            </div>
+          </div>
+          <RiskActionBadge band={analysis.triage.band} runtimeUnavailable={systemState === 'runtime_unavailable'} retakeRecommended={systemState !== 'runtime_unavailable'} />
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={onReset}>
+              <RefreshCw size={14} />
+              {copy.action}
+            </button>
+            <button className="btn btn-glass" onClick={onDownload}>
+              <Download size={14} />
+              Export current report
+            </button>
+          </div>
+          <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
+            This is a system state, not a medical result. Confirm any concern with a clinician or a blood test rather than relying on an unavailable model.
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -1467,7 +1634,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
               <div style={{ padding: '1.25rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <ConfidenceGauge analysis={analysis} color={bandColor} />
               </div>
-              <RiskActionBadge band={analysis.triage.band} />
+              <RiskActionBadge band={analysis.triage.band} retakeRecommended={retakeRecommended} />
             </div>
 
             {/* Disclaimer */}
@@ -1483,7 +1650,7 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
           </div>
         </motion.div>
 
-        <WhyThisResultPanel analysis={analysis} bandColor={bandColor} />
+        <WhyThisResultPanel analysis={analysis} bandColor={bandColor} previewUrl={previewUrl} />
 
         <div className="result-core-grid result-core-grid-clean" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px,1fr))', gap: '1.1rem' }}>
           <motion.div className="glass result-section-card result-section-card-clean" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, ease: E }}
@@ -1493,20 +1660,15 @@ export function ResultView({ analysis, onReset, onDownload, onOpenAuth }: Result
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(0,194,255,0.05)', border: '1px solid rgba(0,194,255,0.14)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
                 <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.8)' }}>
-                  {analysis.guidance.source === 'mistral' ? 'Mistral guidance' : 'Clinical guidance'}
+                  Care guidance
                 </div>
                 <div style={{ padding: '0.28rem 0.72rem', borderRadius: '999px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.54rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(0,194,255,0.85)' }}>
-                  {analysis.guidance.source === 'mistral' ? `Powered by ${analysis.guidance.model_used ?? 'Mistral'}` : 'Fallback guidance'}
+                  {analysis.guidance.source === 'mistral' ? 'Live guidance layer' : 'Fallback guidance'}
                 </div>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
                 {analysis.guidance.explanation}
               </div>
-              {analysis.guidance.source === 'mistral' && (
-                <div style={{ marginTop: '0.7rem', fontSize: '0.68rem', color: 'rgba(0,194,255,0.72)', lineHeight: 1.55 }}>
-                  Language and follow-up guidance in this card is generated by the live Mistral layer.
-                </div>
-              )}
             </div>
 
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.16)' }}>

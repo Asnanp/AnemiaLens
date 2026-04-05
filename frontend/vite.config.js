@@ -1,9 +1,9 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-const apiTarget = process.env.VITE_API_BASE_URL
-    ?? process.env.VITE_API_PROXY_TARGET
-    ?? 'https://asnannp-anemialens.hf.space';
+const apiTarget = process.env.VITE_API_PROXY_TARGET
+    ?? process.env.VITE_API_BASE_URL
+    ?? 'http://127.0.0.1:5000';
 export default defineConfig({
     plugins: [react()],
     build: {
@@ -38,6 +38,7 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 3000,
+        allowedHosts: ['.emergentagent.com', '.preview.emergentagent.com'],
         proxy: {
             '/api': { target: apiTarget, changeOrigin: true },
             '/health': { target: apiTarget, changeOrigin: true },

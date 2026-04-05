@@ -231,10 +231,10 @@ export const STEPS_META = [
 // ── LOADING OVERLAY ───────────────────────────────────────────────────────────
 export function QwenLoadingOverlay() {
   const stages = [
-    { label: 'Image Quality Agent validated capture', done: true },
-    { label: 'Screening Agent analyzed conjunctival pallor', done: true },
-    { label: 'Triage Agent fused intake + image signal', done: true },
-    { label: 'Guidance Agent is preparing next steps...', done: false },
+    { label: 'Image accepted and quality review completed', done: true },
+    { label: 'Screening model is analyzing the image signal', done: false },
+    { label: 'Triage is combining image and symptom context', done: false },
+    { label: 'Preparing the result summary', done: false },
   ];
   return (
     <motion.div
@@ -252,14 +252,14 @@ export function QwenLoadingOverlay() {
         </svg>
       </motion.div>
 
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-          AI Analysis in Progress
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+          Screening analysis in progress
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+          The result is being prepared from the capture and intake you already completed.
+          </div>
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          Mistral AI is generating your personalized guidance
-        </div>
-      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: 340 }}>
         {stages.map((s, i) => (

@@ -1,32 +1,27 @@
-﻿/**
+/**
  * AnemiaLens - Main App Shell
  * Guest-first screening with account save, history, and dashboard flows.
  */
 
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import AboutUs from './pages/AboutUs';
 import HowItWorks from './pages/HowItWorks';
+import Science from './pages/Science';
 import ForProviders from './pages/ForProviders';
 import FAQ from './pages/FAQ';
-import Contact from './pages/Contact';
-import Science from './pages/Science';
-import Pricing from './pages/Pricing';
-import Blog from './pages/Blog';
-import Testimonials from './pages/Testimonials';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useScreening } from './hooks/useScreening';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UploadZone } from './components/features/UploadZone';
 import {
-  STEPS_META, QwenLoadingOverlay, E, WakeBanner, Cursor, LuxuryParticles,
+  STEPS_META, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
 import { Hero } from './pages/HeroSection';
 import { ArrowRight, ChevronRight, Menu, User, X } from 'lucide-react';
 import { SmoothScroll } from './components/SmoothScroll';
 import { ScrollProgress } from './components/ScrollProgress';
-import { Enhanced3DBackground } from './components/Enhanced3DBackground';
+import { scrollToId } from './utils/scroll';
 
 import { toast, ToastContainer } from './components/Toast';
 import { saveScreeningToAccount } from './api';
@@ -42,26 +37,61 @@ const loadResultView = () => import('./components/features/ResultView');
 const ResultView = lazy(async () => ({ default: (await loadResultView()).ResultView }));
 const loadDashboardPage = () => import('./pages/DashboardPage');
 const DashboardPage = lazy(loadDashboardPage);
-const loadAdminDashboardPage = () => import('./pages/AdminDashboardPage');
-const AdminDashboardPage = lazy(loadAdminDashboardPage);
 const loadLandingSections = () => import('./pages/LandingSections');
-const Challenge = lazy(async () => ({ default: (await loadLandingSections()).Challenge }));
-const DifferentiatorsSection = lazy(async () => ({ default: (await loadLandingSections()).DifferentiatorsSection }));
 const WorkflowStepper = lazy(async () => ({ default: (await loadLandingSections()).WorkflowStepper }));
-const TechSection = lazy(async () => ({ default: (await loadLandingSections()).TechSection }));
 const Footer = lazy(async () => ({ default: (await loadLandingSections()).Footer }));
-const loadVisualSystem = () => import('./components/features/VisualSystem');
-const AuroraCanvas = lazy(async () => ({ default: (await loadVisualSystem()).AuroraCanvas }));
 const loadSupabaseTest = () => import('./components/SupabaseTest');
 const SupabaseTest = lazy(async () => ({ default: (await loadSupabaseTest()).SupabaseTest }));
 
 const NAV_LINKS = [
-  { label: 'How It Works', path: '/how-it-works' },
   { label: 'Science', path: '/science' },
-  { label: 'Pricing', path: '/pricing' },
-  { label: 'Blog', path: '/blog' },
-  { label: 'Testimonials', path: '/testimonials' },
-  { label: 'Contact', path: '/contact' },
+  { label: 'How It Works', path: '/how-it-works' },
+  { label: 'Providers', path: '/providers' },
+] as const;
+
+const DEMO_CASES = [
+  {
+    id: 'low-risk-demo',
+    label: 'Low risk',
+    note: 'Balanced lighting and a cleaner lower-eyelid capture.',
+    imageUrl: '/demo-cases/low-risk-demo.jpg',
+    symptoms: {
+      fatigue: false,
+      dizziness: false,
+      pale_skin: false,
+      shortness_of_breath: false,
+      heavy_menstrual_bleeding: null,
+      poor_diet_low_iron: false,
+    },
+  },
+  {
+    id: 'moderate-risk-demo',
+    label: 'Moderate',
+    note: 'A more borderline image-led screening with mild symptom context.',
+    imageUrl: '/demo-cases/moderate-risk-demo.jpg',
+    symptoms: {
+      fatigue: true,
+      dizziness: false,
+      pale_skin: true,
+      shortness_of_breath: false,
+      heavy_menstrual_bleeding: null,
+      poor_diet_low_iron: true,
+    },
+  },
+  {
+    id: 'high-concern-demo',
+    label: 'High concern',
+    note: 'A stronger pallor-like signal with heavier symptom burden.',
+    imageUrl: '/demo-cases/high-concern-demo.jpg',
+    symptoms: {
+      fatigue: true,
+      dizziness: true,
+      pale_skin: true,
+      shortness_of_breath: true,
+      heavy_menstrual_bleeding: true,
+      poor_diet_low_iron: true,
+    },
+  },
 ] as const;
 
 function toTitleCaseWord(value: string) {
@@ -203,12 +233,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
   const scrollTo = (id: string) => {
     setMenuOpen(false);
     setTimeout(() => {
-      const target = document.getElementById(id);
-      if (!target) return;
-      const header = document.querySelector('header');
-      const headerHeight = header?.getBoundingClientRect().height ?? 0;
-      const top = target.getBoundingClientRect().top + window.scrollY - headerHeight - 28;
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+      scrollToId(id);
     }, 150);
   };
 
@@ -298,16 +323,6 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 </>
               ) : (
                 <>
-                  {user?.role === 'admin' && (
-                    <button
-                      className="btn btn-glass nav-secondary-action nav-admin-action"
-                      onMouseEnter={() => { void loadAdminDashboardPage(); }}
-                      onFocus={() => { void loadAdminDashboardPage(); }}
-                      onClick={() => setShowAdmin(true)}
-                    >
-                      Admin
-                    </button>
-                  )}
                   <button
                     className="btn btn-glass nav-secondary-action nav-dashboard-action"
                     onMouseEnter={() => { void loadDashboardPage(); }}
@@ -392,19 +407,6 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 )}
             {isAuthenticated && (
               <div className="nav-mobile-actions">
-                    {user?.role === 'admin' && (
-                      <button
-                        className="btn btn-glass nav-mobile-action nav-admin-action"
-                        onMouseEnter={() => { void loadAdminDashboardPage(); }}
-                        onFocus={() => { void loadAdminDashboardPage(); }}
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setShowAdmin(true);
-                        }}
-                      >
-                        Admin Panel
-                      </button>
-                    )}
                     <button
                       className="btn btn-glass nav-mobile-action"
                       onMouseEnter={() => { void loadDashboardPage(); }}
@@ -443,11 +445,6 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
         {showDashboard && (
           <Suspense fallback={<OverlayLoader title="Preparing Dashboard" detail="Loading your screening intelligence workspace." />}>
             <DashboardPage onClose={() => setShowDashboard(false)} />
-          </Suspense>
-        )}
-        {showAdmin && (
-          <Suspense fallback={<OverlayLoader title="Opening Admin Console" detail="Fetching platform analytics and operator controls." />}>
-            <AdminDashboardPage onClose={() => setShowAdmin(false)} />
           </Suspense>
         )}
       </AnimatePresence>
@@ -618,16 +615,16 @@ function ScreeningSection() {
                   alignItems: 'start',
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.35rem' }}>
                   <div>
                     <div className="section-eyebrow" style={{ marginBottom: '0.75rem' }}>Phase 01</div>
-                    <h3 style={{ fontFamily: 'var(--serif)', fontSize: '2.2rem', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1rem' }}>Initial Image Capture</h3>
+                    <h3 style={{ fontFamily: 'var(--serif)', fontSize: '2.2rem', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1rem' }}>Capture the lower inner eyelid</h3>
                     <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, fontSize: '0.9rem' }}>
-                      High-resolution macro capture of the conjunctival region. Align your phone horizontally with the lower eyelid pulled down.
+                      Start with one clean image in bright indirect light. This first step only cares about whether the capture is strong enough to interpret safely.
                     </p>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div className="label-tag" style={{ marginBottom: '0.5rem' }}>Protocol Check</div>
+                  <div className="screening-phase-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="label-tag" style={{ marginBottom: '0.25rem' }}>Capture rules</div>
                     {['Bright, indirect natural daylight', 'No flash or harsh shadows', 'Lower eyelid fully exposed', 'One eye centered in frame'].map(tip => (
                       <div key={tip} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(200,0,30,0.15)', border: '1px solid rgba(200,0,30,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -637,43 +634,62 @@ function ScreeningSection() {
                       </div>
                     ))}
                   </div>
-                  <div>
-                    <div className="label-tag" style={{ marginBottom: '1rem' }}>Demo Profiles</div>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div className="screening-phase-card screening-phase-note-card">
+                    <div className="label-tag" style={{ marginBottom: '0.55rem' }}>What happens next</div>
+                    <div style={{ display: 'grid', gap: '0.7rem' }}>
                       {[
-                        { id: 'low', label: 'Low Risk', img: '/demo-cases/low-risk-demo.jpg' },
-                        { id: 'moderate', label: 'Moderate', img: '/demo-cases/moderate-risk-demo.jpg' },
-                        { id: 'high', label: 'High Concern', img: '/demo-cases/high-concern-demo.jpg' },
-                      ].map(s => (
-                        <button key={s.id} className="btn btn-glass glass-shimmer"
-                          style={{ padding: '0.5rem 1rem', fontSize: '0.65rem', gap: '0.5rem', borderRadius: '0.75rem' }}
-                          onClick={() => loadSample(s.img, { fatigue: false, dizziness: false, pale_skin: false, shortness_of_breath: false, heavy_menstrual_bleeding: null, poor_diet_low_iron: false }, s.id)}>
-                          <img src={s.img} alt={s.label} style={{ width: 20, height: 20, borderRadius: 4, objectFit: 'cover' }} />
-                          {s.label}
-                        </button>
+                        'The image is checked for blur, lighting, framing, and eyelid visibility.',
+                        'Only a usable image moves on to symptom intake and screening.',
+                        'Risk, trust, and next-step guidance stay together in the final result.',
+                      ].map((point) => (
+                        <div key={point} style={{ fontSize: '0.81rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                          {point}
+                        </div>
                       ))}
                     </div>
                   </div>
-                  {!isAuthenticated && (
-                    <div style={{ padding: '1rem 1.1rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'grid', gap: '0.8rem' }}>
+                </div>
+                <div className="screening-capture-surface glass">
+                  <div className="section-eyebrow" style={{ marginBottom: '0.65rem' }}>Image capture</div>
+                  <div style={{ fontFamily: 'var(--serif)', fontSize: '1.75rem', lineHeight: 1.02, letterSpacing: '-0.03em', marginBottom: '0.55rem' }}>
+                    Upload one clear lower-eyelid image.
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '1rem' }}>
+                    Use the capture surface below. Once the image looks right, run the quality check before moving on.
+                  </div>
+                  <UploadZone onFileSelect={pickFile} previewUrl={previewUrl} onClear={reset} onRunQuality={runQuality} loading={loading} disabled={!file} />
+                  <div className="screening-demo-gallery">
+                    <div className="screening-demo-gallery-head">
                       <div>
-                        <div className="label-tag" style={{ marginBottom: '0.6rem' }}>Account layer</div>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>
-                          Screen as a guest if you want, then create an account to save results, open your dashboard, and build a real screening history over time.
-                        </div>
+                        <div className="label-tag">Demo cases</div>
+                        <div className="screening-demo-gallery-title">Try the local reference captures.</div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
-                        <button className="btn btn-glass" style={{ padding: '0.6rem 1rem', fontSize: '0.65rem', borderRadius: '0.8rem' }} onClick={() => openAuth('login')}>
-                          Sign In
-                        </button>
-                        <button className="btn btn-glass" style={{ padding: '0.6rem 1rem', fontSize: '0.65rem', borderRadius: '0.8rem', border: '1px solid rgba(200,0,30,0.25)', color: 'var(--accent-bright)' }} onClick={() => openAuth('register')}>
-                          Create Account
-                        </button>
+                      <div className="screening-demo-gallery-copy">
+                        Each one loads a local image so you can test the full screening path quickly.
                       </div>
                     </div>
-                  )}
+                    <div className="screening-demo-gallery-grid">
+                      {DEMO_CASES.map((demo) => (
+                        <motion.button
+                          key={demo.id}
+                          type="button"
+                          className="screening-demo-card"
+                          whileHover={{ y: -4, scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          transition={{ duration: 0.2 }}
+                          onClick={() => loadSample(demo.imageUrl, demo.symptoms, demo.id)}
+                        >
+                          <img src={demo.imageUrl} alt={demo.label} className="screening-demo-card-image" />
+                          <div className="screening-demo-card-body">
+                            <div className="screening-demo-card-label">{demo.label}</div>
+                            <div className="screening-demo-card-note">{demo.note}</div>
+                            <div className="screening-demo-card-action">Load this case</div>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <UploadZone onFileSelect={pickFile} previewUrl={previewUrl} onClear={reset} onRunQuality={runQuality} loading={loading} disabled={!file} />
               </div>
             )}
             {step === 1 && quality && (
@@ -704,7 +720,13 @@ function ScreeningSection() {
             {step === 2 && loading && <QwenLoadingOverlay />}
             {step === 3 && analysis && (
               <Suspense fallback={<InlineSurfaceLoader label="Preparing your screening result and report actions." />}>
-                <ResultView analysis={analysis} onReset={reset} onDownload={handleDownload} onOpenAuth={(mode = 'login') => openAuth(mode, true)} />
+                <ResultView
+                  analysis={analysis}
+                  previewUrl={previewUrl}
+                  onReset={reset}
+                  onDownload={handleDownload}
+                  onOpenAuth={(mode = 'login') => openAuth(mode, true)}
+                />
               </Suspense>
             )}
           </motion.div>
@@ -717,7 +739,6 @@ function ScreeningSection() {
 function AppContent() {
   const { backendUp } = useScreening();
   const showSupabaseTest = import.meta.env.DEV && import.meta.env.VITE_SHOW_SUPABASE_TEST === 'true';
-  const [compactVisualMode, setCompactVisualMode] = useState(() => window.innerWidth <= 900);
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -740,14 +761,11 @@ function AppContent() {
   useEffect(() => {
     const warm = () => {
       void loadLandingSections();
-      void loadVisualSystem();
       void loadAuthPage();
       void loadQualityView();
       void loadIntakeView();
       void loadResultView();
       void loadDashboardPage();
-      void loadAdminDashboardPage();
-      if (showSupabaseTest) void loadSupabaseTest();
     };
 
     if ('requestIdleCallback' in window) {
@@ -759,23 +777,13 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, [showSupabaseTest]);
 
-  useEffect(() => {
-    const onResize = () => setCompactVisualMode(window.innerWidth <= 900);
-    window.addEventListener('resize', onResize, { passive: true });
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--void)' }}>
+      <div className="cinematic-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.4 }}>
+        <div style={{ position: 'absolute', top: '10%', left: '15%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--crimson-glow) 0%, transparent 70%)', filter: 'blur(100px)' }} />
+        <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: '35vw', height: '35vw', background: 'radial-gradient(circle, var(--violet-glow) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+      </div>
       <ScrollProgress />
-      <AnimatePresence><WakeBanner /></AnimatePresence>
-      {!compactVisualMode && <Cursor />}
-      {!compactVisualMode && <LuxuryParticles />}
-      {!compactVisualMode && (
-        <Suspense fallback={null}>
-          <Enhanced3DBackground />
-        </Suspense>
-      )}
       <Navbar backendUp={backendUp} />
       <main style={{ position: 'relative', zIndex: 1 }}>
         <Routes>
@@ -783,34 +791,17 @@ function AppContent() {
             <>
               <Hero />
               <div className="section-divider" />
-              <Suspense fallback={<SectionFallback />}>
-                <Challenge />
-              </Suspense>
-              <div className="section-divider" />
-              <Suspense fallback={<SectionFallback />}>
-                <DifferentiatorsSection />
-              </Suspense>
-              <div className="section-divider" />
               <Suspense fallback={<SectionFallback minHeight={280} />}>
                 <WorkflowStepper />
               </Suspense>
               <div className="section-divider" />
               <ScreeningSection />
-              <div className="section-divider" />
-              <Suspense fallback={<SectionFallback />}>
-                <TechSection />
-              </Suspense>
             </>
           } />
-          <Route path="/about" element={<AboutUs />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/science" element={<Science />} />
           <Route path="/providers" element={<ForProviders />} />
           <Route path="/faq" element={<FAQ />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/science" element={<Science />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/testimonials" element={<Testimonials />} />
         </Routes>
       </main>
       <Suspense fallback={null}>

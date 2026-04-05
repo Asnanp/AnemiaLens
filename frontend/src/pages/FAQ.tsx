@@ -1,45 +1,80 @@
-import { motion } from 'framer-motion';
+import { ActionRow, FaqList, PageSurface, SectionBlock } from '../components/site/RoutePage';
+
+const GENERAL_FAQS = [
+  {
+    question: 'What is AnemiaLens actually meant to do?',
+    answer:
+      'It is a first-pass smartphone screening workflow. The product reviews whether a lower-eyelid image is usable, combines that image signal with optional symptom context, and returns a cautious next-step summary.',
+  },
+  {
+    question: 'Does it diagnose anemia from a photo?',
+    answer:
+      'No. It is a screening aid only. Concerning results still need formal hemoglobin or CBC confirmation and clinician review.',
+  },
+  {
+    question: 'Why can the app ask for a retake?',
+    answer:
+      'Because a weak image should not be dressed up as a confident result. If lighting, blur, framing, or eyelid visibility are not strong enough, the safer action is to ask for a better capture.',
+  },
+] as const;
+
+const PRIVACY_FAQS = [
+  {
+    question: 'Can someone use the app without creating an account?',
+    answer:
+      'Yes. The screening flow can be used as a guest. Accounts are most useful when someone wants saved history, email handoff, or a repeatable record over time.',
+  },
+  {
+    question: 'What happens when the backend or model is unavailable?',
+    answer:
+      'The interface should move into a clear system state instead of pretending a normal screening result was produced. The product is being updated to keep that distinction visible everywhere.',
+  },
+  {
+    question: 'Is the result enough for treatment decisions?',
+    answer:
+      'No. The result can help with triage and follow-up planning, but treatment decisions should depend on formal testing and clinician judgment.',
+  },
+] as const;
 
 export default function FAQ() {
-  const faqs = [
-    { q: "How accurate is the AnemiaLens screening?", a: "Our AI model is trained on thousands of clinical images and achieves high sensitivity in detecting palpebral conjunctiva pallor, a strong indicator of anemia. However, it is a screening tool, not a diagnostic one. Always consult a healthcare professional for a confirmed diagnosis." },
-    { q: "Is my medical data secure?", a: "Absolutely. We employ end-to-end encryption. If you use the app as a guest, your images are processed in-memory and immediately discarded. Registered users have their data securely stored in HIPAA-compliant databases." },
-    { q: "Can I use this on children?", a: "The current model is primarily calibrated for adult conjunctiva. While it can process pediatric images, the confidence intervals may vary. We recommend clinical supervision for pediatric screening." },
-    { q: "How do I get the best results?", a: "Ensure you are in a well-lit room, preferably with natural daylight. Gently pull down your lower eyelid to expose the inner tissue, and ensure the camera focuses sharply on the eye." }
-  ];
-
   return (
-    <div className="pt-24 pb-16 min-h-screen">
-      <div className="max-w-4xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
-        >
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
-            Frequently Asked Questions
-          </h1>
-          <p className="text-lg text-[var(--text-secondary)]">
-            Everything you need to know about the AnemiaLens platform.
-          </p>
-        </motion.div>
+    <PageSurface
+      eyebrow="FAQ"
+      title={
+        <>
+          Common questions,
+          <br />
+          answered more
+          <br />
+          carefully.
+        </>
+      }
+      intro="The product works best when people understand both what it helps with and where its limits are. These are the questions most likely to shape safe use."
+      badges={['Screening support only', 'Guest access available', 'Clinical follow-up still matters']}
+      actions={
+        <ActionRow
+          actions={[
+            { to: '/', children: 'Start screening', variant: 'primary' },
+            { to: '/how-it-works', children: 'See workflow', variant: 'secondary' },
+          ]}
+        />
+      }
+    >
+      <SectionBlock
+        eyebrow="General"
+        title="What the workflow is meant to do."
+        intro="These answers focus on how the product should be understood by a patient, clinician, or reviewer."
+      >
+        <FaqList items={GENERAL_FAQS} />
+      </SectionBlock>
 
-        <div className="space-y-6">
-          {faqs.map((faq, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="glass p-6 md:p-8 rounded-2xl border border-[var(--glass-border)] hover:border-[var(--glass-highlight)] transition-colors"
-            >
-              <h3 className="text-xl font-semibold mb-3 text-[var(--text-primary)]">{faq.q}</h3>
-              <p className="text-[var(--text-muted)] leading-relaxed">{faq.a}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </div>
+      <SectionBlock
+        eyebrow="Use and safety"
+        title="What happens around the result."
+        intro="The system should stay honest when trust is low, when the model is unavailable, or when a case still needs formal testing."
+      >
+        <FaqList items={PRIVACY_FAQS} />
+      </SectionBlock>
+    </PageSurface>
   );
 }
