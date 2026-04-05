@@ -3,6 +3,7 @@
  */
 import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MagneticButton } from '../components/MagneticButton';
 import {
   Activity, AlertTriangle, BarChart2, CheckCircle2, ChevronRight, Clock,
   Gauge, HeartPulse, History, RefreshCw, ShieldCheck, Sparkles, Stethoscope,
@@ -306,15 +307,15 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="dashboard-header-actions" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <button onClick={handleRefresh} disabled={isLoading || statsLoading} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <MagneticButton onClick={handleRefresh} disabled={isLoading || statsLoading} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <RefreshCw size={12} style={{ animation: isLoading || statsLoading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
-            </button>
-            <button onClick={onClose} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem' }}>
+            </MagneticButton>
+            <MagneticButton onClick={onClose} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem' }}>
               Close
-            </button>
-            <button onClick={() => { logout(); onClose(); }} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', color: '#EF4444', borderColor: 'rgba(239,68,68,0.18)' }}>
+            </MagneticButton>
+            <MagneticButton onClick={() => { logout(); onClose(); }} className="btn btn-glass" style={{ padding: '0.5rem 0.95rem', fontSize: '0.62rem', borderRadius: '0.75rem', color: '#EF4444', borderColor: 'rgba(239,68,68,0.18)' }}>
               Sign Out
-            </button>
+            </MagneticButton>
           </div>
         </div>
 
@@ -607,7 +608,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
 
-                  <button
+                  <MagneticButton
                     onClick={(event) => { event.stopPropagation(); deleteScreening(screening.uid); }}
                     style={{
                       alignSelf: 'center',
@@ -622,14 +623,14 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                     title="Delete screening"
                   >
                     <Trash2 size={13} />
-                  </button>
+                  </MagneticButton>
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
 
           {screenings.length < total && (
-            <button
+            <MagneticButton
               onClick={loadMore}
               disabled={isLoading}
               style={{
@@ -651,7 +652,7 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
               }}
             >
               Load More <ChevronRight size={12} />
-            </button>
+            </MagneticButton>
           )}
         </div>
       </motion.div>

@@ -1,7 +1,8 @@
 import { Activity, Droplets, Eye, HeartPulse, UserRound, UtensilsCrossed, Wind, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { PatientProfileInput, SymptomInput } from '../../types';
+import { MagneticButton } from '../MagneticButton';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -107,9 +108,8 @@ export function IntakeView({
 
         <div style={{ display: 'grid', gap: '1rem' }}>
           <div style={{ padding: '1rem 1.05rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'grid', gap: '0.8rem' }}>
-            <button
-              type="button"
-              className="btn btn-glass"
+            <MagneticButton
+              className="btn-glass"
               onClick={() => setShowOptionalContext((current) => !current)}
               style={{
                 justifyContent: 'space-between',
@@ -118,25 +118,34 @@ export function IntakeView({
                 borderRadius: '0.9rem',
                 border: '1px solid rgba(255,255,255,0.08)',
                 background: 'rgba(255,255,255,0.03)',
+                width: '100%',
               }}
             >
               Optional context
               <span style={{ color: 'var(--text-dim)' }}>
                 {showOptionalContext ? 'Hide' : 'Add details'}
               </span>
-            </button>
+            </MagneticButton>
             <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
               Age, sex, and diet are optional. The screening still works without them.
               {optionalProfileSummary ? ` Current optional context: ${optionalProfileSummary}.` : ''}
             </div>
 
-            {showOptionalContext && (
-              <div className="intake-optional-grid" style={{ display: 'grid', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.55rem' }}>
-                    Age
-                  </div>
-                  <input
+            <AnimatePresence>
+              {showOptionalContext && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: E }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div className="intake-optional-grid" style={{ display: 'grid', gap: '1rem', paddingTop: '0.5rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.55rem' }}>
+                        Age
+                      </div>
+                      <input
                     type="number"
                     min={1}
                     max={120}
@@ -217,7 +226,9 @@ export function IntakeView({
                   </div>
                 </div>
               </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -248,14 +259,31 @@ export function IntakeView({
           </p>
         </div>
 
-        <div className="intake-symptom-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}>
+        <motion.div 
+          className="intake-symptom-grid" 
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.8rem' }}
+          variants={{
+            hidden: {},
+            show: {
+              transition: { staggerChildren: 0.04 }
+            }
+          }}
+          initial="hidden"
+          animate="show"
+        >
           {(Object.keys(symptomLabels) as Array<keyof SymptomInput>).map((key) => {
             const active = symptoms[key] === true;
             const icon = SYMPTOM_ICONS[key as string] ?? <HeartPulse size={16} />;
             return (
-              <button
+              <motion.button
                 key={key}
                 type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                variants={{
+                  hidden: { opacity: 0, y: 15 },
+                  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+                }}
                 onClick={() => toggleSymptom(key)}
                 style={{
                   textAlign: 'left',
@@ -266,22 +294,27 @@ export function IntakeView({
                   cursor: 'pointer',
                   display: 'grid',
                   gap: '0.65rem',
-                  transition: 'transform 0.22s ease, border-color 0.22s ease, background 0.22s ease',
+                  transition: 'border-color 0.22s ease, background 0.22s ease',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: active ? 'rgba(200,0,30,0.16)' : 'rgba(255,255,255,0.05)',
-                    color: active ? 'var(--accent-bright)' : 'var(--text-dim)',
-                  }}>
+                  <motion.div 
+                    initial={false}
+                    animate={{ scale: active ? [1, 1.15, 1] : 1 }}
+                    transition={{ duration: 0.4 }}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: active ? 'rgba(200,0,30,0.16)' : 'rgba(255,255,255,0.05)',
+                      color: active ? 'var(--accent-bright)' : 'var(--text-dim)',
+                    }}
+                  >
                     {icon}
-                  </div>
+                  </motion.div>
                   <div style={{
                     width: 18,
                     height: 18,
@@ -297,18 +330,18 @@ export function IntakeView({
                 <div style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: active ? 'var(--accent-bright)' : 'var(--text-dim)' }}>
                   {active ? 'Included in triage' : 'Tap to include'}
                 </div>
-              </button>
+              </motion.button>
             );
           })}
-        </div>
+        </motion.div>
 
         <div className="intake-actions" style={{ paddingTop: '0.35rem', display: 'flex', gap: '0.75rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <button className="btn btn-glass" style={{ padding: '0.75rem 1.35rem', fontSize: '0.7rem' }} onClick={onBack}>
+          <MagneticButton className="btn-glass" style={{ padding: '0.75rem 1.35rem', fontSize: '0.7rem' }} onClick={onBack}>
             Back
-          </button>
-          <button className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '0.7rem' }} onClick={onContinue} disabled={loading}>
+          </MagneticButton>
+          <MagneticButton className="btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '0.7rem' }} onClick={onContinue} disabled={loading}>
             {loading ? 'Analyzing...' : 'Run Clinical Workflow'}
-          </button>
+          </MagneticButton>
         </div>
       </motion.div>
     </div>

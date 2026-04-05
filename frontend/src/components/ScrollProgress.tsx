@@ -15,12 +15,12 @@ export function ScrollProgress() {
         top: 0,
         left: 0,
         right: 0,
-        height: 3,
-        background: 'linear-gradient(90deg, var(--crimson), var(--accent-bright), #FF6B8A)',
+        height: 2,
+        background: 'linear-gradient(90deg, var(--crimson), var(--pink-glow), var(--teal))',
         transformOrigin: '0%',
         scaleX,
         zIndex: 10000,
-        boxShadow: '0 0 20px rgba(200,0,30,0.5)',
+        boxShadow: '0 0 16px rgba(200,0,30,0.35), 0 0 30px rgba(94,234,212,0.15)',
       }}
     />
   );

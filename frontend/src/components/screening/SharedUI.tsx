@@ -45,7 +45,7 @@ export function WakeBanner() {
         <>
           <span style={{
             display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
-            border: '2px solid rgba(200,0,30,0.4)', borderTopColor: 'var(--accent-bright)',
+            border: '2px solid rgba(94,234,212,0.3)', borderTopColor: 'var(--teal)',
             animation: 'spin 0.8s linear infinite', flexShrink: 0,
           }} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
@@ -69,7 +69,7 @@ export function LuxuryParticles() {
     left: Math.random() * 100,
     duration: Math.random() * 20 + 15,
     delay: Math.random() * 20,
-    color: i % 3 === 0 ? 'rgba(200,0,30,0.5)' : i % 3 === 1 ? 'rgba(232,41,74,0.35)' : 'rgba(255,255,255,0.15)',
+    color: i % 3 === 0 ? 'rgba(200,0,30,0.5)' : i % 3 === 1 ? 'rgba(94,234,212,0.35)' : 'rgba(255,255,255,0.15)',
   }));
   return (
     <>
@@ -108,9 +108,9 @@ export function MarqueeTicker() {
   return (
     <div className="marquee-strip" style={{
       position:'relative', zIndex:2, overflow:'hidden',
-      borderTop:'1px solid rgba(200,0,30,0.15)',
-      borderBottom:'1px solid rgba(200,0,30,0.15)',
-      background:'linear-gradient(90deg, rgba(200,0,30,0.04) 0%, rgba(200,0,30,0.02) 50%, rgba(200,0,30,0.04) 100%)',
+      borderTop:'1px solid rgba(94,234,212,0.12)',
+      borderBottom:'1px solid rgba(94,234,212,0.12)',
+      background:'linear-gradient(90deg, rgba(94,234,212,0.03) 0%, rgba(94,234,212,0.01) 50%, rgba(94,234,212,0.03) 100%)',
       padding:'0.875rem 0',
     }}>
       <div style={{ position:'absolute', left:0, top:0, bottom:0, width:120, background:'linear-gradient(90deg, var(--void), transparent)', zIndex:2, pointerEvents:'none' }} />
@@ -121,12 +121,12 @@ export function MarqueeTicker() {
             <span
               style={{
                 display: 'inline-block',
-                width: 6,
-                height: 6,
+                width: 5,
+                height: 5,
                 borderRadius: '50%',
-                background: 'var(--accent-bright)',
+                background: 'var(--teal)',
                 marginRight: '0.55rem',
-                boxShadow: '0 0 10px rgba(232,41,74,0.45)',
+                boxShadow: '0 0 8px rgba(94,234,212,0.4)',
               }}
             />
             {item}
@@ -151,8 +151,8 @@ export function Cursor() {
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      rpos.current.x = lerp(rpos.current.x, pos.current.x, 0.10);
-      rpos.current.y = lerp(rpos.current.y, pos.current.y, 0.10);
+      rpos.current.x = lerp(rpos.current.x, pos.current.x, 0.08);
+      rpos.current.y = lerp(rpos.current.y, pos.current.y, 0.08);
       if (dot.current)  dot.current.style.transform  = `translate(calc(${pos.current.x}px - 50%), calc(${pos.current.y}px - 50%))`;
       if (ring.current) ring.current.style.transform = `translate(calc(${rpos.current.x}px - 50%), calc(${rpos.current.y}px - 50%))`;
     };
@@ -179,14 +179,14 @@ function useMagneticTilt(ref: React.RefObject<HTMLElement | null>) {
       const r = el.getBoundingClientRect();
       const shimX = e.clientX - r.left;
       const shimY = e.clientY - r.top;
-      const tiltX = ((shimY / r.height) - 0.5) * -8;
-      const tiltY = ((shimX / r.width) - 0.5) * 8;
-      el.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateY(-6px)`;
+      const tiltX = ((shimY / r.height) - 0.5) * -6;
+      const tiltY = ((shimX / r.width) - 0.5) * 6;
+      el.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateY(-4px)`;
       el.style.setProperty('--shimmer-x', `${shimX}px`);
       el.style.setProperty('--shimmer-y', `${shimY}px`);
     };
     const onLeave = () => {
-      el.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+      el.style.transform = 'perspective(800px) rotateX(0) rotateY(0) translateY(0)';
       el.style.setProperty('--shimmer-x', '50%');
       el.style.setProperty('--shimmer-y', '50%');
       if (raf) { cancelAnimationFrame(raf); raf = null; }
@@ -213,7 +213,7 @@ export const GlassCard = ({ children, className = '', style = {}, ...props }: Re
     >
       <div style={{
         position:'absolute', inset:0, borderRadius:'inherit', pointerEvents:'none', zIndex:4,
-        background:'radial-gradient(300px at var(--shimmer-x, 50%) var(--shimmer-y, 50%), rgba(255,255,255,0.10), rgba(255,255,255,0.03) 60%, transparent)',
+        background:'radial-gradient(300px at var(--shimmer-x, 50%) var(--shimmer-y, 50%), rgba(94,234,212,0.06), rgba(255,255,255,0.02) 60%, transparent)',
       }} />
       {children}
     </div>
@@ -228,52 +228,230 @@ export const STEPS_META = [
   { label: 'Result',   icon: <Brain size={13} /> },
 ] as const;
 
-// ── LOADING OVERLAY ───────────────────────────────────────────────────────────
+// ── AI THINKING MOMENT — the critical emotional pause ─────────────────────────
 export function QwenLoadingOverlay() {
-  const stages = [
-    { label: 'Image accepted and quality review completed', done: true },
-    { label: 'Screening model is analyzing the image signal', done: false },
-    { label: 'Triage is combining image and symptom context', done: false },
-    { label: 'Preparing the result summary', done: false },
+  const [phase, setPhase] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  const messages = [
+    'Analyzing hemoglobin signals…',
+    'Evaluating image quality markers…',
+    'Correlating clinical indicators…',
+    'Preparing screening result…',
   ];
+
+  useEffect(() => {
+    const progressInterval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 92) return p;
+        return p + 0.4 + Math.random() * 0.3;
+      });
+    }, 50);
+
+    const timers = messages.map((_, i) =>
+      setTimeout(() => setPhase(i), i * 1800 + 600)
+    );
+
+    return () => {
+      clearInterval(progressInterval);
+      timers.forEach(clearTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 420, gap: '2rem' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 480,
+        gap: '2.5rem',
+        position: 'relative',
+      }}
     >
+      {/* Breathing background glow */}
       <motion.div
-        animate={{ scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
-        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(0,194,255,0.1)', border: '1px solid rgba(0,194,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(0,194,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2a4 4 0 0 1 4 4c0 .34-.04.67-.1 1H16a3 3 0 0 1 3 3v1a3 3 0 0 1-1.5 2.6V14a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-.4A3 3 0 0 1 5 11v-1a3 3 0 0 1 3-3h.1A4 4 0 0 1 12 2z"/>
-          <path d="M9 17v2m6-2v2M9 21h6"/>
-        </svg>
-      </motion.div>
+        aria-hidden="true"
+        animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.3, 0.15] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute',
+          width: 300,
+          height: 300,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(94,234,212,0.12) 0%, transparent 70%)',
+          filter: 'blur(60px)',
+          pointerEvents: 'none',
+        }}
+      />
 
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+      {/* Scanning ring */}
+      <div style={{ position: 'relative' }}>
+        <motion.div
+          animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0.9, 0.5] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            background: 'rgba(94,234,212,0.06)',
+            border: '1px solid rgba(94,234,212,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              border: '1.5px solid rgba(94,234,212,0.1)',
+              borderTopColor: 'var(--teal)',
+            }}
+          />
+        </motion.div>
+        {/* Scan line sweep */}
+        <motion.div
+          animate={{ top: ['10%', '90%', '10%'] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: 1,
+            background: 'linear-gradient(90deg, transparent, var(--teal), transparent)',
+            boxShadow: '0 0 8px rgba(94,234,212,0.4)',
+          }}
+        />
+      </div>
+
+      {/* Title */}
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{
+          fontFamily: 'var(--serif)',
+          fontSize: '1.5rem',
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          marginBottom: '0.5rem',
+        }}>
           Screening analysis in progress
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          The result is being prepared from the capture and intake you already completed.
-          </div>
         </div>
+        <div style={{
+          fontSize: '0.75rem',
+          color: 'var(--text-dim)',
+          maxWidth: 380,
+          margin: '0 auto',
+          lineHeight: 1.6,
+        }}>
+          The result is being prepared from the capture and intake you already completed.
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: 340 }}>
-        {stages.map((s, i) => (
-          <motion.div key={i}
-            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.15 }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.03)', border: `1px solid ${s.done ? 'rgba(0,229,150,0.2)' : 'rgba(0,194,255,0.2)'}` }}
+      {/* Progress bar */}
+      <div style={{
+        width: '100%',
+        maxWidth: 320,
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        <div style={{
+          height: 3,
+          borderRadius: 99,
+          background: 'rgba(255,255,255,0.06)',
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            style={{
+              height: '100%',
+              borderRadius: 99,
+              background: 'linear-gradient(90deg, var(--crimson), var(--pink-glow), var(--teal))',
+              width: `${progress}%`,
+              boxShadow: '0 0 12px rgba(94,234,212,0.3)',
+            }}
+            transition={{ duration: 0.05 }}
+          />
+        </div>
+      </div>
+
+      {/* Sequential messages */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.65rem',
+        width: '100%',
+        maxWidth: 360,
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        {messages.map((msg, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{
+              opacity: i <= phase ? 1 : 0.2,
+              x: i <= phase ? 0 : -8,
+            }}
+            transition={{ delay: i * 0.15, duration: 0.4 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.6rem 1rem',
+              borderRadius: '0.75rem',
+              background: i <= phase ? 'rgba(255,255,255,0.03)' : 'transparent',
+              border: `1px solid ${
+                i < phase
+                  ? 'rgba(94,234,212,0.15)'
+                  : i === phase
+                  ? 'rgba(94,234,212,0.25)'
+                  : 'rgba(255,255,255,0.04)'
+              }`,
+            }}
           >
-            {s.done ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00E596" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {i < phase ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            ) : i === phase ? (
+              <span style={{
+                display: 'inline-block',
+                width: 12,
+                height: 12,
+                border: '1.5px solid rgba(94,234,212,0.2)',
+                borderTopColor: 'var(--teal)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+                flexShrink: 0,
+              }} />
             ) : (
-              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(0,194,255,0.3)', borderTopColor: 'rgba(0,194,255,0.9)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+              <span style={{
+                display: 'inline-block',
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,0.08)',
+                flexShrink: 0,
+              }} />
             )}
-            <span style={{ fontSize: '0.75rem', color: s.done ? 'var(--text-muted)' : 'rgba(0,194,255,0.9)', fontFamily: 'var(--mono)' }}>{s.label}</span>
+            <span style={{
+              fontSize: '0.72rem',
+              color: i < phase
+                ? 'var(--text-muted)'
+                : i === phase
+                ? 'var(--teal)'
+                : 'var(--text-dim)',
+              fontFamily: 'var(--mono)',
+              letterSpacing: '0.02em',
+            }}>
+              {msg}
+            </span>
           </motion.div>
         ))}
       </div>

@@ -1,10 +1,10 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Info, Share2, AlertCircle, RefreshCw, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse, GuidanceChatMessage, InsightDriver, RuntimeStatusResponse } from '../../types';
 import { getRuntimeStatus, sendEmailReport, sendGuidanceChat } from '../../api';
 import { useAuth } from '../../hooks/useAuth';
-
+import { MagneticButton } from '../MagneticButton';
 const E = [0.22, 1, 0.36, 1] as const;
 
 function useCountUp(target: number, duration = 1600, delay = 200) {
@@ -27,6 +27,11 @@ function useCountUp(target: number, duration = 1600, delay = 200) {
   return val;
 }
 
+function CountUpMetric({ value, duration = 1600, delay = 200, postfix = '' }: { value: number, duration?: number, delay?: number, postfix?: string }) {
+  const val = useCountUp(value, duration, delay);
+  return <>{val}{postfix}</>;
+}
+
 function RiskArc({ value, color }: { value: number; color: string }) {
   const r = 52, circ = 2 * Math.PI * r;
   return (
@@ -43,7 +48,7 @@ function RiskArc({ value, color }: { value: number; color: string }) {
         />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.4rem', color, lineHeight: 1 }}>{value}%</span>
+        <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.4rem', color, lineHeight: 1 }}><CountUpMetric value={value} duration={1600} delay={500} postfix="%" /></span>
         <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 4 }}>Risk Score</span>
       </div>
     </div>
@@ -795,7 +800,7 @@ function GuidanceChatPanel({ analysis }: { analysis: AnalyzeResponse }) {
             fontSize: '0.78rem',
           }}
         />
-        <button
+        <MagneticButton
           className="btn btn-glass"
           onClick={() => void handleSend()}
           disabled={loading || !input.trim()}
@@ -803,7 +808,7 @@ function GuidanceChatPanel({ analysis }: { analysis: AnalyzeResponse }) {
         >
           <Send size={13} />
           {loading ? 'Sending' : 'Ask'}
-        </button>
+        </MagneticButton>
       </div>
 
       {error && (
@@ -950,9 +955,9 @@ function InsightPackPanel({ analysis }: { analysis: AnalyzeResponse }) {
       </div>
       <div style={{ display: 'flex', borderRadius: '0.625rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
         {(['drivers', 'timeline', 'tips'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '0.55rem', fontSize: '0.58rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, background: tab === t ? 'rgba(255,165,0,0.15)' : 'transparent', color: tab === t ? '#FFA500' : 'var(--text-dim)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', borderRight: t !== 'tips' ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+          <MagneticButton key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '0.55rem', fontSize: '0.58rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, background: tab === t ? 'rgba(255,165,0,0.15)' : 'transparent', color: tab === t ? '#FFA500' : 'var(--text-dim)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', borderRight: t !== 'tips' ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
             {t === 'drivers' ? 'Risk Drivers' : t === 'timeline' ? 'Timeline' : 'Capture Tips'}
-          </button>
+          </MagneticButton>
         ))}
       </div>
       <AnimatePresence mode="wait">
@@ -1093,7 +1098,7 @@ function AudienceModePanel({
             { key: 'user', label: 'User View', icon: <Zap size={11} /> },
             { key: 'doctor', label: 'Doctor View', icon: <Stethoscope size={11} /> },
           ] as const).map((option) => (
-            <button
+            <MagneticButton
               key={option.key}
               onClick={() => onModeChange(option.key)}
               style={{
@@ -1114,7 +1119,7 @@ function AudienceModePanel({
               }}
             >
               {option.icon}{option.label}
-            </button>
+            </MagneticButton>
           ))}
         </div>
       </div>
@@ -1176,9 +1181,9 @@ function ScenarioSimulatorPanel({
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.75rem' }}>
             Cleaner lighting and steadier framing would most likely improve confidence first. {thresholdMargin < 0.08 ? 'Because this case sits near threshold, a stronger retake could also stabilize the final band.' : 'The biggest gain here is a more defensible explanation and hemoglobin estimate.'}
           </div>
-          <button className="btn btn-glass" onClick={onRetake} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
+          <MagneticButton className="btn btn-glass" onClick={onRetake} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
             <RefreshCw size={13} /> Retake for Stronger Confidence
-          </button>
+          </MagneticButton>
         </div>
 
         <div style={{ padding: '1rem', borderRadius: '0.9rem', background: 'rgba(255,165,0,0.05)', border: '1px solid rgba(255,165,0,0.15)' }}>
@@ -1209,9 +1214,9 @@ function ScenarioSimulatorPanel({
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: '0.75rem' }}>
             The case already has share text, safety checks, and threshold-aware audit context prepared for a provider. That makes follow-up faster than a generic symptom app.
           </div>
-          <button className="btn btn-glass" onClick={onShare} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
+          <MagneticButton className="btn btn-glass" onClick={onShare} style={{ width: '100%', padding: '0.7rem', borderRadius: '0.8rem', fontSize: '0.66rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}>
             <Share2 size={13} /> Share Clinician Packet
-          </button>
+          </MagneticButton>
         </div>
       </div>
 
@@ -1362,13 +1367,13 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
               </div>
             </div>
           </div>
-          <button
+          <MagneticButton
             onClick={onClose}
             aria-label="Close email dialog"
             style={{ width: 36, height: 36, borderRadius: '0.9rem', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
           >
             ×
-          </button>
+          </MagneticButton>
         </div>
 
         {status === 'sent' ? (
@@ -1381,7 +1386,7 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
               A structured result summary was sent to <strong style={{ color: 'var(--text)' }}>{email.trim().toLowerCase()}</strong>.
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '0.55rem' }}>Check your inbox in a moment and review the next steps.</div>
-            <button onClick={onClose} style={{ marginTop: '1.5rem', padding: '0.8rem 2rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', fontSize: '0.82rem', cursor: 'pointer' }}>Done</button>
+            <MagneticButton onClick={onClose} style={{ marginTop: '1.5rem', padding: '0.8rem 2rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text)', fontSize: '0.82rem', cursor: 'pointer' }}>Done</MagneticButton>
           </div>
         ) : (
           <>
@@ -1427,7 +1432,7 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
               The email includes the result, a short explanation, and next-step guidance. It is a screening aid, not a diagnosis, and should still be confirmed with a clinical blood test (CBC).
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={onClose} style={{ flex: 1, padding: '0.8rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)', fontSize: '0.8rem', cursor: 'pointer' }}>Cancel</button>
+              <MagneticButton onClick={onClose} style={{ flex: 1, padding: '0.8rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-dim)', fontSize: '0.8rem', cursor: 'pointer' }}>Cancel</MagneticButton>
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleSend} disabled={status === 'sending'}
                 style={{ flex: 2, padding: '0.8rem', borderRadius: '0.875rem', background: 'linear-gradient(135deg, #C8001E, #E8294A)', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', opacity: status === 'sending' ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                 <Mail size={14} />{status === 'sending' ? 'Sending…' : 'Send Report'}
@@ -1622,14 +1627,14 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
           </div>
           <RiskActionBadge band={analysis.triage.band} runtimeUnavailable={systemState === 'runtime_unavailable'} retakeRecommended={systemState !== 'runtime_unavailable'} />
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={onReset}>
+            <MagneticButton className="btn btn-primary" onClick={onReset}>
               <RefreshCw size={14} />
               {copy.action}
-            </button>
-            <button className="btn btn-glass" onClick={onDownload}>
+            </MagneticButton>
+            <MagneticButton className="btn btn-glass" onClick={onDownload}>
               <Download size={14} />
               Export current report
-            </button>
+            </MagneticButton>
           </div>
           <div style={{ padding: '1rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.76rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
             This is a system state, not a medical result. Confirm any concern with a clinician or a blood test rather than relying on an unavailable model.
@@ -1746,14 +1751,16 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
               <div style={{ width: 1, height: 90, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} className="result-divider" />
               <div className="result-metric-cluster" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {[
-                  { label: 'Triage Score', val: `${Math.round((analysis.triage.score ?? 0) * 100)}%` },
-                  { label: 'Confidence', val: `${Math.round((analysis.prediction?.confidence ?? 0) * 100)}%` },
-                  { label: 'Reliability', val: reliability.label },
-                ].map(s => (
-                  <div key={s.label}>
+                  { label: 'Triage Score', isCount: true, val: Math.round((analysis.triage.score ?? 0) * 100), postfix: '%' },
+                  { label: 'Confidence', isCount: true, val: Math.round((analysis.prediction?.confidence ?? 0) * 100), postfix: '%' },
+                  { label: 'Reliability', isCount: false, val: reliability.label, postfix: '' },
+                ].map((s, i) => (
+                  <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 + i * 0.1, duration: 0.5 }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.3rem' }}>{s.label}</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.15rem', color: 'var(--text)' }}>{s.val}</div>
-                  </div>
+                    <div className="shimmer-text" style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.15rem', color: 'var(--text)' }}>
+                      {s.isCount ? <CountUpMetric value={s.val as number} delay={600 + i * 100} postfix={s.postfix} /> : <>{s.val}{s.postfix}</>}
+                    </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1852,20 +1859,20 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <button
+                  <MagneticButton
                     className="btn btn-glass"
                     style={{ padding: '0.7rem 0.95rem', fontSize: '0.65rem', borderRadius: '0.8rem' }}
                     onClick={() => onOpenAuth('login')}
                   >
                     Sign In to Save
-                  </button>
-                  <button
+                  </MagneticButton>
+                  <MagneticButton
                     className="btn btn-primary"
                     style={{ padding: '0.7rem 0.95rem', fontSize: '0.65rem', borderRadius: '0.8rem' }}
                     onClick={() => onOpenAuth('register')}
                   >
                     Create Free Account
-                  </button>
+                  </MagneticButton>
                 </div>
               </div>
             )}
@@ -1890,16 +1897,16 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
                 onClick={() => setShowEmailModal(true)}>
                 <Mail size={14} /> Send Report to Email
               </motion.button>
-              <motion.button className="btn btn-glass" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              <MagneticButton className="btn btn-glass"
                 style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 onClick={onDownload}>
                 <Download size={14} /> Export PDF Report
-              </motion.button>
-              <motion.button className="btn btn-glass" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              </MagneticButton>
+              <MagneticButton className="btn btn-glass"
                 style={{ width: '100%', padding: '0.85rem', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 onClick={onReset}>
                 <RefreshCw size={13} /> {retakeRecommended ? 'Retake Image' : 'Start New Screening'}
-              </motion.button>
+              </MagneticButton>
             </div>
             <div style={{ padding: '0.95rem 1.1rem', borderRadius: '0.875rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize: '0.56rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.45rem' }}>
@@ -1914,7 +1921,7 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
 
         <motion.div className="glass" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, ease: E }}
           style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <button
+          <MagneticButton
             onClick={() => setShowAdvanced((current) => !current)}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, textAlign: 'left' }}
           >
@@ -1927,7 +1934,7 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
             <span style={{ padding: '0.35rem 0.8rem', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               {showAdvanced ? 'Hide' : 'Show'}
             </span>
-          </button>
+          </MagneticButton>
 
           <AnimatePresence>
             {showAdvanced && (

@@ -1,47 +1,83 @@
-import { useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, useSpring, useTransform, useReducedMotion } from 'framer-motion';
+import { useRipple } from './RippleEffect';
+import { E } from './screening/SharedUI';
 
-interface MagneticButtonProps {
+import { HTMLMotionProps } from 'framer-motion';
+
+interface MagneticButtonProps extends HTMLMotionProps<"button"> {
   children: React.ReactNode;
   className?: string;
-  onClick?: () => void;
-  strength?: number;
+  magneticStrength?: number;
 }
 
 export function MagneticButton({
   children,
   className = '',
+  magneticStrength = 15,
   onClick,
-  strength = 0.3,
+  onPointerMove,
+  onPointerLeave,
+  ...props
 }: MagneticButtonProps) {
   const ref = useRef<HTMLButtonElement>(null);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const reduceMotion = useReducedMotion();
+  const { addRipple, RippleElements } = useRipple();
+  
+  const [hovered, setHovered] = useState(false);
 
-  const handleMouse = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!ref.current) return;
+  const mouseX = useSpring(0, { stiffness: 150, damping: 15, mass: 0.5 });
+  const mouseY = useSpring(0, { stiffness: 150, damping: 15, mass: 0.5 });
 
-    const rect = ref.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left - rect.width / 2) * strength;
-    const y = (e.clientY - rect.top - rect.height / 2) * strength;
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (reduceMotion) return;
+    const { clientX, clientY } = e;
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const centerX = left + width / 2;
+    const centerY = top + height / 2;
+    // Calculate the distance from center
+    const x = ((clientX - centerX) / width) * magneticStrength;
+    const y = ((clientY - centerY) / height) * magneticStrength;
 
-    setPosition({ x, y });
+    mouseX.set(x);
+    mouseY.set(y);
+    setHovered(true);
+    
+    onPointerMove?.(e);
   };
 
-  const handleMouseLeave = () => {
-    setPosition({ x: 0, y: 0 });
+  const handlePointerLeave = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (reduceMotion) return;
+    mouseX.set(0);
+    mouseY.set(0);
+    setHovered(false);
+    
+    onPointerLeave?.(e);
+  };
+  
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    addRipple(e);
+    onClick?.(e);
   };
 
   return (
     <motion.button
       ref={ref}
-      className={className}
-      onClick={onClick}
-      onMouseMove={handleMouse}
-      onMouseLeave={handleMouseLeave}
-      animate={{ x: position.x, y: position.y }}
-      transition={{ type: 'spring', stiffness: 150, damping: 15, mass: 0.1 }}
+      className={`btn ${className}`}
+      onClick={handleClick}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={{
+        x: reduceMotion ? 0 : mouseX,
+        y: reduceMotion ? 0 : mouseY,
+      }}
+      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+      {...props}
     >
-      {children}
+      {RippleElements}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+        {children}
+      </div>
     </motion.button>
   );
 }

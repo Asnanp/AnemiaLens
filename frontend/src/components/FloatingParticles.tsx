@@ -21,9 +21,9 @@ interface FloatingParticlesProps {
 }
 
 const DEFAULT_COLORS = [
-  'rgba(241, 90, 119, VAL)',  // coral
-  'rgba(67, 216, 194, VAL)',  // teal
-  'rgba(167, 139, 250, VAL)', // violet
+  'rgba(94, 234, 212, VAL)',   // teal
+  'rgba(200, 0, 30, VAL)',    // crimson
+  'rgba(255, 107, 138, VAL)', // pink-glow
   'rgba(255, 255, 255, VAL)', // white
 ];
 
@@ -134,6 +134,29 @@ export function FloatingParticles({
         ctx.fillStyle = colorStr;
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // Draw connections (neural/plexus effect)
+      for (let i = 0; i < particlesRef.current.length; i++) {
+        for (let j = i + 1; j < particlesRef.current.length; j++) {
+          const p1 = particlesRef.current[i];
+          const p2 = particlesRef.current[j];
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const distSq = dx * dx + dy * dy;
+          // Connecting range ~120px
+          if (distSq < 14400) {
+            const dist = Math.sqrt(distSq);
+            // Opacity scales down inversely with distance
+            const linkAlpha = (1 - dist / 120) * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = p1.color.replace('VAL', String(linkAlpha));
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
       }
 
       rafRef.current = requestAnimationFrame(draw);

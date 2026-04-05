@@ -1,5 +1,6 @@
 import { CheckCircle, AlertTriangle, Info, RotateCcw, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { MagneticButton } from '../MagneticButton';
 import type { QualityAssessment, RoiPreview } from '../../types';
 
 const E = [0.22, 1, 0.36, 1] as const;
@@ -51,6 +52,22 @@ function RoiOverlayPreview({
             alt={alt}
             style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
           />
+          <motion.div
+            initial={{ top: '-10%' }}
+            animate={{ top: '110%' }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              height: 2,
+              background: 'var(--teal)',
+              boxShadow: '0 0 10px rgba(94,234,212,0.8), 0 0 40px rgba(94,234,212,0.4)',
+              zIndex: 5,
+              pointerEvents: 'none',
+              opacity: 0.85,
+            }}
+          />
           {overlayStyle && (
             <div
               style={{
@@ -60,6 +77,7 @@ function RoiOverlayPreview({
                 borderRadius: '0.6rem',
                 background: 'rgba(34,211,238,0.08)',
                 pointerEvents: 'none',
+                zIndex: 4,
                 ...overlayStyle,
               }}
             />
@@ -295,12 +313,12 @@ export function QualityView({ quality, roiPreview, previewUrl, onContinue, onBac
           </div>
 
           <div style={{ display: 'flex', gap: '0.875rem' }}>
-            <button className="btn btn-glass" style={{ flex: 1, gap: '0.5rem' }} onClick={onBack} disabled={loading}>
+            <MagneticButton className="btn-glass" style={{ flex: 1, gap: '0.5rem' }} onClick={onBack} disabled={loading}>
               <RotateCcw size={13} /> Retake Image
-            </button>
-            <button className="btn btn-primary" style={{ flex: 1, gap: '0.5rem', opacity: (!passed || loading) ? 0.4 : 1 }} onClick={onContinue} disabled={!passed || loading}>
+            </MagneticButton>
+            <MagneticButton className="btn-primary" style={{ flex: 1, gap: '0.5rem', opacity: (!passed || loading) ? 0.4 : 1 }} onClick={onContinue} disabled={!passed || loading}>
               {loading ? 'Analyzing...' : <><ArrowRight size={13} /> Continue</>}
-            </button>
+            </MagneticButton>
           </div>
         </div>
       </motion.div>

@@ -1,3 +1,4 @@
+import { useRef, useState, useCallback } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   motion,
@@ -10,21 +11,18 @@ import {
   useTransform,
 } from 'framer-motion';
 import { Activity, ArrowRight, CheckCircle2, FileText, ScanEye, ShieldCheck, Sparkles } from 'lucide-react';
-import { useRef, useState } from 'react';
 
 import { E } from '../components/screening/SharedUI';
 import { scrollToId } from '../utils/scroll';
+import { FloatingParticles } from '../components/FloatingParticles';
+import { MagneticButton } from '../components/MagneticButton';
 
-const HERO_METRICS = [
-  { value: 'One image', eyebrow: 'Capture', label: 'Lower inner eyelid only', signal: 0.94 },
-  { value: '4 care steps', eyebrow: 'Flow', label: 'Capture, quality, intake, result', signal: 0.82 },
-  { value: 'Share-ready', eyebrow: 'Output', label: 'Risk, trust, and next step together', signal: 0.9 },
-] as const;
+/* ────────────────────────────────────────────────────────────────────────── */
 
 const HERO_SIGNALS = [
   { icon: ShieldCheck, label: 'Quality gate before inference' },
-  { icon: Activity, label: 'Trust stays visible beside risk' },
-  { icon: Sparkles, label: 'Care-ready summary output' },
+  { icon: Activity,    label: 'Trust stays visible beside risk' },
+  { icon: Sparkles,    label: 'Care-ready summary output' },
 ] as const;
 
 const HERO_SUPPORT = [
@@ -51,15 +49,15 @@ const HERO_SUPPORT = [
 const HERO_FLOW = [
   { id: '01', label: 'Capture', micro: 'Guide one eyelid image' },
   { id: '02', label: 'Quality', micro: 'Check whether it is usable' },
-  { id: '03', label: 'Intake', micro: 'Merge context carefully' },
-  { id: '04', label: 'Result', micro: 'Keep trust and next step together' },
+  { id: '03', label: 'Intake',  micro: 'Merge context carefully' },
+  { id: '04', label: 'Result',  micro: 'Keep trust and next step together' },
 ] as const;
 
 const HERO_STAGE_DETAILS = [
   {
     eyebrow: 'Capture live',
     title: 'Guide the lower inner eyelid before scoring starts',
-    detail: 'The first step checks framing and light before the image is allowed into the screening flow.',
+    detail: 'The first step checks framing and light before the image enters the screening flow.',
     checks: ['Indirect daylight preferred', 'Lower inner eyelid fully visible', 'Single calm capture'],
     metrics: [
       { label: 'Framing lock', value: 86, tone: 'rose' },
@@ -70,7 +68,7 @@ const HERO_STAGE_DETAILS = [
   {
     eyebrow: 'Quality gate',
     title: 'Stop weak captures before the model overclaims',
-    detail: 'Blur, glare, and eyelid visibility are checked before the model is trusted with the image signal.',
+    detail: 'Blur, glare, and eyelid visibility are checked before the model is trusted.',
     checks: ['Blur and glare screened first', 'Weak images pause for retake', 'Trust stays visible beside the result'],
     metrics: [
       { label: 'ROI lock', value: 77, tone: 'rose' },
@@ -81,7 +79,7 @@ const HERO_STAGE_DETAILS = [
   {
     eyebrow: 'Context merge',
     title: 'Add symptom context only after the image clears the gate',
-    detail: 'Symptoms and patient details support the triage story after the image has already earned basic trust.',
+    detail: 'Symptoms shape the triage story after the image has already earned basic trust.',
     checks: ['Image remains primary', 'Symptoms shape triage', 'Weak scans do not skip the gate'],
     metrics: [
       { label: 'Image weight', value: 78, tone: 'rose' },
@@ -92,7 +90,7 @@ const HERO_STAGE_DETAILS = [
   {
     eyebrow: 'Care summary',
     title: 'Risk, trust, and next step stay together',
-    detail: 'The final surface keeps the screening signal, confidence story, and follow-up guidance in one calm place.',
+    detail: 'The final surface keeps the screening signal, confidence, and follow-up guidance in one calm place.',
     checks: ['Risk shown beside trust', 'Guidance remains cautious', 'Share-ready handoff preserved'],
     metrics: [
       { label: 'Signal clarity', value: 83, tone: 'rose' },
@@ -101,6 +99,56 @@ const HERO_STAGE_DETAILS = [
     ],
   },
 ] as const;
+
+/* ────────── Letter-by-letter headline component ────────── */
+
+function AnimatedHeadline() {
+  const reduceMotion = useReducedMotion();
+  const lines = [
+    { text: 'Safer anemia screening', accent: false },
+    { text: 'from one guided', accent: false },
+    { text: 'lower-eyelid image.', accent: true },
+  ];
+
+  let charIndex = 0;
+
+  return (
+    <motion.h1
+      className="home-hero-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      {lines.map((line, lineIdx) => (
+        <span
+          key={lineIdx}
+          className={`home-hero-title-line ${line.accent ? 'home-hero-title-accent' : ''}`}
+        >
+          {line.text.split('').map((char) => {
+            const i = charIndex++;
+            return (
+              <motion.span
+                key={`${lineIdx}-${i}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 20, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{
+                  duration: 0.4,
+                  delay: reduceMotion ? 0 : 0.15 + i * 0.022,
+                  ease: E,
+                }}
+                style={{ display: 'inline-block', whiteSpace: char === ' ' ? 'pre' : undefined }}
+              >
+                {char}
+              </motion.span>
+            );
+          })}
+        </span>
+      ))}
+    </motion.h1>
+  );
+}
+
+/* ────────── Main Hero component ────────── */
 
 export function Hero() {
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -114,23 +162,23 @@ export function Hero() {
 
   const pointerX = useMotionValue(50);
   const pointerY = useMotionValue(38);
-  const pointerXSpring = useSpring(pointerX, { stiffness: 120, damping: 18, mass: 0.8 });
-  const pointerYSpring = useSpring(pointerY, { stiffness: 120, damping: 18, mass: 0.8 });
+  const pointerXSpring = useSpring(pointerX, { stiffness: 100, damping: 20, mass: 0.9 });
+  const pointerYSpring = useSpring(pointerY, { stiffness: 100, damping: 20, mass: 0.9 });
 
-  const shellY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 74]);
-  const shellOpacity = useTransform(scrollYProgress, [0, 0.88], [1, reduceMotion ? 1 : 0.78]);
-  const shellScale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 0.985]);
-  const metricsY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 30]);
-  const supportY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 42]);
-  const stageY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 54]);
+  const shellY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 80]);
+  const shellOpacity = useTransform(scrollYProgress, [0, 0.85], [1, reduceMotion ? 1 : 0.7]);
+  const shellScale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 0.98]);
+  const metricsY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 35]);
+  const supportY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 48]);
+  const stageY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 60]);
   const activeStageDetail = HERO_STAGE_DETAILS[activeStage];
 
   const frameGlow = useMotionTemplate`
-    radial-gradient(circle at ${pointerXSpring}% ${pointerYSpring}%, rgba(243, 166, 179, 0.14), transparent 44%),
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.012))
+    radial-gradient(circle at ${pointerXSpring}% ${pointerYSpring}%, rgba(94, 234, 212, 0.08), transparent 44%),
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))
   `;
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const target = frameRef.current ?? sectionRef.current;
     if (reduceMotion || !target) return;
     const bounds = target.getBoundingClientRect();
@@ -138,13 +186,13 @@ export function Hero() {
     const nextY = ((event.clientY - bounds.top) / Math.max(bounds.height, 1)) * 100;
     pointerX.set(Math.min(100, Math.max(0, nextX)));
     pointerY.set(Math.min(100, Math.max(0, nextY)));
-  };
+  }, [reduceMotion, pointerX, pointerY]);
 
-  const handlePointerLeave = () => {
+  const handlePointerLeave = useCallback(() => {
     if (reduceMotion) return;
     pointerX.set(50);
     pointerY.set(38);
-  };
+  }, [reduceMotion, pointerX, pointerY]);
 
   return (
     <section
@@ -153,42 +201,94 @@ export function Hero() {
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
+      {/* ── Liquid ambient gradient background ── */}
       <motion.div
         aria-hidden="true"
         className="home-hero-aura home-hero-aura-primary"
-        animate={reduceMotion ? undefined : { scale: [1, 1.05, 1], opacity: [0.56, 0.78, 0.56] }}
-        transition={reduceMotion ? undefined : { duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduceMotion ? undefined : {
+          scale: [1, 1.08, 1],
+          opacity: [0.4, 0.65, 0.4],
+        }}
+        transition={reduceMotion ? undefined : {
+          duration: 14,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        style={{
+          background: 'radial-gradient(circle, rgba(200,0,30,0.18) 0%, rgba(200,0,30,0.04) 40%, transparent 70%)',
+        }}
       />
       <motion.div
         aria-hidden="true"
         className="home-hero-aura home-hero-aura-secondary"
-        animate={reduceMotion ? undefined : { x: [0, 28, 0], y: [0, -22, 0], opacity: [0.22, 0.42, 0.22] }}
-        transition={reduceMotion ? undefined : { duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduceMotion ? undefined : {
+          x: [0, 35, 0],
+          y: [0, -25, 0],
+          opacity: [0.15, 0.35, 0.15],
+        }}
+        transition={reduceMotion ? undefined : {
+          duration: 18,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        style={{
+          background: 'radial-gradient(circle, rgba(94,234,212,0.12) 0%, rgba(94,234,212,0.02) 40%, transparent 70%)',
+        }}
       />
       <motion.div
         aria-hidden="true"
         className="home-hero-aura home-hero-aura-tertiary"
-        animate={reduceMotion ? undefined : { x: [0, -18, 0], y: [0, 16, 0], opacity: [0.18, 0.34, 0.18] }}
-        transition={reduceMotion ? undefined : { duration: 13, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduceMotion ? undefined : {
+          x: [0, -20, 0],
+          y: [0, 18, 0],
+          opacity: [0.10, 0.25, 0.10],
+        }}
+        transition={reduceMotion ? undefined : {
+          duration: 16,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        style={{
+          background: 'radial-gradient(circle, rgba(255,107,138,0.10) 0%, transparent 60%)',
+        }}
+      />
+
+      {/* ── Floating AI particles ── */}
+      <FloatingParticles
+        count={30}
+        colors={[
+          'rgba(94, 234, 212, VAL)',
+          'rgba(200, 0, 30, VAL)',
+          'rgba(255, 107, 138, VAL)',
+          'rgba(255, 255, 255, VAL)',
+        ]}
+        style={{ position: 'absolute', inset: 0, zIndex: 0 }}
       />
 
       <motion.div
         className="home-hero-shell"
         style={{ y: shellY, opacity: shellOpacity, scale: shellScale }}
-        initial={{ opacity: 0, y: 28 }}
+        initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.85, ease: E }}
+        transition={{ duration: 0.9, ease: E }}
       >
+        {/* Eyebrow chip */}
         <motion.div
           className="hero-eyebrow-chip"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.04, ease: E }}
         >
-          <span className="hero-eyebrow-dot" />
+          <motion.span
+            className="hero-eyebrow-dot"
+            animate={reduceMotion ? undefined : { scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
+            transition={reduceMotion ? undefined : { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ background: 'var(--teal)', boxShadow: '0 0 8px rgba(94,234,212,0.5)' }}
+          />
           Smartphone screening support
         </motion.div>
 
+        {/* Signal pills */}
         <motion.div
           className="home-hero-signal-row"
           initial={{ opacity: 0, y: 14 }}
@@ -201,32 +301,25 @@ export function Hero() {
               className="home-hero-signal-pill glass"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              whileHover={reduceMotion ? undefined : { y: -2 }}
+              whileHover={reduceMotion ? undefined : { y: -2, borderColor: 'rgba(94,234,212,0.2)' }}
               transition={{ duration: 0.45, delay: 0.12 + index * 0.08, ease: E }}
             >
-              <Icon size={13} />
+              <Icon size={13} style={{ color: 'var(--teal)' }} />
               <span>{label}</span>
             </motion.div>
           ))}
         </motion.div>
 
-        <motion.h1
-          className="home-hero-title"
-          initial={{ opacity: 0, y: 26 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1, ease: E }}
-        >
-          <span className="home-hero-title-line">Safer anemia screening</span>
-          <span className="home-hero-title-line">from one guided</span>
-          <span className="home-hero-title-line home-hero-title-accent">lower-eyelid image.</span>
-        </motion.h1>
+        {/* ── Letter-by-letter animated headline ── */}
+        <AnimatedHeadline />
 
+        {/* Text frame with pointer-following glow */}
         <motion.div
           ref={frameRef}
           className="home-hero-text-frame glass"
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.62, delay: 0.18, ease: E }}
+          transition={{ duration: 0.62, delay: 0.5, ease: E }}
           style={reduceMotion ? undefined : { backgroundImage: frameGlow }}
         >
           <p className="home-hero-summary">
@@ -236,74 +329,65 @@ export function Hero() {
           </p>
 
           <div className="home-hero-actions">
-            <button className="btn btn-primary" onClick={() => scrollToId('screening')}>
+            <MagneticButton
+              className="btn-primary"
+              onClick={() => scrollToId('screening')}
+            >
+              {/* Micro pulse glow behind button */}
+              {!reduceMotion && (
+                <motion.span
+                  aria-hidden="true"
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{
+                    position: 'absolute',
+                    inset: -4,
+                    borderRadius: 99,
+                    background: 'rgba(200,0,30,0.2)',
+                    filter: 'blur(12px)',
+                    zIndex: -1,
+                  }}
+                />
+              )}
               <ScanEye size={16} />
               Start screening
-            </button>
-            <button className="btn btn-glass" onClick={() => scrollToId('workflow-sequence')}>
+            </MagneticButton>
+            <MagneticButton className="btn-glass" onClick={() => scrollToId('workflow-sequence')}>
               See care workflow
               <ArrowRight size={14} />
-            </button>
+            </MagneticButton>
           </div>
 
           <div className="home-hero-note">
-            <ShieldCheck size={15} />
+            <ShieldCheck size={15} style={{ color: 'var(--teal)', flexShrink: 0 }} />
             <span>
               Screening support only. Concerning results still need hemoglobin or CBC confirmation.
             </span>
           </div>
         </motion.div>
 
-        <motion.div
-          className="home-hero-metrics"
-          style={{ y: metricsY }}
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.42, ease: E }}
-        >
-          {HERO_METRICS.map((metric, index) => (
-            <motion.div
-              key={metric.eyebrow}
-              className="home-hero-metric-card glass"
-              whileHover={reduceMotion ? undefined : { y: -4, scale: 1.01 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="home-hero-metric-value">{metric.value}</div>
-              <div className="home-hero-metric-copy">
-                <div className="home-hero-metric-eyebrow">{metric.eyebrow}</div>
-                <div className="home-hero-metric-label">{metric.label}</div>
-                <div className="home-hero-metric-bar">
-                  <motion.span
-                    className="home-hero-metric-bar-fill"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: metric.signal }}
-                    transition={{ duration: 0.85, delay: 0.55 + index * 0.1, ease: E }}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-
+        {/* ── Support cards ── */}
         <motion.div
           className="home-hero-support"
           style={{ y: supportY }}
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.62, delay: 0.5, ease: E }}
+          transition={{ duration: 0.62, delay: 0.6, ease: E }}
         >
           {HERO_SUPPORT.map(({ icon: Icon, kicker, title, copy }, index) => (
             <motion.div
               key={title}
               className="home-hero-support-card glass"
-              whileHover={reduceMotion ? undefined : { y: -3 }}
+              whileHover={reduceMotion ? undefined : { y: -3, borderColor: 'rgba(94,234,212,0.15)' }}
               transition={{ duration: 0.2 }}
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
-              style={reduceMotion ? undefined : { animationDelay: `${index * 1.6}s` }}
             >
-              <div className="home-hero-support-icon">
-                <Icon size={16} />
+              <div className="home-hero-support-icon" style={{
+                background: 'rgba(94,234,212,0.08)',
+                border: '1px solid rgba(94,234,212,0.15)',
+              }}>
+                <Icon size={16} style={{ color: 'var(--teal)' }} />
               </div>
               <div>
                 <div className="home-hero-support-kicker">{kicker}</div>
@@ -314,28 +398,39 @@ export function Hero() {
           ))}
         </motion.div>
 
+        {/* ── Live care sequence / stage board ── */}
         <motion.div
           className="home-hero-stage-board glass"
           style={{ y: stageY }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.58, ease: E }}
+          transition={{ duration: 0.7, delay: 0.7, ease: E }}
         >
           <div className="home-hero-stage-board-top">
             <div>
               <div className="home-hero-stage-board-label">Live care sequence</div>
-              <div className="home-hero-stage-board-title">The screening flow stays active before the final result exists.</div>
+              <div className="home-hero-stage-board-title">
+                The screening flow stays active before the final result exists.
+              </div>
             </div>
-            <div className="home-hero-stage-board-status">Guided and conservative</div>
+            <div className="home-hero-stage-board-status" style={{
+              color: 'var(--teal)',
+              borderColor: 'rgba(94,234,212,0.2)',
+              background: 'rgba(94,234,212,0.05)',
+            }}>
+              Guided and conservative
+            </div>
           </div>
 
+          {/* Stage pills with animated trace line */}
           <div className="home-hero-stage-track">
             {!reduceMotion && (
               <motion.span
                 aria-hidden="true"
                 className="home-hero-stage-trace"
                 animate={{ x: ['-8%', '102%', '-8%'] }}
-                transition={{ duration: 8.6, repeat: Infinity, ease: 'easeInOut' }}
+                transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+                style={{ background: 'linear-gradient(90deg, transparent, var(--teal), transparent)' }}
               />
             )}
             {HERO_FLOW.map((stage, index) => (
@@ -347,8 +442,14 @@ export function Hero() {
                 whileHover={reduceMotion ? undefined : { y: -2 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.995 }}
                 transition={{ duration: 0.2 }}
+                style={index === activeStage ? {
+                  borderColor: 'rgba(94,234,212,0.3)',
+                  boxShadow: '0 0 20px rgba(94,234,212,0.08)',
+                } : undefined}
               >
-                <span className="home-hero-stage-index">{stage.id}</span>
+                <span className="home-hero-stage-index" style={
+                  index === activeStage ? { color: 'var(--teal)' } : undefined
+                }>{stage.id}</span>
                 <div className="home-hero-stage-copy">
                   <div className="home-hero-stage-label">{stage.label}</div>
                   <div className="home-hero-stage-micro">{stage.micro}</div>
@@ -357,6 +458,7 @@ export function Hero() {
             ))}
           </div>
 
+          {/* Stage detail card */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeStageDetail.eyebrow}
@@ -367,13 +469,15 @@ export function Hero() {
               transition={{ duration: 0.38, ease: E }}
             >
               <div className="home-hero-stage-card home-hero-stage-card-wide">
-                <div className="home-hero-stage-card-eyebrow">{activeStageDetail.eyebrow}</div>
+                <div className="home-hero-stage-card-eyebrow" style={{ color: 'var(--teal)' }}>
+                  {activeStageDetail.eyebrow}
+                </div>
                 <div className="home-hero-stage-card-title">{activeStageDetail.title}</div>
                 <div className="home-hero-stage-card-detail">{activeStageDetail.detail}</div>
                 <div className="home-hero-stage-checklist">
                   {activeStageDetail.checks.map((item) => (
                     <div key={item} className="home-hero-stage-check">
-                      <CheckCircle2 size={14} />
+                      <CheckCircle2 size={14} style={{ color: 'var(--teal)' }} />
                       {item}
                     </div>
                   ))}
@@ -391,6 +495,13 @@ export function Hero() {
                           initial={{ width: 0 }}
                           animate={{ width: `${metric.value}%` }}
                           transition={{ duration: 0.75, delay: index * 0.06, ease: E }}
+                          style={
+                            metric.tone === 'teal'
+                              ? { background: 'linear-gradient(90deg, rgba(94,234,212,0.3), rgba(94,234,212,0.6))' }
+                              : metric.tone === 'rose'
+                              ? { background: 'linear-gradient(90deg, rgba(200,0,30,0.3), rgba(200,0,30,0.6))' }
+                              : undefined
+                          }
                         />
                       </div>
                     </div>

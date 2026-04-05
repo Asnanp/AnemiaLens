@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { E } from '../components/screening/SharedUI';
+import { E, GlassCard } from '../components/screening/SharedUI';
 import { scrollToId } from '../utils/scroll';
+import { MagneticButton } from '../components/MagneticButton';
 
 const WORKFLOW_STEPS = [
   {
@@ -355,17 +356,17 @@ export function WorkflowStepper() {
 
                     <div className="workflow-static-preview-card-grid">
                       {activeVisual.cards.map((card, cardIndex) => (
-                        <motion.div
-                          key={card.label}
-                          className="workflow-static-preview-card"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.28, delay: cardIndex * 0.05, ease: E }}
-                        >
-                          <div className="workflow-static-preview-card-label">{card.label}</div>
-                          <div className="workflow-static-preview-card-value">{card.value}</div>
-                          <div className="workflow-static-preview-card-detail">{card.detail}</div>
-                        </motion.div>
+                        <GlassCard key={card.label} className="workflow-static-preview-card">
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.28, delay: cardIndex * 0.05, ease: E }}
+                          >
+                            <div className="workflow-static-preview-card-label">{card.label}</div>
+                            <div className="workflow-static-preview-card-value">{card.value}</div>
+                            <div className="workflow-static-preview-card-detail">{card.detail}</div>
+                          </motion.div>
+                        </GlassCard>
                       ))}
                     </div>
 
@@ -472,13 +473,14 @@ export function WorkflowStepper() {
             })}
             </div>
 
-            <button
-              className="btn btn-primary workflow-static-primary-button"
+            <MagneticButton
+              className="btn-primary workflow-static-primary-button"
               onClick={() => scrollToId('screening')}
+              style={{ padding: '0.8rem 1.4rem' }}
             >
               <ScanEye size={16} />
               Start screening
-            </button>
+            </MagneticButton>
           </div>
         </div>
       </div>
