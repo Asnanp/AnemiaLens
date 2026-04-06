@@ -215,7 +215,7 @@ app.add_middleware(
         "https://anemia-lens.vercel.app",
         "https://asnanp.github.io",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.emergentagent\.com|https://.*\.preview\.emergentagent\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

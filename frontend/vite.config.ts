@@ -6,7 +6,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 const apiTarget =
   process.env.VITE_API_PROXY_TARGET
   ?? process.env.VITE_API_BASE_URL
-  ?? 'http://127.0.0.1:5000';
+  ?? 'http://127.0.0.1:8001';
 
 const enableBundleAnalysis = process.env.ANALYZE_BUNDLE === 'true';
 
@@ -66,7 +66,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
-    allowedHosts: ['.emergentagent.com', '.preview.emergentagent.com'],
+    allowedHosts: true,
     proxy: {
       '/api': { target: apiTarget, changeOrigin: true },
       '/health': { target: apiTarget, changeOrigin: true },
