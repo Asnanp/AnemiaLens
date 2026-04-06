@@ -54,7 +54,7 @@ class PredictionResult(BaseModel):
         default=None,
         description="Decomposed confidence view covering capture quality, model stability, threshold stability, and guardrail effects.",
     )
-    xai_data: dict[str, str | dict[str, float] | list[float] | list[dict[str, float]]] | None = Field(
+    xai_data: dict | None = Field(
         default=None,
         description="Explainable AI data including Grad-CAM heatmaps, bounding boxes, and Conjunctiva Pallor Analysis."
     )

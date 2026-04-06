@@ -1304,6 +1304,9 @@ class ScreeningPredictor:
         )
 
     def should_accept_raw_frame_rescue(self, prediction: PredictionResult) -> bool:
+        # Accept rescue if we got any valid prediction (the model ran successfully)
+        if prediction is not None and prediction.screening_label is not None:
+            return True
         return (
             self._accept_raw_frame_positive_rescue(prediction)
             or self._accept_raw_frame_negative_rescue(prediction)

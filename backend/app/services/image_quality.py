@@ -457,13 +457,16 @@ class ImageQualityService:
         return softened
 
     def allows_raw_frame_rescue(self, assessment: QualityAssessment) -> bool:
-        if any(
-            issue.code == "inner_eye_not_detected" and issue.severity == "blocking"
-            for issue in assessment.issues
-        ):
-            return False
         blocking_codes = {issue.code for issue in assessment.issues if issue.severity == "blocking"}
-        return blocking_codes == {"poor_lighting"}
+        # Allow rescue when only ROI-related or lighting blocks
+        rescue_eligible = blocking_codes <= {"inner_eye_not_detected", "poor_lighting", "eye_not_visible"}
+        if not rescue_eligible:
+            return False
+        # Need at least some basic quality metrics
+        return (
+            assessment.blur_score >= 50.0
+            and assessment.contrast_score >= 0.03
+        )
 
     def build_raw_frame_rescue_assessment(self, assessment: QualityAssessment) -> QualityAssessment:
         if not self.allows_raw_frame_rescue(assessment):
@@ -471,7 +474,7 @@ class ImageQualityService:
 
         rescued_issues: list[QualityIssue] = []
         for issue in assessment.issues:
-            if issue.severity == "blocking" and issue.code in {"bad_framing", "eye_not_visible", "poor_lighting"}:
+            if issue.severity == "blocking" and issue.code in {"bad_framing", "eye_not_visible", "poor_lighting", "inner_eye_not_detected"}:
                 rescued_issues.append(
                     issue.model_copy(
                         update={

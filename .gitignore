@@ -83,3 +83,7 @@ artifacts/
 brain/
 playwright-report/
 test-results/
+-e 
+# Environment files
+*.env
+*.env.*
