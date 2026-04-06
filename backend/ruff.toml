@@ -1,0 +1,7 @@
+[lint.per-file-ignores]
+# Tests use sys.path.insert() before imports
+"tests/*" = ["E402"]
+# FastAPI app registers middleware/routers after app creation
+"app/main.py" = ["E402"]
+# Auth module has intentional deferred imports
+"app/api/auth.py" = ["E402"]

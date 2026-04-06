@@ -11,8 +11,6 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app.ml.calibration import (  # noqa: E402
     CompositeCalibrator,
     PlattScaler,
-    TemperatureScaler,
-    expected_calibration_error,
 )
 
 

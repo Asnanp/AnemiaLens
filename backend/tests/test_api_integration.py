@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -284,7 +282,6 @@ class TestErrorHandling:
 class TestGuidanceChatEndpoint:
     def test_guidance_chat_with_valid_payload(self) -> None:
         from app.main import app
-        from app.schemas import QualityAssessment
 
         client = TestClient(app)
         # Create a minimal analysis payload

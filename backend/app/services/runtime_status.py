@@ -11,7 +11,7 @@ from app.config import (
     DEFAULT_ULTIMATE_REFINEMENT_REPORT_PATH,
     DEFAULT_V8_RUNTIME_CALIBRATION_REPORT_PATH,
 )
-from app.schemas import ModelRuntimeStatus, RuntimeStatusResponse
+from app.schemas import RuntimeStatusResponse
 from app.services.guidance import GuidanceService
 from app.services.prediction import ScreeningPredictor
 

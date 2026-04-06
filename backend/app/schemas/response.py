@@ -14,7 +14,7 @@ from app.schemas.guidance import GuidanceResult
 from app.schemas.handoff import HandoffSummary
 from app.schemas.insight import CaseInsightPack
 from app.schemas.meta import AnalysisMeta
-from app.schemas.patient import PatientProfileInput, SymptomInput
+from app.schemas.patient import SymptomInput
 from app.schemas.prediction import PredictionResult
 from app.schemas.quality import QualityAssessment
 from app.schemas.structured_case import StructuredCaseRecord

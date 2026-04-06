@@ -4,7 +4,6 @@ Workflow stage and patient profile schemas for case tracking.
 
 from __future__ import annotations
 
-from typing import Annotated
 
 from pydantic import BaseModel, Field
 

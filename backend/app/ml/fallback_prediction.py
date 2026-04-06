@@ -28,12 +28,11 @@ reflect the reduced confidence of the fallback method.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
-from PIL import Image, ImageStat
+from PIL import Image
 
 log = logging.getLogger("anemialens.fallback")
 

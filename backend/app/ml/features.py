@@ -701,7 +701,7 @@ def _extract_lbp_features(image: Image.Image, center: Image.Image) -> dict[str, 
     """
     try:
         gray = image.resize((64, 64)).convert("L")
-        gray_center = center.resize((32, 32)).convert("L")
+        center.resize((32, 32)).convert("L")
 
         # Radius 1: fine texture (capillary-level)
         fine_edges = gray.filter(_EDGE_KERNEL)
@@ -970,8 +970,8 @@ def _extract_vascular_features(
         r, g, b = rgb.split()
         r_pixels = list(r.getdata())
         g_pixels = list(g.getdata())
-        b_pixels = list(b.getdata())
-        gray_pixels = list(gray.getdata())
+        list(b.getdata())
+        list(gray.getdata())
 
         # Vessel contrast: red channel intensity relative to surroundings
         red_mean = sum(r_pixels) / max(len(r_pixels), 1)

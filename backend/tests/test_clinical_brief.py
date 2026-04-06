@@ -13,7 +13,6 @@ from app.schemas import (
     QualityAssessment,
     QualityIssue,
     SymptomInput,
-    TriageResult,
 )
 from app.services.analysis_meta import build_analysis_meta
 from app.services.case_insight import CaseInsightService

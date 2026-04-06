@@ -27,7 +27,6 @@ import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
@@ -39,7 +38,6 @@ from fastapi import (
     Request,
     UploadFile,
     status,
-    Depends,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
