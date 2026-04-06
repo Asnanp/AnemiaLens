@@ -73,7 +73,15 @@ function _setWake(s: WakeStatus) {
 })();
 
 // ── IMAGE COMPRESSION ─────────────────────────────────────────────────────────
-async function compressImage(file: File, maxDim = 800, maxBytes = 300_000): Promise<File> {
+// NOTE: UploadZone already compresses images to 2048px/85% quality.
+// We do NOT compress again here to preserve ML inference quality.
+// Only resize if image is extremely large (>4000px) to prevent memory issues.
+async function compressImage(file: File, maxDim = 4000, maxBytes = 2_000_000): Promise<File> {
+  // If file is already small enough, return as-is
+  if (file.size <= maxBytes) {
+    return file;
+  }
+
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -81,25 +89,29 @@ async function compressImage(file: File, maxDim = 800, maxBytes = 300_000): Prom
       URL.revokeObjectURL(url);
       const { width, height } = img;
       const scale = Math.min(1, maxDim / Math.max(width, height));
+      
+      // Only compress if image is larger than maxDim
+      if (scale >= 1) {
+        resolve(file);
+        return;
+      }
+
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(width * scale);
       canvas.height = Math.round(height * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const qualities = [0.82, 0.72, 0.62, 0.52, 0.42];
-      let i = 0;
-      const tryNext = () => {
-        const q = qualities[i++];
-        canvas.toBlob((blob) => {
-          if (!blob) { resolve(file); return; }
-          if (blob.size <= maxBytes || i >= qualities.length) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          } else { tryNext(); }
-        }, 'image/jpeg', q);
-      };
-      tryNext();
+      
+      // Use high quality for ML inference
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.92);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
     img.src = url;
   });
 }

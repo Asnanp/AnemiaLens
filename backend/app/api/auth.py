@@ -32,8 +32,9 @@ log = logging.getLogger("anemialens.auth")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-DEFAULT_GOOGLE_CLIENT_ID = "919623138739-ep5cvs1et5o790j3rmlilfpd0q9r9q9i.apps.googleusercontent.com"
-DEFAULT_GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+# SECURITY: Google OAuth config must be set via environment variables
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_TOKENINFO_URL = os.getenv("GOOGLE_TOKENINFO_URL", "https://oauth2.googleapis.com/tokeninfo")
 
 
 # ---------------------------------------------------------------------------
@@ -115,12 +116,12 @@ def _verify_google_id_token(credential: str) -> GoogleIdentity:
         os.getenv("ANEMIALENS_GOOGLE_CLIENT_ID")
         or os.getenv("GOOGLE_CLIENT_ID")
         or os.getenv("VITE_GOOGLE_CLIENT_ID")
-        or DEFAULT_GOOGLE_CLIENT_ID
+        or GOOGLE_CLIENT_ID
     )
     google_tokeninfo_url = (
         os.getenv("ANEMIALENS_GOOGLE_TOKENINFO_URL")
         or os.getenv("GOOGLE_TOKENINFO_URL")
-        or DEFAULT_GOOGLE_TOKENINFO_URL
+        or GOOGLE_TOKENINFO_URL
     )
 
     if not google_client_id:
@@ -222,10 +223,11 @@ async def register(
     except HTTPException:
         raise
     except Exception as exc:
-        log.exception("Registration failed for %s: %s", body.email, str(exc))
+        log.exception("Registration failed for %s", body.email)
+        # SECURITY: Don't leak internal error details to clients
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration error: {type(exc).__name__}: {str(exc)[:200]}",
+            detail="Registration failed. Please try again or contact support if the problem persists.",
         )
 
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { onWakeStatus } from '../../api';
 import {
@@ -10,6 +11,7 @@ export const E = [0.22, 1, 0.36, 1] as const;
 
 // ── WAKE BANNER ───────────────────────────────────────────────────────────────
 export function WakeBanner() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'waking' | 'ready' | 'failed'>('waking');
   const [dots, setDots] = useState('');
 
@@ -49,12 +51,12 @@ export function WakeBanner() {
             animation: 'spin 0.8s linear infinite', flexShrink: 0,
           }} />
           <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Backend waking up - first load can take ~60s while Hugging Face Spaces spins up{dots}
+            {t('wakeBanner.waking')}{dots}
           </span>
         </>
       ) : (
         <span style={{ fontFamily: 'var(--mono)', fontSize: '0.6rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(239,68,68,0.8)' }}>
-          Backend unreachable - please refresh or try again shortly
+          {t('wakeBanner.unreachable')}
         </span>
       )}
     </motion.div>
@@ -221,23 +223,34 @@ export const GlassCard = ({ children, className = '', style = {}, ...props }: Re
 };
 
 // ── STEP META ─────────────────────────────────────────────────────────────────
+export function useStepsMeta() {
+  const { t } = useTranslation();
+  return [
+    { label: t('steps.capture'), icon: <Camera size={13} /> },
+    { label: t('steps.quality'), icon: <ShieldCheck size={13} /> },
+    { label: t('steps.intake'), icon: <HeartPulse size={13} /> },
+    { label: t('steps.result'), icon: <Brain size={13} /> },
+  ] as const;
+}
+
 export const STEPS_META = [
-  { label: 'Capture',  icon: <Camera size={13} /> },
-  { label: 'Quality',  icon: <ShieldCheck size={13} /> },
+  { label: 'Capture', icon: <Camera size={13} /> },
+  { label: 'Quality', icon: <ShieldCheck size={13} /> },
   { label: 'Intake', icon: <HeartPulse size={13} /> },
-  { label: 'Result',   icon: <Brain size={13} /> },
+  { label: 'Result', icon: <Brain size={13} /> },
 ] as const;
 
 // ── AI THINKING MOMENT — the critical emotional pause ─────────────────────────
 export function QwenLoadingOverlay() {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState(0);
   const [progress, setProgress] = useState(0);
 
   const messages = [
-    'Analyzing hemoglobin signals…',
-    'Evaluating image quality markers…',
-    'Correlating clinical indicators…',
-    'Preparing screening result…',
+    t('loading.analyzingHemoglobin'),
+    t('loading.evaluatingQuality'),
+    t('loading.correlatingClinical'),
+    t('loading.preparingResult'),
   ];
 
   useEffect(() => {
@@ -341,7 +354,7 @@ export function QwenLoadingOverlay() {
           letterSpacing: '-0.02em',
           marginBottom: '0.5rem',
         }}>
-          Screening analysis in progress
+          {t('loading.screeningAnalysis')}
         </div>
         <div style={{
           fontSize: '0.75rem',
@@ -350,7 +363,7 @@ export function QwenLoadingOverlay() {
           margin: '0 auto',
           lineHeight: 1.6,
         }}>
-          The result is being prepared from the capture and intake you already completed.
+          {t('loading.screeningAnalysisDetail')}
         </div>
       </div>
 

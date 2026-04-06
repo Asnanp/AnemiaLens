@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Activity,
   ArrowRight,
@@ -15,6 +15,8 @@ import { useState } from 'react';
 import { E, GlassCard } from '../components/screening/SharedUI';
 import { scrollToId } from '../utils/scroll';
 import { MagneticButton } from '../components/MagneticButton';
+import { useScrollReveal } from '../hooks/useScrollAnimation';
+import { buttonSpring, cardLiftSpring, fanOutVariants, springTransition } from '../utils/springAnimations';
 
 const WORKFLOW_STEPS = [
   {
@@ -260,20 +262,25 @@ export function DifferentiatorsSection() {
 
 export function WorkflowStepper() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const headerReveal = useScrollReveal({ direction: 'up', distance: 40, spring: 'gentle' });
+  const previewReveal = useScrollReveal({ direction: 'scale', distance: 32, spring: 'default' });
   const activeStep = WORKFLOW_STEPS[activeIndex];
   const activeVisual = WORKFLOW_VISUALS[activeIndex];
   const ActiveIcon = activeVisual.icon;
   const progressPct = `${((activeIndex + 1) / WORKFLOW_STEPS.length) * 100}%`;
+  const fanOut = fanOutVariants({ distance: 36, spring: 'default', staggerMs: 90 });
 
   return (
     <section id="workflow-sequence" className="workflow-sequence-section workflow-static-section">
       <div className="landing-shell workflow-static-shell">
         <motion.div
+          ref={headerReveal.ref}
           className="workflow-static-header"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, ease: E }}
+          style={reduceMotion ? undefined : { y: headerReveal.y, opacity: headerReveal.opacity }}
+          initial={reduceMotion ? undefined : { opacity: 0, y: 24 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? undefined : { duration: 0.8, ease: E }}
         >
           <div className="workflow-static-intro">
             <div className="section-eyebrow">Care workflow</div>
@@ -288,11 +295,12 @@ export function WorkflowStepper() {
 
         <div className="workflow-static-grid">
           <motion.div
+            ref={previewReveal.ref}
             className="workflow-static-preview glass"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.65, ease: E }}
+            style={reduceMotion ? undefined : { y: previewReveal.y, opacity: previewReveal.opacity, scale: previewReveal.scale }}
+            initial={reduceMotion ? undefined : { opacity: 0, y: 20 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            transition={reduceMotion ? undefined : { duration: 0.65, ease: E }}
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -358,9 +366,13 @@ export function WorkflowStepper() {
                       {activeVisual.cards.map((card, cardIndex) => (
                         <GlassCard key={card.label} className="workflow-static-preview-card">
                           <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.28, delay: cardIndex * 0.05, ease: E }}
+                            variants={fanOut}
+                            initial="hidden"
+                            animate="visible"
+                            custom={cardIndex}
+                            whileHover={!reduceMotion ? cardLiftSpring.hover : undefined}
+                            whileTap={!reduceMotion ? cardLiftSpring.tap : undefined}
+                            transition={!reduceMotion ? springTransition('default') : undefined}
                           >
                             <div className="workflow-static-preview-card-label">{card.label}</div>
                             <div className="workflow-static-preview-card-value">{card.value}</div>
@@ -421,9 +433,9 @@ export function WorkflowStepper() {
                   type="button"
                   className={`workflow-static-step ${isActive ? 'workflow-static-step-active' : ''}`}
                   onClick={() => setActiveIndex(index)}
-                  whileHover={{ y: -3 }}
-                  whileTap={{ scale: 0.995 }}
-                  transition={{ duration: 0.18, ease: E }}
+                  whileHover={!reduceMotion ? { y: -3 } : undefined}
+                  whileTap={!reduceMotion ? { scale: 0.995 } : undefined}
+                  transition={!reduceMotion ? springTransition('snappy') : { duration: 0.18, ease: E }}
                   aria-pressed={isActive}
                 >
                   <div className="workflow-static-step-head">

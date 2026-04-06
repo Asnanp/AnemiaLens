@@ -42,7 +42,7 @@ from fastapi import (
     Depends,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from PIL import UnidentifiedImageError
 
 from app.config import BACKEND_ROOT, settings
@@ -169,6 +169,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Shutdown: close DB engine
+    from app.database import close_engine
+
+    await close_engine()
+
     log.info("AnemiaLens shutting down.")
 
 
@@ -231,6 +236,11 @@ from app.middleware.memory_guard import MemoryGuardMiddleware
 
 app.add_middleware(MemoryGuardMiddleware)
 
+# 4. Metrics collection
+from app.middleware.metrics import MetricsMiddleware
+
+app.add_middleware(MetricsMiddleware)
+
 
 # ---------------------------------------------------------------------------
 # Middleware — request ID + timing
@@ -283,12 +293,16 @@ from app.api.history import router as history_router
 from app.api.admin import router as admin_router
 from app.api.billing import router as billing_router
 from app.api.email_report import router as email_report_router
+from app.api.v1 import router as v1_router
 
 app.include_router(auth_router)
 app.include_router(history_router)
 app.include_router(admin_router)
 app.include_router(billing_router)
 app.include_router(email_report_router)
+
+# API v1 — versioned namespace (all routes under /api/v1/*)
+app.include_router(v1_router)
 
 
 # ---------------------------------------------------------------------------
@@ -375,13 +389,26 @@ async def root() -> RedirectResponse:
 
 @app.get("/health", tags=["meta"], summary="Liveness probe")
 async def health(request: Request) -> dict[str, object]:
-    """Returns 200 OK when the server is alive."""
-    guidance_status = request.app.state.guidance_service.runtime_status()
-    return {
-        "status": "ok",
-        "model_ready": request.app.state.predictor.is_ready(),
-        "guidance_strategy": guidance_status.active_strategy,
-    }
+    """
+    Returns detailed health status with dependency checks.
+
+    Includes:
+    - Model readiness
+    - Guidance service status
+    - Database connectivity
+    - Model file integrity
+    - External API availability
+    - System resource usage (disk, memory, CPU)
+
+    Results are cached for 10 seconds to prevent excessive resource usage
+    from frequent load balancer probes.
+    """
+    from app.health_checks import get_cached_health_status, metrics_collector
+
+    result = await get_cached_health_status()
+    await metrics_collector.record_cache_access(hit=result.get("cache_hit", False))
+
+    return result
 
 
 @app.get("/readyz", tags=["meta"], summary="Readiness probe")
@@ -400,6 +427,28 @@ async def readyz(request: Request) -> JSONResponse:
             "guidance_strategy": guidance_status.active_strategy,
             "guidance_fallback_reason": guidance_status.fallback_reason,
         },
+    )
+
+
+@app.get("/metrics", tags=["meta"], summary="Prometheus-compatible metrics")
+async def metrics() -> Response:
+    """
+    Returns application metrics in Prometheus text exposition format.
+
+    Includes:
+    - Request count, error rate, latency percentiles (p50, p95, p99)
+    - Model inference count, error rate, latency percentiles
+    - Cache hit/miss rates
+    - Active user count
+    - Per-endpoint request counts and latencies
+    """
+    from app.health_checks import metrics_collector
+    from starlette.responses import Response as StarletteResponse
+
+    prometheus_text = await metrics_collector.get_prometheus_format()
+    return StarletteResponse(
+        content=prometheus_text,
+        media_type="text/plain; version=0.0.4; charset=utf-8",
     )
 
 
@@ -537,17 +586,19 @@ async def analyze(
     except Exception:
         pass  # Anonymous is fine
 
-    # --- Scan limit enforcement (free = 10 scans) --------------------------
-    FREE_SCAN_LIMIT = 10
+    # --- Scan limit enforcement (free plan) --------------------------------
+    from app.config import settings
+
+    scan_limit = settings.free_plan_scan_limit
     if (
         user_id is not None
         and user_tier == "free"
-        and user_scan_count >= FREE_SCAN_LIMIT
+        and user_scan_count >= scan_limit
     ):
         return JSONResponse(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             content={
-                "error": f"Free plan limit reached ({FREE_SCAN_LIMIT} scans). Upgrade to Pro for unlimited screenings.",
+                "error": f"Free plan limit reached ({scan_limit} scans). Upgrade to Pro for unlimited screenings.",
                 "upgrade_required": True,
                 "request_id": rid,
             },
@@ -577,15 +628,29 @@ async def analyze(
         return _image_error_response(rid)
 
     # --- Inference (skipped on quality failure) -----------------------------
-    prediction = (
-        svc.predictor.predict(
-            rgb,
-            quality,
-            patient_profile=patient_profile_input,
+    _infer_start = time.perf_counter()
+    _infer_success = True
+    try:
+        prediction = (
+            svc.predictor.predict(
+                rgb,
+                quality,
+                patient_profile=patient_profile_input,
+            )
+            if quality.passed
+            else None
         )
-        if quality.passed
-        else None
-    )
+    except Exception:
+        _infer_success = False
+        prediction = None
+        raise
+    finally:
+        if quality.passed:
+            _infer_latency_ms = (time.perf_counter() - _infer_start) * 1000
+            from app.health_checks import metrics_collector as _mc
+
+            await _mc.record_inference(latency_ms=_infer_latency_ms, success=_infer_success)
+
     used_raw_frame_rescue = False
     if prediction is None:
         quality, prediction, used_raw_frame_rescue = _attempt_raw_frame_rescue(

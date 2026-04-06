@@ -66,7 +66,7 @@ body {
   color: var(--text);
   font-family: var(--sans);
   overflow-x: hidden;
-  cursor: none;
+  /* Custom cursor removed for accessibility - users can opt-in via settings */
 }
 
 a {
@@ -7062,8 +7062,17 @@ textarea,
 
 .screening-demo-gallery-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .screening-demo-gallery-grid {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
 }
 
 .screening-demo-card {
@@ -7073,23 +7082,43 @@ textarea,
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
   overflow: hidden;
-  background: rgba(11, 17, 26, 0.94);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.2);
+  background: rgba(11, 17, 26, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
   text-align: left;
   color: inherit;
+  transition: transform 0.4s var(--ease-out-expo), box-shadow 0.4s var(--ease-out-expo), border-color 0.4s;
+  cursor: pointer;
+}
+
+.screening-demo-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(94, 234, 212, 0.3);
+  border-color: rgba(94, 234, 212, 0.3);
 }
 
 .screening-demo-card-image {
   width: 100%;
-  aspect-ratio: 1.28 / 1;
+  aspect-ratio: 1.4 / 1;
   object-fit: cover;
+  object-position: center 20%;
   display: block;
+  background: rgba(255, 255, 255, 0.03);
+  transition: transform 0.6s var(--ease-out-expo);
+}
+
+.screening-demo-card:hover .screening-demo-card-image {
+  transform: scale(1.05);
 }
 
 .screening-demo-card-body {
   display: grid;
-  gap: 0.38rem;
-  padding: 0.82rem 0.9rem 0.9rem;
+  gap: 0.45rem;
+  padding: 1.25rem 1.1rem;
+  background: linear-gradient(180deg, rgba(11,17,26,0.2) 0%, rgba(11,17,26,0.9) 100%);
+  position: relative;
+  z-index: 1;
 }
 
 .screening-demo-card-label {

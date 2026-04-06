@@ -1,0 +1,235 @@
+/* =====================================================
+   PREMIUM ENHANCEMENTS - SPATIAL COMPUTING OVERHAUL
+   Apple/Stripe-level Design System
+   Append to styles.css
+   ===================================================== */
+
+/* ===== 1. NOISE & GRAIN (Spatial Computing Feel) ===== */
+.bg-noise {
+  position: relative;
+}
+.bg-noise::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: -1;
+  mix-blend-mode: overlay;
+}
+
+/* ===== 2. DEEP MULTI-LAYERED GLASSMORPHISM ===== */
+.glass-premium {
+  background: 
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    );
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 20px rgba(255, 255, 255, 0.02);
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+}
+
+/* Dynamic light reflection */
+.glass-premium::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(255, 255, 255, 0.08),
+    transparent 40%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.glass-premium:hover::after {
+  opacity: 1;
+}
+
+/* ===== 3. DYNAMIC ANIMATED GRADIENT BACKGROUNDS ===== */
+@keyframes aurora-mesh {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.gradient-animated {
+  background: 
+    radial-gradient(circle at 15% 50%, rgba(200, 0, 30, 0.15), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(94, 234, 212, 0.15), transparent 25%),
+    radial-gradient(circle at 50% 80%, rgba(139, 92, 246, 0.15), transparent 25%);
+  background-size: 200% 200%;
+  animation: aurora-mesh 20s ease-in-out infinite;
+  background-attachment: fixed;
+}
+
+/* ===== 4. CINEMATIC BUTTON EFFECTS ===== */
+.btn-premium-primary {
+  position: relative;
+  background: linear-gradient(135deg, #FF1A3A 0%, #C8001E 100%);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 1rem 2.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 10px 30px rgba(200, 0, 30, 0.4),
+    0 4px 12px rgba(200, 0, 30, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-premium-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-premium-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 15px 40px rgba(200, 0, 30, 0.5),
+    0 6px 16px rgba(200, 0, 30, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.btn-premium-primary:hover::before {
+  left: 120%;
+}
+
+.btn-premium-primary:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    0 5px 15px rgba(200, 0, 30, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-premium-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #fff);
+  border-radius: 999px;
+  padding: 0.9rem 2.2rem;
+  font-weight: 500;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-premium-glass:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ===== 5. FLAWLESS TYPOGRAPHY SPACING ===== */
+h1, h2, h3, .text-premium-title {
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  background: linear-gradient(180deg, #FFFFFF 0%, #A0A0A0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-premium-subtitle {
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+}
+
+/* ===== 6. CINEMATIC LOADERS ===== */
+.loader-cinematic {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.loader-cinematic::before,
+.loader-cinematic::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  animation: pulse-cinematic 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.loader-cinematic::before {
+  inset: 0;
+  border: 2px solid transparent;
+  border-top-color: var(--teal, #5EEAD4);
+  border-right-color: var(--teal, #5EEAD4);
+  animation: spin-cinematic 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  box-shadow: 0 0 20px rgba(94, 234, 212, 0.4);
+}
+
+.loader-cinematic::after {
+  inset: 8px;
+  background: radial-gradient(circle, rgba(200,0,30,0.4) 0%, transparent 70%);
+  animation-delay: 0.5s;
+}
+
+@keyframes spin-cinematic {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-cinematic {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* ===== 7. SPATIAL HOVER CARDS ===== */
+.card-spatial {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.card-spatial:hover {
+  transform: translateY(-10px) rotateX(2deg) rotateY(-2deg);
+  box-shadow:
+    -20px 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(255, 255, 255, 0.05);
+}
+
+/* Micro-interactions */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-6px) scale(1.01);
+}

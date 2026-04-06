@@ -1,31 +1,17 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Download, Info, Share2, AlertCircle, RefreshCw, Stethoscope, TrendingUp, TrendingDown, Minus, Clock, Camera, Mail, BarChart2, Zap, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AnalyzeResponse, GuidanceChatMessage, InsightDriver, RuntimeStatusResponse } from '../../types';
 import { getRuntimeStatus, sendEmailReport, sendGuidanceChat } from '../../api';
 import { useAuth } from '../../hooks/useAuth';
 import { MagneticButton } from '../MagneticButton';
+import { SignalBar } from '../result/SignalBar';
+import { FramedCapturePreview } from '../result/FramedCapturePreview';
+import { HbReferenceBand } from '../result/HbReferenceBand';
+import { ConfidenceGauge } from '../result/ConfidenceGauge';
+import { RiskActionBadge } from '../result/RiskActionBadge';
+import { useCountUp, getReliabilityStatus } from '../result/resultHelpers';
 const E = [0.22, 1, 0.36, 1] as const;
-
-function useCountUp(target: number, duration = 1600, delay = 200) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    let start: number | null = null;
-    const t = setTimeout(() => {
-      const step = (ts: number) => {
-        if (!start) start = ts;
-        const p = Math.min((ts - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - p, 3);
-        setVal(parseFloat((ease * target).toFixed(1)));
-        if (p < 1) requestAnimationFrame(step);
-        else setVal(target);
-      };
-      requestAnimationFrame(step);
-    }, delay);
-    return () => clearTimeout(t);
-  }, [target, duration, delay]);
-  return val;
-}
 
 function CountUpMetric({ value, duration = 1600, delay = 200, postfix = '' }: { value: number, duration?: number, delay?: number, postfix?: string }) {
   const val = useCountUp(value, duration, delay);
@@ -77,28 +63,11 @@ function joinHuman(items: string[]): string {
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
-type ReliabilityStatus = {
-  label: 'High' | 'Moderate' | 'Low';
-  color: string;
-  detail: string;
-};
-
 type HemoglobinPresentation = {
   headline: string;
   detail: string;
   preview: string;
 };
-
-function isSevereLightingCase(analysis: AnalyzeResponse): boolean {
-  const breakdown = analysis.prediction?.confidence_breakdown;
-  return (
-    analysis.quality.lighting_condition === 'glare_heavy'
-    || analysis.quality.lighting_condition === 'shadow_heavy'
-    || analysis.quality.lighting_condition === 'overexposed'
-    || (breakdown?.glare_risk ?? analysis.quality.glare_risk ?? 0) > 0.65
-    || (breakdown?.shadow_risk ?? analysis.quality.shadow_risk ?? 0) > 0.65
-  );
-}
 
 function classificationLabel(label: string): string {
   return (label ?? 'screening result').toLowerCase().replace(/\s+/g, '-');
@@ -111,80 +80,6 @@ function formatModelVersion(modelSource?: string | null): string {
 function humanizeToken(value?: string | null, fallback = 'N/A'): string {
   if (!value) return fallback;
   return value.replace(/_/g, ' ');
-}
-
-function getReliabilityStatus(analysis: AnalyzeResponse): ReliabilityStatus {
-  const prediction = analysis.prediction;
-  const confidencePct = Math.round((prediction?.confidence ?? 0) * 100);
-  const hasWarnings = analysis.quality.issues.some((issue) => issue.severity === 'warning');
-  const blockedByQuality = !prediction || !analysis.quality.passed || analysis.decision_audit.processing_path === 'quality_blocked';
-  const severeLighting = isSevereLightingCase(analysis);
-  const captureQuality = prediction?.confidence_breakdown?.capture_quality ?? 0;
-  const thresholdStability = prediction?.confidence_breakdown?.threshold_stability ?? 0;
-  const modelStability = prediction?.confidence_breakdown?.model_stability ?? 0;
-
-  if (blockedByQuality) {
-    return {
-      label: 'Low',
-      color: '#EF4444',
-      detail: 'Image quality affected prediction reliability, so the system stayed retake-first instead of giving false reassurance.',
-    };
-  }
-
-  if (
-    severeLighting
-    || confidencePct < 45
-    || analysis.decision_audit.processing_path === 'full_frame_rescue'
-  ) {
-    return {
-      label: 'Low',
-      color: '#F97316',
-      detail: 'Image quality affected prediction reliability, so a cleaner retake would improve trust in this result.',
-    };
-  }
-
-  if (
-    prediction.reliability_flag === 'low'
-    && analysis.quality.passed
-    && confidencePct >= 65
-    && captureQuality >= 0.7
-    && thresholdStability >= 0.72
-    && !severeLighting
-  ) {
-    return {
-      label: 'Moderate',
-      color: '#F59E0B',
-      detail: modelStability < 0.45
-        ? 'The result is leaning one way, but repeat model passes varied more than ideal. A cleaner retake would make it more defensible.'
-        : 'The capture is usable and the result is leaning one way, but it still benefits from a cleaner retake for stronger trust.',
-    };
-  }
-
-  if (
-    prediction.reliability_flag === 'low'
-    || confidencePct < 50
-    || hasWarnings
-  ) {
-    return {
-      label: 'Low',
-      color: '#F97316',
-      detail: 'Image quality or model spread reduced trust in this result, so a cleaner retake would improve confidence.',
-    };
-  }
-
-  if (prediction.reliability_flag === 'high' && confidencePct >= 80) {
-    return {
-      label: 'High',
-      color: '#10B981',
-      detail: 'Clean image quality and a stable signal support this prediction.',
-    };
-  }
-
-  return {
-    label: 'Moderate',
-    color: '#F59E0B',
-    detail: 'The prediction is usable, but stronger lighting or a cleaner capture would make it more defensible.',
-  };
 }
 
 function buildMandatoryWhySummary(analysis: AnalyzeResponse): string {
@@ -324,24 +219,6 @@ function buildWhyResultSteps(analysis: AnalyzeResponse): Array<{
   return [imageStep, confidenceStep, symptomStep, finalStep];
 }
 
-function SignalBar({ label, value, color, delay = 0 }: { label: string; value: number; color: string; delay?: number }) {
-  const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{label}</span>
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, fontFamily: 'var(--mono)', color }}>{pct}%</span>
-      </div>
-      <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-          transition={{ duration: 1.2, delay, ease: E }}
-          style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, var(--crimson), ${color})`, boxShadow: `0 0 8px ${color}60` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function getHemoglobinPresentation(analysis: AnalyzeResponse): HemoglobinPresentation {
   const value = analysis.prediction?.predicted_hemoglobin;
   if (value != null) {
@@ -422,67 +299,6 @@ function getSystemResultState(analysis: AnalyzeResponse): SystemResultState {
   }
 
   return 'normal';
-}
-
-function FramedCapturePreview({
-  src,
-  alt,
-  roiPreview,
-}: {
-  src?: string | null;
-  alt: string;
-  roiPreview?: AnalyzeResponse['roi_preview'] | null;
-}) {
-  const box = roiPreview?.roi_box;
-  const frameWidth = roiPreview?.frame_width ?? 0;
-  const frameHeight = roiPreview?.frame_height ?? 0;
-  const hasBox = Boolean(
-    box
-    && frameWidth > 0
-    && frameHeight > 0
-    && box.width > 0
-    && box.height > 0
-  );
-
-  const overlayStyle = hasBox
-    ? {
-        left: `${(box!.x / frameWidth) * 100}%`,
-        top: `${(box!.y / frameHeight) * 100}%`,
-        width: `${(box!.width / frameWidth) * 100}%`,
-        height: `${(box!.height / frameHeight) * 100}%`,
-      }
-    : null;
-
-  return (
-    <div style={{ borderRadius: '0.85rem', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', minHeight: 112, position: 'relative' }}>
-      {src ? (
-        <>
-          <img
-            src={src}
-            alt={alt}
-            style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-          />
-          {overlayStyle && (
-            <div
-              style={{
-                position: 'absolute',
-                border: '2px solid rgba(34,211,238,0.95)',
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.35), 0 0 18px rgba(34,211,238,0.45)',
-                borderRadius: '0.7rem',
-                background: 'rgba(34,211,238,0.08)',
-                pointerEvents: 'none',
-                ...overlayStyle,
-              }}
-            />
-          )}
-        </>
-      ) : (
-        <div style={{ minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-          Preview unavailable
-        </div>
-      )}
-    </div>
-  );
 }
 
 function RoiPreviewPanel({
@@ -879,56 +695,6 @@ function ClinicalModePanel({ analysis }: { analysis: AnalyzeResponse }) {
     </div>
   );
 }
-
-const WHO_BANDS = [
-  { label: 'Severe', max: 8, color: '#EF4444', bg: 'rgba(239,68,68,0.15)' },
-  { label: 'Moderate', max: 11, color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  { label: 'Mild', max: 12, color: '#FBBF24', bg: 'rgba(251,191,36,0.1)' },
-  { label: 'Normal', max: 18, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
-];
-
-function HbReferenceBand({ hb }: { hb: number }) {
-  const MIN = 4, MAX = 18;
-  const clamp = (v: number) => Math.max(MIN, Math.min(MAX, v));
-  const pct = (v: number) => ((clamp(v) - MIN) / (MAX - MIN)) * 100;
-  const markerPct = pct(hb);
-  const activeBand = WHO_BANDS.find((b, i) => {
-    const prev = WHO_BANDS[i - 1];
-    return hb <= b.max && (!prev || hb > prev.max);
-  }) ?? WHO_BANDS[WHO_BANDS.length - 1];
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,215,0,0.6)' }}>WHO Hb Reference</span>
-        <span style={{ fontSize: '0.7rem', fontFamily: 'var(--mono)', color: activeBand.color, fontWeight: 700 }}>{activeBand.label} {hb < 12 ? '⚠' : '✓'}</span>
-      </div>
-      <div style={{ position: 'relative', height: 32, borderRadius: 99, overflow: 'visible' }}>
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 99, background: 'linear-gradient(90deg, #EF4444 0%, #F59E0B 35%, #FBBF24 55%, #10B981 100%)', opacity: 0.25 }} />
-        {WHO_BANDS.map((band, i) => {
-          const prevMax = WHO_BANDS[i - 1]?.max ?? MIN;
-          const left = pct(prevMax);
-          const width = pct(band.max) - left;
-          return (
-            <div key={band.label} style={{ position: 'absolute', top: 0, bottom: 0, left: `${left}%`, width: `${width}%`, background: band.bg, borderRight: i < WHO_BANDS.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.48rem', fontFamily: 'var(--mono)', color: band.color, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{band.label}</span>
-            </div>
-          );
-        })}
-        <motion.div initial={{ left: '0%' }} animate={{ left: `${markerPct}%` }} transition={{ duration: 1.4, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          style={{ position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)', width: 16, height: 16, borderRadius: '50%', background: activeBand.color, border: '2px solid rgba(255,255,255,0.9)', boxShadow: `0 0 12px ${activeBand.color}, 0 0 24px ${activeBand.color}60`, zIndex: 2 }}
-        />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        {[4, 8, 11, 12, 18].map(v => (
-          <span key={v} style={{ fontSize: '0.55rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{v}</span>
-        ))}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: '0.52rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', marginTop: '-0.25rem' }}>g/dL — WHO Adult Reference Ranges</div>
-    </div>
-  );
-}
-
 const DRIVER_ICONS: Record<InsightDriver['impact'], React.ReactNode> = {
   up: <TrendingUp size={13} />,
   down: <TrendingDown size={13} />,
@@ -1445,72 +1211,6 @@ function EmailReportModal({ analysis, onClose }: { analysis: AnalyzeResponse; on
   );
 }
 
-function RiskActionBadge({
-  band,
-  runtimeUnavailable,
-  retakeRecommended,
-}: {
-  band: string;
-  runtimeUnavailable?: boolean;
-  retakeRecommended?: boolean;
-}) {
-  const config = runtimeUnavailable
-    ? {
-        color: '#38BDF8',
-        bg: 'rgba(56,189,248,0.08)',
-        border: 'rgba(56,189,248,0.2)',
-        action: 'The screening model is temporarily unavailable. Retry this scan in a moment instead of relying on this incomplete result.',
-      }
-    : retakeRecommended || band === 'uncertain_retake_needed'
-    ? {
-        color: '#F59E0B',
-        bg: 'rgba(245,158,11,0.08)',
-        border: 'rgba(245,158,11,0.25)',
-        action: 'Retake the image in bright indirect light and keep the lower eyelid fully visible before making a follow-up decision.',
-      }
-    : band === 'high_concern'
-    ? { color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', action: 'Consult a doctor immediately — seek a CBC blood test within 24–48 hours.' }
-    : band === 'moderate_risk'
-    ? { color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)', action: 'Consider scheduling a blood test soon. Monitor symptoms and maintain iron-rich diet.' }
-    : { color: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', action: 'Maintain a balanced diet. Rescreen in 3–6 months or if symptoms develop.' };
-  return (
-    <div style={{ display: 'flex', gap: '0.875rem', alignItems: 'flex-start', padding: '1rem 1.125rem', borderRadius: '0.875rem', background: config.bg, border: `1px solid ${config.border}` }}>
-      <Zap size={15} style={{ color: config.color, flexShrink: 0, marginTop: 2 }} />
-      <div>
-        <div style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: config.color, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.35rem' }}>Recommended Action</div>
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>{config.action}</div>
-      </div>
-    </div>
-  );
-}
-
-function ConfidenceGauge({ analysis, color }: { analysis: AnalyzeResponse; color: string }) {
-  const pct = Math.round((analysis.prediction?.confidence ?? 0) * 100);
-  const reliability = getReliabilityStatus(analysis);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Confidence</span>
-        <span style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--mono)', color }}>{pct}%</span>
-      </div>
-      <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1.4, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${color}80, ${color})`, boxShadow: `0 0 8px ${color}60` }}
-        />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.62rem', fontFamily: 'var(--mono)' }}>
-        <span style={{ color: 'var(--text-dim)' }}>Trust level</span>
-        <span style={{ color: reliability.color, fontWeight: 700 }}>{reliability.label}</span>
-      </div>
-      <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.65 }}>
-        {reliability.detail}
-      </div>
-      <div style={{ fontSize: '0.58rem', color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.04em' }}>
-        Confidence shows direction. Trust level shows how clean and repeatable the capture was.
-      </div>
-    </div>
-  );
-}
 
 interface ResultViewProps {
   analysis: AnalyzeResponse;
@@ -1711,8 +1411,19 @@ export function ResultView({ analysis, previewUrl, onReset, onDownload, onOpenAu
             position: 'relative',
             overflow: 'hidden',
           }}>
-          <motion.div animate={{ scale: [1, 1.12, 1], opacity: [0.06, 0.1, 0.06] }} transition={{ duration: 7, repeat: Infinity }}
-            style={{ position: 'absolute', top: -100, right: -100, width: 360, height: 360, borderRadius: '50%', background: bandColor, filter: 'blur(140px)', pointerEvents: 'none' }} />
+          <div
+            style={{
+              position: 'absolute',
+              top: -100,
+              right: -100,
+              width: 360,
+              height: 360,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, ${bandColor} 0%, ${bandColor}33 30%, transparent 70%)`,
+              opacity: 0.12,
+              pointerEvents: 'none',
+            }}
+          />
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             {/* Badges row */}

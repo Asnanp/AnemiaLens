@@ -1,6 +1,7 @@
 import { CheckCircle, AlertTriangle, Info, RotateCcw, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MagneticButton } from '../MagneticButton';
+import { Skeleton, SkeletonText, SkeletonMetric } from '../ui/Skeleton';
 import type { QualityAssessment, RoiPreview } from '../../types';
 
 const E = [0.22, 1, 0.36, 1] as const;
@@ -149,6 +150,129 @@ function ScoreRing({ value, color, label }: { value: number; color: string; labe
   );
 }
 
+// Skeleton circular progress ring for loading state
+function SkeletonScoreRing({ label }: { label: string }) {
+  const r = 28;
+  const circ = 2 * Math.PI * r;
+
+  return (
+    <div
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+      role="status"
+      aria-busy="true"
+      aria-label={`${label} score loading`}
+    >
+      <div style={{ position: 'relative', width: 72, height: 72 }}>
+        <svg width="72" height="72" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="4" />
+          <motion.circle
+            cx="36"
+            cy="36"
+            r={r}
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: circ * 0.3 }}
+            transition={{ duration: 1.5, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' }}
+          />
+        </svg>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Skeleton variant="text" width="30px" height="1rem" />
+        </div>
+      </div>
+      <Skeleton variant="text" width="50px" height="0.6rem" />
+    </div>
+  );
+}
+
+// Skeleton loading state for quality assessment
+function QualitySkeleton() {
+  return (
+    <div
+      style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}
+      role="status"
+      aria-busy="true"
+      aria-label="Quality assessment in progress"
+    >
+      {/* Left panel skeleton */}
+      <div
+        className="glass"
+        style={{
+          padding: '2.5rem',
+          borderLeft: '3px solid rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.02)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+          <Skeleton variant="circular" width="32px" height="32px" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+            <Skeleton variant="text" width="55%" height="1.5rem" />
+            <Skeleton variant="text" width="80%" height="0.8rem" />
+          </div>
+          <Skeleton variant="text" width="80px" height="1.25rem" borderRadius="99px" />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                padding: '1.1rem 1.4rem',
+                borderRadius: '1rem',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.04)',
+              }}
+            >
+              <Skeleton variant="circular" width="30px" height="30px" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1 }}>
+                <Skeleton variant="text" width="40%" height="0.85rem" />
+                <SkeletonText lines={2} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.875rem', marginTop: '1.5rem' }}>
+          <Skeleton variant="rectangular" width="48%" height="44px" borderRadius="99px" />
+          <Skeleton variant="rectangular" width="48%" height="44px" borderRadius="99px" />
+        </div>
+      </div>
+
+      {/* Right panel skeleton */}
+      <div className="glass" style={{ padding: '2rem' }}>
+        <Skeleton variant="text" width="50%" height="0.7rem" style={{ marginBottom: '1.75rem' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '2rem' }}>
+          {['Sharpness', 'Lighting', 'Framing'].map((label) => (
+            <SkeletonScoreRing key={label} label={label} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Skeleton variant="text" width="60px" height="0.7rem" />
+                <Skeleton variant="text" width="35px" height="0.7rem" />
+              </div>
+              <Skeleton variant="rectangular" width="100%" height="3px" borderRadius="99px" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function humanizeSource(source?: string | null) {
   if (!source) return 'full frame';
   return source.replace(/_/g, ' ');
@@ -176,7 +300,27 @@ export function QualityView({ quality, roiPreview, previewUrl, onContinue, onBac
   const statusGlow = passed ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.12)';
 
   return (
-    <div className="quality-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}>
+    <AnimatePresence mode="wait">
+      {loading ? (
+        <motion.div
+          key="quality-skeleton"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <QualitySkeleton />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="quality-content"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="quality-grid"
+          style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}
+        >
       <motion.div
         className="glass"
         initial={{ opacity: 0, y: 24 }}
@@ -199,9 +343,8 @@ export function QualityView({ quality, roiPreview, previewUrl, onContinue, onBac
             width: 240,
             height: 240,
             borderRadius: '50%',
-            background: statusColor,
-            filter: 'blur(100px)',
-            opacity: 0.08,
+            background: `radial-gradient(circle, ${statusColor} 0%, ${statusColor}33 30%, transparent 70%)`,
+            opacity: 0.15,
             pointerEvents: 'none',
           }}
         />
@@ -474,6 +617,8 @@ export function QualityView({ quality, roiPreview, previewUrl, onContinue, onBac
           </p>
         </div>
       </motion.div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

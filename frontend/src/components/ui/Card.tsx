@@ -1,79 +1,91 @@
-import * as React from 'react';
-import { cn } from '../../utils';
+import { motion } from 'framer-motion';
+import React from 'react';
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { glow?: boolean }
->(({ className, glow = false, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'glass-card glass-card-hover p-6',
-      glow && 'neon-border animate-glow',
-      className
-    )}
-    {...props}
-  />
-));
-Card.displayName = 'Card';
+interface CardProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'glass' | 'elevated' | 'bordered';
+  hover?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  onClick?: () => void;
+}
 
-const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex flex-col space-y-1.5 mb-6', className)}
-    {...props}
-  />
-));
-CardHeader.displayName = 'CardHeader';
+export function Card({
+  children,
+  variant = 'default',
+  hover = false,
+  className = '',
+  style,
+  onClick,
+}: CardProps) {
+  const baseStyles: React.CSSProperties = {
+    borderRadius: 'var(--radius-xl)',
+    transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+  };
 
-const CardTitle = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h3
-    ref={ref}
-    className={cn(
-      'text-xl font-bold leading-none tracking-tight text-white',
-      className
-    )}
-    {...props}
-  />
-));
-CardTitle.displayName = 'CardTitle';
+  const variantStyles: Record<string, React.CSSProperties> = {
+    default: {
+      background: 'var(--color-surface)',
+      border: '1px solid var(--color-border)',
+    },
+    glass: {
+      background: 'var(--glass-white)',
+      backdropFilter: 'blur(20px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      border: '1px solid var(--glass-border)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+    },
+    elevated: {
+      background: 'var(--color-surface)',
+      boxShadow: 'var(--shadow-lg)',
+    },
+    bordered: {
+      background: 'transparent',
+      border: '1px solid var(--color-border)',
+    },
+  };
 
-const CardDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn('text-sm text-text-dim', className)}
-    {...props}
-  />
-));
-CardDescription.displayName = 'CardDescription';
+  const hoverStyles: React.CSSProperties = hover
+    ? {
+        cursor: 'pointer',
+      }
+    : {};
 
-const CardContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('', className)} {...props} />
-));
-CardContent.displayName = 'CardContent';
+  const combinedStyle: React.CSSProperties = {
+    ...baseStyles,
+    ...variantStyles[variant],
+    ...hoverStyles,
+    ...style,
+  };
 
-const CardFooter = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex items-center pt-6 mt-6 border-t border-white/5', className)}
-    {...props}
-  />
-));
-CardFooter.displayName = 'CardFooter';
+  const Wrapper = onClick ? motion.div : 'div';
+  const wrapperProps = onClick
+    ? {
+        whileHover: { y: -4, scale: 1.01 },
+        whileTap: { scale: 0.99 },
+        onClick,
+      }
+    : {};
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+  return (
+    <Wrapper className={className} style={combinedStyle} {...wrapperProps}>
+      {/* Top shine effect for glass cards */}
+      {variant === 'glass' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {children}
+    </Wrapper>
+  );
+}

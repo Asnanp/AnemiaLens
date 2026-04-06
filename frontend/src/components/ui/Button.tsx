@@ -1,47 +1,108 @@
-import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
-import { cn } from '../../utils';
+import { motion } from 'framer-motion';
+import { LucideIcon } from 'lucide-react';
+import React from 'react';
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  asChild?: boolean;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+  size?: 'sm' | 'md' | 'lg';
+  icon?: LucideIcon;
+  iconPosition?: 'left' | 'right';
+  loading?: boolean;
+  fullWidth?: boolean;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button';
-    
-    const variants = {
-      primary: 'btn-premium-primary',
-      secondary: 'btn-premium-secondary',
-      ghost: 'bg-transparent hover:bg-white/5 text-text-secondary hover:text-white',
-      outline: 'bg-transparent border border-white/10 hover:border-white/30 text-white',
-      danger: 'bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500/30',
-    };
+export function Button({
+  children,
+  variant = 'primary',
+  size = 'md',
+  icon: Icon,
+  iconPosition = 'left',
+  loading = false,
+  fullWidth = false,
+  disabled,
+  className = '',
+  style,
+  ...props
+}: ButtonProps) {
+  const baseStyles: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    fontFamily: 'var(--font-sans)',
+    fontWeight: 600,
+    border: 'none',
+    cursor: disabled || loading ? 'not-allowed' : 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+    width: fullWidth ? '100%' : 'auto',
+    opacity: disabled ? 0.5 : 1,
+  };
 
-    const sizes = {
-      sm: 'px-4 py-1.5 text-xs',
-      md: 'px-8 py-3 text-sm',
-      lg: 'px-10 py-4 text-base',
-      icon: 'p-2.5',
-    };
+  const sizeStyles: Record<string, React.CSSProperties> = {
+    sm: { padding: '0.5rem 1rem', fontSize: '0.875rem', borderRadius: 'var(--radius-md)' },
+    md: { padding: '0.75rem 1.5rem', fontSize: '0.9375rem', borderRadius: 'var(--radius-lg)' },
+    lg: { padding: '1rem 2rem', fontSize: '1rem', borderRadius: 'var(--radius-xl)' },
+  };
 
-    return (
-      <Comp
-        className={cn(
-          'btn-premium inline-flex items-center justify-center whitespace-nowrap',
-          variants[variant],
-          sizes[size],
-          className
-        )}
-        ref={ref}
-        {...props}
-      />
-    );
-  }
-);
-Button.displayName = 'Button';
+  const variantStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)',
+      color: 'white',
+      boxShadow: '0 4px 20px rgba(200, 0, 30, 0.3)',
+    },
+    secondary: {
+      background: 'rgba(255, 255, 255, 0.05)',
+      color: 'var(--color-text)',
+      border: '1px solid var(--color-border)',
+      backdropFilter: 'blur(10px)',
+    },
+    ghost: {
+      background: 'transparent',
+      color: 'var(--color-text-secondary)',
+    },
+    danger: {
+      background: 'linear-gradient(135deg, var(--color-error) 0%, var(--color-error-light) 100%)',
+      color: 'white',
+      boxShadow: '0 4px 20px rgba(239, 68, 68, 0.3)',
+    },
+    success: {
+      background: 'linear-gradient(135deg, var(--color-success) 0%, var(--color-success-light) 100%)',
+      color: 'white',
+      boxShadow: '0 4px 20px rgba(16, 185, 129, 0.3)',
+    },
+  };
 
-export { Button };
+  const combinedStyle: React.CSSProperties = {
+    ...baseStyles,
+    ...sizeStyles[size],
+    ...variantStyles[variant],
+    ...style,
+  };
+
+  const motionProps = !disabled && !loading
+    ? { whileHover: { scale: 1.02, y: -2 } as const, whileTap: { scale: 0.98 } as const }
+    : {};
+
+  return (
+    <motion.button
+      className={className}
+      style={combinedStyle}
+      {...(motionProps as any)}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading && (
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          style={{ width: '1em', height: '1em', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}
+        />
+      )}
+      {!loading && Icon && iconPosition === 'left' && <Icon size={16} />}
+      {children}
+      {!loading && Icon && iconPosition === 'right' && <Icon size={16} />}
+    </motion.button>
+  );
+}

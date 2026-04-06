@@ -1,0 +1,190 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+
+jobs:
+  lint:
+    name: 🔍 Code Quality & Type Checking
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: 🔎 Run ESLint
+        working-directory: ./frontend
+        run: |
+          npm run lint
+
+      - name: 🔒 Type checking
+        working-directory: ./frontend
+        run: |
+          npm run type-check || npx tsc --noEmit
+
+      - name: 🎨 Check Prettier formatting
+        working-directory: ./frontend
+        run: |
+          npx prettier --check "src/**/*.{ts,tsx,css,json}" || true
+
+  test:
+    name: 🧪 Frontend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: 🧪 Run unit tests
+        working-directory: ./frontend
+        run: |
+          npm run test -- --coverage
+
+      - name: 📊 Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./frontend/coverage/coverage-final.json
+          flags: frontend,unit
+          name: frontend-unit
+          fail_ci_if_error: false
+
+  build:
+    name: 🏗️ Build & Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, test]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: 🏗️ Build production bundle
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: https://api.anemialens.com
+          VITE_STRIPE_PUBLIC_KEY: pk_test_placeholder
+        run: |
+          npm run build
+
+      - name: 📦 Analyze bundle size
+        working-directory: ./frontend
+        run: |
+          npx source-map-explorer 'dist/assets/*.js' --html bundle-analysis.html || true
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          retention-days: 7
+
+  accessibility:
+    name: ♿ Accessibility & Performance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: 🏗️ Build
+        working-directory: ./frontend
+        run: |
+          npm run build
+
+      - name: 🚀 Serve build locally
+        working-directory: ./frontend
+        run: |
+          npx serve dist -p 3000 &
+          sleep 3
+
+      - name: ♿ Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            http://localhost:3000
+          budgetPath: ./frontend/lighthouse-budget.json
+          uploadArtifacts: true
+          accessibilityMinScore: 0.90
+
+  deploy-preview:
+    name: 🚀 Deploy Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, accessibility]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+      - name: 🚀 Deploy to Vercel (Preview)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./frontend
+          alias-domains: |
+            pr-{{PR_NUMBER}}-anemialens.vercel.app

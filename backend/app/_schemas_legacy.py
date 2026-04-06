@@ -815,6 +815,7 @@ class RuntimeStatusResponse(BaseModel):
     api_status: Literal["ok"] = "ok"
     guidance: GuidanceRuntimeStatus
     model: ModelRuntimeStatus
+    cache_hit_rate: float | None = Field(default=None, description="Cache hit rate (0.0-1.0)")
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import hashlib
+import secrets
+import warnings
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -18,7 +20,26 @@ from jose import JWTError, jwt
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(BACKEND_ROOT / ".env")
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-only-change-in-production")
+# SECURITY: Generate secure JWT secret if not provided
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    # Development mode: generate a random secret with warning
+    env = os.getenv("ENVIRONMENT", "development")
+    if env == "production":
+        raise RuntimeError(
+            "JWT_SECRET_KEY environment variable is REQUIRED in production. "
+            "Set it in your .env file or environment variables."
+        )
+    # Development fallback: generate random secret
+    JWT_SECRET_KEY = secrets.token_urlsafe(64)
+    warnings.warn(
+        "JWT_SECRET_KEY not set - using auto-generated secret for development. "
+        "This will change on restart and invalidate all tokens. "
+        "Set JWT_SECRET_KEY in .env for persistent sessions.",
+        UserWarning,
+        stacklevel=2
+    )
+
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_ACCESS_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 JWT_REFRESH_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "30"))

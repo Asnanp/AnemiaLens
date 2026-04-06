@@ -309,9 +309,37 @@ class Settings(BaseSettings):
     max_field_length: int = Field(default=48, ge=8, le=512)
     max_image_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)  # 20 MB
 
+    # --- Billing / Plan limits -------------------------------------------
+    free_plan_scan_limit: int = Field(
+        default=10,
+        ge=1,
+        le=1000,
+        description="Maximum number of free screenings allowed per account on the free plan.",
+    )
+
     # --- Feature flags ---------------------------------------------------
     enable_roi_crop: bool = True
     enable_deep_stack: bool = False  # set True once model ships
+
+    # --- Caching ---------------------------------------------------------
+    redis_url: str = Field(
+        default="",
+        description="Redis URL for caching (e.g., redis://localhost:6379/0). Empty = in-memory only.",
+    )
+    cache_ttl_default: float = Field(
+        default=60.0,
+        ge=1.0,
+        description="Default TTL for response cache in seconds.",
+    )
+    cache_maxsize: int = Field(
+        default=256,
+        ge=16,
+        description="Maximum entries in the in-memory cache.",
+    )
+
+    # --- Rate limiting ---------------------------------------------------
+    rate_limit_analyze_rpm: int = Field(default=10, ge=1)
+    rate_limit_quality_rpm: int = Field(default=30, ge=1)
 
     @field_validator("max_brightness")
     @classmethod

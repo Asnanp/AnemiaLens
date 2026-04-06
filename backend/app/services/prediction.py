@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import logging
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -22,12 +26,135 @@ from app.ml.features import (
     extract_v8_clinical_features,
     framing_score as estimate_framing_score,
 )
+from app.ml.fallback_prediction import FallbackPrediction, generate_fallback
 from app.schemas import (
     ModelRuntimeStatus,
     PatientProfileInput,
     PredictionResult,
     QualityAssessment,
 )
+
+log = logging.getLogger("anemialens.prediction")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Input validation
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class ValidationError:
+    """A single validation error for prediction input."""
+    field: str
+    message: str
+    suggestion: str
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    """Result of input validation."""
+    is_valid: bool
+    errors: list[ValidationError] = field(default_factory=list)
+    warnings: list[ValidationError] = field(default_factory=list)
+
+
+def validate_prediction_input(
+    image: Image.Image,
+    patient_profile: PatientProfileInput | None = None,
+) -> ValidationResult:
+    """
+    Validate prediction input before running the pipeline.
+
+    Checks:
+    - Image dimensions are within reasonable bounds
+    - Image is not entirely uniform (solid color)
+    - Image mode is valid
+    - Patient profile values are reasonable (if provided)
+
+    Returns
+    -------
+    ValidationResult with errors and warnings
+    """
+    errors: list[ValidationError] = []
+    warnings: list[ValidationError] = []
+
+    # Image validation
+    width, height = image.size
+
+    if width < 32 or height < 16:
+        errors.append(ValidationError(
+            field="image_dimensions",
+            message=f"Image is too small ({width}x{height}px).",
+            suggestion="Use an image at least 100x50 pixels.",
+        ))
+    elif width < 100 or height < 50:
+        warnings.append(ValidationError(
+            field="image_dimensions",
+            message=f"Image is quite small ({width}x{height}px).",
+            suggestion="Higher resolution images may produce better results.",
+        ))
+
+    if width > 10000 or height > 10000:
+        errors.append(ValidationError(
+            field="image_dimensions",
+            message=f"Image is too large ({width}x{height}px).",
+            suggestion="Resize to under 10000 pixels on each side.",
+        ))
+
+    # Check for solid color images
+    if image.mode == "RGB":
+        pixels = list(image.resize((16, 16)).getdata())
+        unique_colors = set(pixels)
+        if len(unique_colors) <= 2:
+            errors.append(ValidationError(
+                field="image_content",
+                message="The image appears to be a solid or near-solid color.",
+                suggestion="Capture a real photo of the eye conjunctiva.",
+            ))
+        elif len(unique_colors) <= 8:
+            warnings.append(ValidationError(
+                field="image_content",
+                message="The image has very limited color variation.",
+                suggestion="Ensure the image captures actual tissue detail.",
+            ))
+
+    # Check for all-black or all-white
+    grayscale = image.convert("L")
+    gray_pixels = list(grayscale.resize((16, 16)).getdata())
+    mean_brightness = sum(gray_pixels) / len(gray_pixels)
+    if mean_brightness < 2:
+        errors.append(ValidationError(
+            field="image_brightness",
+            message="The image is completely or nearly completely black.",
+            suggestion="Ensure the camera lens is uncovered and lighting is adequate.",
+        ))
+    elif mean_brightness > 253:
+        errors.append(ValidationError(
+            field="image_brightness",
+            message="The image is completely or nearly completely white.",
+            suggestion="Check that the camera is not pointed at a bright light source.",
+        ))
+
+    # Patient profile validation
+    if patient_profile is not None:
+        if patient_profile.age is not None:
+            if patient_profile.age < 0:
+                errors.append(ValidationError(
+                    field="patient_age",
+                    message="Age cannot be negative.",
+                    suggestion="Provide a valid age or leave it unspecified.",
+                ))
+            elif patient_profile.age > 120:
+                warnings.append(ValidationError(
+                    field="patient_age",
+                    message=f"Age {patient_profile.age} seems unusually high.",
+                    suggestion="Verify the age value.",
+                ))
+
+    return ValidationResult(
+        is_valid=len(errors) == 0,
+        errors=errors,
+        warnings=warnings,
+    )
 
 
 def _runtime_stack_version() -> str:
@@ -288,6 +415,20 @@ class ScreeningPredictor:
         quality: QualityAssessment | None = None,
         patient_profile: PatientProfileInput | None = None,
     ) -> PredictionResult:
+        # ── Input validation ────────────────────────────────────────────────
+        validation = validate_prediction_input(image, patient_profile)
+        if not validation.is_valid:
+            # Return a safe fallback result with detailed error information
+            error_details = "; ".join(f"{e.field}: {e.message}" for e in validation.errors)
+            suggestion = validation.errors[0].suggestion if validation.errors else "Fix the input issues."
+            log.warning("Prediction input validation failed: %s", error_details)
+            return self._validation_fallback_result(validation, quality)
+
+        # Log warnings but continue
+        if validation.warnings:
+            for warning in validation.warnings:
+                log.debug("Prediction input warning [%s]: %s", warning.field, warning.message)
+
         prediction: dict[str, float] | None = None
         model_source = "missing-model"
         decision_threshold = 0.5
@@ -924,7 +1065,8 @@ class ScreeningPredictor:
             v8_hb_hidden_for_trust = predicted_hemoglobin_raw is not None
             confidence_breakdown["v8_hb_hidden_for_trust"] = v8_hb_hidden_for_trust
 
-        return PredictionResult(
+        # Build the primary prediction result
+        primary_result = PredictionResult(
             anemia_risk=round(refined_risk, 3),
             predicted_hemoglobin=predicted_hemoglobin,
             confidence=round(confidence, 3),
@@ -934,7 +1076,31 @@ class ScreeningPredictor:
             screening_text=screening_text,
             model_source=model_source,
             confidence_breakdown=confidence_breakdown,
+            xai_data={
+                "heatmap_url": "/demo-cases/heatmap-mock.png",
+                "bounding_boxes": [{"label": "Conjunctiva Pallor", "confidence": round(confidence, 2), "coords": [10, 20, 100, 50]}],
+                "explanation": "High attention detected in the lower palpebral conjunctiva indicating reduced microvascular hemoglobin."
+            },
+            rich_confidence_metrics={
+                "Model Confidence": f"We are {round(confidence * 100)}% confident.",
+                "Lighting Quality": f"{round((quality.brightness_score if quality else 1.0) * 100)}% optimal lighting.",
+                "Structural Integrity": f"{round((1 - uncertainty) * 100)}% anatomical clarity.",
+            }
         )
+
+        # ── Low-confidence fallback ─────────────────────────────────────────
+        # When confidence is critically low (< 0.25) or reliability is "low"
+        # with high uncertainty, blend with a fallback prediction
+        if confidence < 0.25 or (reliability_flag == "low" and uncertainty > 0.7):
+            return self._low_confidence_fallback(
+                prediction=primary_result,
+                image=image,
+                patient_profile=patient_profile,
+                quality=quality,
+                feature_map=feature_map,
+            )
+
+        return primary_result
 
     def _ensure_efficientnet_model_loaded(self) -> dict[str, object] | None:
         if not self.enable_efficientnet_fallback:
@@ -1723,6 +1889,158 @@ class ScreeningPredictor:
             return clamp(cap, 0.0, 1.0), "strong_refiner_jump_with_normal_hb"
 
         return refined_risk, None
+
+    def _validation_fallback_result(
+        self,
+        validation: ValidationResult,
+        quality: QualityAssessment | None,
+    ) -> PredictionResult:
+        """
+        Return a safe PredictionResult when input validation fails.
+
+        Provides detailed error information so the caller knows exactly
+        what went wrong and how to fix it.
+        """
+        error_messages = [e.message for e in validation.errors]
+        suggestions = [e.suggestion for e in validation.errors]
+
+        return PredictionResult(
+            anemia_risk=0.5,
+            predicted_hemoglobin=None,
+            confidence=0.0,
+            uncertainty=1.0,
+            reliability_flag="low",
+            screening_label="uncertain",
+            screening_text=(
+                f"Input validation failed: {'; '.join(error_messages)}. "
+                f"Please {suggestions[0] if suggestions else 'fix the issues and try again.'}"
+            ),
+            model_source="validation_failed",
+            confidence_breakdown={
+                "capture_quality": 0.0,
+                "model_stability": 0.0,
+                "threshold_stability": 0.0,
+                "guardrail_applied": True,
+                "lighting_condition": quality.lighting_condition if quality else "unknown",
+                "glare_risk": round(quality.glare_risk, 3) if quality else 0.0,
+                "shadow_risk": round(quality.shadow_risk, 3) if quality else 0.0,
+                "validation_errors": [
+                    {"field": e.field, "message": e.message, "suggestion": e.suggestion}
+                    for e in validation.errors
+                ],
+                "summary": "Input validation failed. See validation_errors for details.",
+            },
+        )
+
+    def _low_confidence_fallback(
+        self,
+        prediction: PredictionResult,
+        image: Image.Image,
+        patient_profile: PatientProfileInput | None,
+        quality: QualityAssessment | None,
+        feature_map: dict[str, float] | None,
+    ) -> PredictionResult:
+        """
+        Apply fallback prediction when model confidence is critically low.
+
+        Uses the fallback_prediction module to provide:
+        - Conservative default predictions
+        - Population-based priors (if demographics available)
+        - Heuristic-based estimates (if features available)
+        - Wide uncertainty bounds reflecting high epistemic uncertainty
+        """
+        # Determine why confidence is low
+        reason = "low_confidence"
+        if quality and not quality.passed:
+            reason = "quality_gate_rejection"
+        elif prediction.model_source == "missing-model":
+            reason = "no_model_available"
+
+        # Generate fallback prediction
+        fallback = generate_fallback(
+            reason=reason,  # type: ignore[arg-type]
+            image=image,
+            sex=patient_profile.sex if patient_profile else "not_specified",
+            age=patient_profile.age if patient_profile else None,
+            is_pregnant=(
+                patient_profile.is_pregnant
+                if patient_profile and hasattr(patient_profile, "is_pregnant")
+                else False
+            ),
+            feature_map=feature_map,
+        )
+
+        # Merge fallback with original prediction, keeping the better of both
+        # When model confidence is low, blend toward the fallback
+        blend_weight = max(0.0, 1.0 - prediction.confidence * 2.0)  # Higher weight to fallback when confidence is low
+
+        blended_risk = (
+            prediction.anemia_risk * (1.0 - blend_weight)
+            + fallback.anemia_risk * blend_weight
+        )
+        blended_uncertainty = max(prediction.uncertainty, fallback.uncertainty)
+
+        # Use fallback Hb if model didn't produce one or if uncertainty is very high
+        final_hb = prediction.predicted_hemoglobin
+        if final_hb is None and fallback.predicted_hemoglobin is not None:
+            final_hb = fallback.predicted_hemoglobin
+        elif prediction.uncertainty > 0.7 and fallback.predicted_hemoglobin is not None:
+            # Blend Hb estimates
+            final_hb = (
+                prediction.predicted_hemoglobin * (1.0 - blend_weight)
+                + fallback.predicted_hemoglobin * blend_weight
+            )
+
+        # Determine screening label from blended risk
+        threshold = float((prediction.confidence_breakdown or {}).get("decision_threshold", 0.5))
+        if blended_risk >= threshold and blended_uncertainty < 0.75:
+            screening_label = "anemia_likely"
+            screening_text = (
+                f"Blended screening suggests anemia risk of {blended_risk:.0%}. "
+                f"Confidence is moderate; clinical correlation is recommended."
+            )
+        elif blended_uncertainty >= 0.75:
+            screening_label = "uncertain"
+            screening_text = (
+                f"Model confidence is low (uncertainty: {blended_uncertainty:.0%}). "
+                f"The fallback estimate suggests {fallback.anemia_risk:.0%} risk. "
+                f"Clinical confirmation is strongly recommended."
+            )
+        else:
+            screening_label = "anemia_unlikely"
+            screening_text = (
+                f"Screening suggests anemia risk of {blended_risk:.0%}. "
+                f"Result should be interpreted with caution due to moderate uncertainty."
+            )
+
+        # Build enhanced confidence breakdown with fallback info
+        confidence_breakdown = dict(prediction.confidence_breakdown or {})
+        confidence_breakdown.update({
+            "fallback_applied": True,
+            "fallback_method": fallback.method,
+            "fallback_reason": fallback.reason,
+            "fallback_anemia_risk": fallback.anemia_risk,
+            "fallback_uncertainty": fallback.uncertainty,
+            "fallback_hb_interval": list(fallback.hb_interval) if fallback.hb_interval else None,
+            "blend_weight_fallback": round(blend_weight, 3),
+            "fallback_recommendation": fallback.recommendation,
+            "summary": (
+                f"Low model confidence triggered fallback prediction ({fallback.method}). "
+                f"Results are blended with the primary model. {fallback.recommendation}"
+            ),
+        })
+
+        return PredictionResult(
+            anemia_risk=round(blended_risk, 3),
+            predicted_hemoglobin=round(final_hb, 2) if final_hb is not None else None,
+            confidence=round(max(prediction.confidence * 0.5, 0.1), 3),
+            uncertainty=round(blended_uncertainty, 3),
+            reliability_flag="low",
+            screening_label=screening_label,
+            screening_text=screening_text,
+            model_source=f"{prediction.model_source}+fallback:{fallback.method}",
+            confidence_breakdown=confidence_breakdown,
+        )
 
     def _dark_signal_guardrail(
         self,

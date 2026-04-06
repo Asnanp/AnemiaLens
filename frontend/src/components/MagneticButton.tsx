@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useRipple } from './RippleEffect';
 import { E } from './screening/SharedUI';
+import { springPresets, buttonSpring, springTransition } from '../utils/springAnimations';
 
 import { HTMLMotionProps } from 'framer-motion';
 
@@ -23,11 +24,12 @@ export function MagneticButton({
   const ref = useRef<HTMLButtonElement>(null);
   const reduceMotion = useReducedMotion();
   const { addRipple, RippleElements } = useRipple();
-  
+
   const [hovered, setHovered] = useState(false);
 
-  const mouseX = useSpring(0, { stiffness: 150, damping: 15, mass: 0.5 });
-  const mouseY = useSpring(0, { stiffness: 150, damping: 15, mass: 0.5 });
+  // Stiffer spring for snappier magnetic feel
+  const mouseX = useSpring(0, { stiffness: 180, damping: 12, mass: 0.4 });
+  const mouseY = useSpring(0, { stiffness: 180, damping: 12, mass: 0.4 });
 
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (reduceMotion) return;
@@ -42,7 +44,7 @@ export function MagneticButton({
     mouseX.set(x);
     mouseY.set(y);
     setHovered(true);
-    
+
     onPointerMove?.(e);
   };
 
@@ -51,10 +53,10 @@ export function MagneticButton({
     mouseX.set(0);
     mouseY.set(0);
     setHovered(false);
-    
+
     onPointerLeave?.(e);
   };
-  
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     addRipple(e);
     onClick?.(e);
@@ -71,7 +73,9 @@ export function MagneticButton({
         x: reduceMotion ? 0 : mouseX,
         y: reduceMotion ? 0 : mouseY,
       }}
-      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+      whileHover={!reduceMotion ? buttonSpring.hover : undefined}
+      whileTap={!reduceMotion ? buttonSpring.tap : undefined}
+      transition={!reduceMotion ? springTransition('snappy') : undefined}
       {...props}
     >
       {RippleElements}

@@ -1,0 +1,375 @@
+/* =====================================================
+   ACCESSIBILITY - WCAG 2.1 AA Compliance
+   High contrast, font size, reduced motion, focus, skip links
+   ===================================================== */
+
+/* ── Skip to Content Link ────────────────────────────── */
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-primary);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(200, 0, 30, 0.4);
+  transition: top 0.15s ease;
+}
+
+.skip-to-content:focus {
+  top: 0.5rem;
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+/* ── Focus Visible Styles ────────────────────────────── */
+*:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High contrast focus */
+.high-contrast *:focus-visible {
+  outline: 4px solid #FFD700;
+  outline-offset: 3px;
+}
+
+/* ── High Contrast Mode ──────────────────────────────── */
+.high-contrast {
+  --color-primary: #FF1744;
+  --color-primary-light: #FF5252;
+  --color-secondary: #00E5FF;
+  --color-accent: #D500F9;
+  --color-text: #FFFFFF;
+  --color-text-secondary: #E0E0E0;
+  --color-text-muted: #BDBDBD;
+  --color-bg: #000000;
+  --color-surface: #111111;
+  --color-surface-hover: #1A1A1A;
+  --color-border: rgba(255, 255, 255, 0.3);
+  --color-border-light: rgba(255, 255, 255, 0.5);
+  --color-border-hover: rgba(255, 255, 255, 0.7);
+  --glass-white: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-highlight: rgba(255, 255, 255, 0.18);
+  --shadow-glow-primary: 0 0 60px rgba(255, 23, 68, 0.5);
+  --shadow-glow-secondary: 0 0 60px rgba(0, 229, 255, 0.5);
+  --color-success: #00E676;
+  --color-warning: #FFD600;
+  --color-error: #FF1744;
+  --color-info: #448AFF;
+
+  /* Increase text contrast */
+  color: #FFFFFF !important;
+  background-color: #000000 !important;
+}
+
+.high-contrast a {
+  color: #80D8FF !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast button,
+.high-contrast [role="button"] {
+  border: 2px solid #FFFFFF !important;
+}
+
+.high-contrast img {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  border: 2px solid #FFFFFF !important;
+  background: #111111 !important;
+  color: #FFFFFF !important;
+}
+
+.high-contrast .glass,
+.high-contrast [class*="glass"] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ── Font Size Adjustments ───────────────────────────── */
+.font-size-small {
+  font-size: 87.5% !important;
+}
+
+.font-size-small * {
+  font-size: inherit !important;
+}
+
+.font-size-medium {
+  /* Default - no override needed */
+}
+
+.font-size-large {
+  font-size: 112.5% !important;
+}
+
+.font-size-large * {
+  font-size: inherit !important;
+}
+
+.font-size-xlarge {
+  font-size: 125% !important;
+}
+
+.font-size-xlarge * {
+  font-size: inherit !important;
+}
+
+/* Ensure minimum touch target size (44x44px per WCAG 2.5.5) */
+.font-size-large button,
+.font-size-xlarge button,
+.font-size-large [role="button"],
+.font-size-xlarge [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ── Reduced Motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Disable parallax and horizontal scroll */
+.reduced-motion [class*="parallax"],
+.reduced-motion [class*="horizontal-scroll"],
+.reduced-motion [class*="smooth-scroll"] {
+  transform: none !important;
+}
+
+/* ── Screen Reader Only Utility ──────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ── Live Region Styles ──────────────────────────────── */
+[aria-live] {
+  min-height: 1px;
+}
+
+/* ── Accessibility Toolbar ───────────────────────────── */
+.a11y-toolbar {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.a11y-toolbar-toggle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.a11y-toolbar-toggle:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+  transform: scale(1.05);
+}
+
+.a11y-toolbar-toggle:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+.a11y-toolbar-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 240px;
+}
+
+.a11y-toolbar-panel h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--color-text);
+}
+
+.a11y-toolbar-section {
+  margin-bottom: 0.75rem;
+}
+
+.a11y-toolbar-section:last-child {
+  margin-bottom: 0;
+}
+
+.a11y-toolbar-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.375rem;
+  font-weight: 500;
+}
+
+.a11y-toolbar-row {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.a11y-toolbar-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.a11y-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+}
+
+.a11y-toolbar-btn:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 1px;
+}
+
+.a11y-toolbar-btn[aria-pressed="true"] {
+  background: var(--color-primary-glow);
+  border-color: var(--color-primary);
+  color: var(--color-primary-light);
+}
+
+.high-contrast .a11y-toolbar-btn[aria-pressed="true"] {
+  background: rgba(255, 23, 68, 0.3);
+  border-color: #FF1744;
+  color: #FF5252;
+}
+
+/* ── Modal Focus Trap ────────────────────────────────── */
+.focus-trap-outline {
+  outline: none;
+}
+
+/* ── Form Accessibility ──────────────────────────────── */
+.form-error {
+  color: var(--color-error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.form-hint {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.high-contrast .form-error {
+  color: #FF5252;
+}
+
+.high-contrast .form-hint {
+  color: #E0E0E0;
+}
+
+/* ── Link Underline for High Contrast ────────────────── */
+.high-contrast a:not([class*="btn"]) {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+}
+
+/* ── Image Alt Text Indicator (Dev Only) ─────────────── */
+.img-no-alt {
+  outline: 3px dashed #FF0000;
+}
+
+/* ── Minimum Color Contrast Fixes ────────────────────── */
+.high-contrast .text-muted,
+.high-contrast [class*="text-muted"],
+.high-contrast .text-dim,
+.high-contrast [class*="text-dim"] {
+  color: #BDBDBD !important;
+}
+
+/* ── Table Accessibility ─────────────────────────────── */
+.high-contrast table {
+  border-collapse: collapse;
+}
+
+.high-contrast th,
+.high-contrast td {
+  border: 1px solid #FFFFFF;
+  padding: 0.5rem;
+}
+
+/* ── Breadcrumb Accessibility ────────────────────────── */
+[role="navigation"][aria-label="Breadcrumb"] ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Landmark Region Visual Indicators (Dev Mode) ────── */
+/* Enable with: document.body.classList.add('show-landmarks') */
+.show-landmarks main { outline: 3px dashed rgba(0, 255, 0, 0.5); }
+.show-landmarks nav { outline: 3px dashed rgba(0, 0, 255, 0.5); }
+.show-landmarks header { outline: 3px dashed rgba(255, 165, 0, 0.5); }
+.show-landmarks footer { outline: 3px dashed rgba(128, 0, 128, 0.5); }
+.show-landmarks aside { outline: 3px dashed rgba(255, 255, 0, 0.5); }
+.show-landmarks section { outline: 3px dashed rgba(0, 255, 255, 0.3); }

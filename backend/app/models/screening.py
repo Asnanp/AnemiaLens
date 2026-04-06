@@ -1,11 +1,16 @@
-"""Screening ORM model — persists every analysis result."""
+"""Screening ORM model — persists every analysis result.
+
+Performance optimizations:
+- Composite index on (user_id, created_at) for history queries
+- Index on triage_band for filtering by risk band
+"""
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy import DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -64,6 +69,12 @@ class Screening(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+
+    # Composite index for history queries: order by created_at DESC where user_id = ?
+    __table_args__ = (
+        Index("ix_screenings_user_created", "user_id", "created_at"),
+        Index("ix_screenings_triage_band", "triage_band"),
     )
 
     def __repr__(self) -> str:

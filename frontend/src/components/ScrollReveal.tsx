@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
-import { motion, useInView, useAnimation, type Variants } from 'framer-motion';
+import { motion, useInView, useAnimation, useReducedMotion, type Variants } from 'framer-motion';
+import { springPresets, springTransition, type SpringPresetKey } from '../utils/springAnimations';
 
 interface ScrollRevealProps {
   children: React.ReactNode;
@@ -7,6 +8,10 @@ interface ScrollRevealProps {
   delay?: number;
   direction?: 'up' | 'down' | 'left' | 'right' | 'scale';
   once?: boolean;
+  /** Spring preset name for the reveal animation. Default: 'default' */
+  spring?: SpringPresetKey;
+  /** Distance to travel on entrance (px). Default: 64 */
+  distance?: number;
 }
 
 export function ScrollReveal({
@@ -15,10 +20,15 @@ export function ScrollReveal({
   delay = 0,
   direction = 'up',
   once = true,
+  spring = 'default',
+  distance = 64,
 }: ScrollRevealProps) {
   const ref = useRef(null);
+  const reduceMotion = useReducedMotion();
   const isInView = useInView(ref, { once, amount: 0.2 });
   const controls = useAnimation();
+
+  const springConfig = springPresets[spring];
 
   useEffect(() => {
     if (isInView) {
@@ -31,9 +41,9 @@ export function ScrollReveal({
   const variants: Variants = {
     hidden: {
       opacity: 0,
-      y: direction === 'up' ? 60 : direction === 'down' ? -60 : 0,
-      x: direction === 'left' ? 60 : direction === 'right' ? -60 : 0,
-      scale: direction === 'scale' ? 0.8 : 1,
+      y: direction === 'up' ? distance : direction === 'down' ? -distance : 0,
+      x: direction === 'left' ? distance : direction === 'right' ? -distance : 0,
+      scale: direction === 'scale' ? 0.85 : 1,
     },
     visible: {
       opacity: 1,
@@ -41,12 +51,19 @@ export function ScrollReveal({
       x: 0,
       scale: 1,
       transition: {
-        duration: 0.8,
         delay,
-        ease: 'easeOut',
+        ...springConfig,
       },
     },
   };
+
+  if (reduceMotion) {
+    return (
+      <div className={className}>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <motion.div

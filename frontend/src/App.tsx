@@ -4,6 +4,7 @@
  */
 
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import HowItWorks from './pages/HowItWorks';
 import Science from './pages/Science';
@@ -15,7 +16,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { UploadZone } from './components/features/UploadZone';
 import {
-  STEPS_META, QwenLoadingOverlay, E,
+  STEPS_META, useStepsMeta, QwenLoadingOverlay, E,
 } from './components/screening/SharedUI';
 import { Hero } from './pages/HeroSection';
 import { ArrowRight, ChevronRight, Menu, User, X } from 'lucide-react';
@@ -26,6 +27,9 @@ import { scrollToId } from './utils/scroll';
 import { toast, ToastContainer } from './components/Toast';
 import { saveScreeningToAccount } from './api';
 import type { AnalyzeResponse } from './types';
+import { Onboarding } from './components/Onboarding';
+import { useOnboarding } from './hooks/useOnboarding';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 
 const loadAuthPage = () => import('./pages/AuthPage');
 const AuthPage = lazy(loadAuthPage);
@@ -44,9 +48,9 @@ const loadSupabaseTest = () => import('./components/SupabaseTest');
 const SupabaseTest = lazy(async () => ({ default: (await loadSupabaseTest()).SupabaseTest }));
 
 const NAV_LINKS = [
-  { label: 'Science', path: '/science' },
-  { label: 'How It Works', path: '/how-it-works' },
-  { label: 'Providers', path: '/providers' },
+  { labelKey: 'common.science', path: '/science' },
+  { labelKey: 'common.howItWorks', path: '/how-it-works' },
+  { labelKey: 'common.providers', path: '/providers' },
 ] as const;
 
 const DEMO_CASES = [
@@ -109,7 +113,7 @@ function getAccountBadge(user?: { full_name?: string | null; email?: string | nu
   const initialSource = canShowName
     ? normalized
     : (user?.email?.trim()?.charAt(0).toUpperCase() || 'A');
-  return { label: 'Dashboard', initial: initialSource, hint: normalized };
+  return { label: 'common.dashboard', initial: initialSource, hint: normalized };
 }
 
 function OverlayLoader({ title, detail }: { title: string; detail: string }) {
@@ -207,6 +211,7 @@ function SectionFallback({ minHeight = 360 }: { minHeight?: number }) {
 }
 
 function Navbar({ backendUp }: { backendUp: boolean }) {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -287,38 +292,38 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
               <span className="nav-brand-title">
                 Anemia<span style={{ color: 'var(--accent-bright)' }}>Lens</span>
               </span>
-              <span className="nav-brand-subtitle">Safer first-pass anemia screening</span>
+              <span className="nav-brand-subtitle">{t('common.saferFirstPass')}</span>
             </div>
             {backendUp && (
               <span className="stat-chip nav-status-chip">
                 <span className="nav-status-dot" />
-                Live
+                {t('common.live')}
               </span>
             )}
           </button>
 
           <nav className="nav-desktop nav-link-row">
-            {NAV_LINKS.map(({ label, path }) => (
+            {NAV_LINKS.map(({ labelKey, path }) => (
               <Link
-                key={label}
+                key={labelKey}
                 to={path}
                 className="label-tag nav-link nav-link-button"
                 style={{ color: 'var(--text-muted)', background: 'none', border: 'none', textDecoration: 'none' }}
               >
-                {label}
+                {t(labelKey)}
               </Link>
             ))}
           </nav>
 
           {!compactViewport ? (
-            <div className="nav-desktop nav-actions">
+            <div className="nav-desktop nav-actions" style={{ alignItems: 'center', gap: '0.75rem' }}>
               {!isAuthenticated ? (
                 <>
                   <button className="btn btn-glass nav-secondary-action" onClick={() => openAuth('login')}>
-                    Sign In
+                    {t('common.signIn')}
                   </button>
                   <button className="nav-inline-action" onClick={() => openAuth('register')}>
-                    Create account
+                    {t('common.createAccount')}
                   </button>
                 </>
               ) : (
@@ -331,12 +336,13 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                     title={accountBadge.hint}
                   >
                     <span className="nav-account-avatar" aria-hidden="true">{accountBadge.initial}</span>
-                    <span className="nav-account-label nav-account-label-solo">{accountBadge.label}</span>
+                    <span className="nav-account-label nav-account-label-solo">{t(accountBadge.label)}</span>
                   </button>
                 </>
               )}
+              <LanguageSwitcher variant="inline" />
               <a className="btn btn-primary nav-primary-cta" href="/#screening" style={{ textDecoration: 'none' }}>
-                Start Screening <ArrowRight size={12} />
+                {t('screening.startScreening')} <ArrowRight size={12} />
               </a>
             </div>
           ) : (
@@ -344,7 +350,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
               {backendUp && (
                 <span className="nav-mobile-status-pill">
                   <span className="nav-status-dot" />
-                  Live
+                  {t('common.live')}
                 </span>
               )}
               <button className="nav-hamburger" onClick={() => setMenuOpen((open) => !open)} aria-label="Toggle menu" aria-expanded={menuOpen}>
@@ -363,16 +369,16 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
               <div className="nav-mobile-panel">
                 <div className="nav-mobile-meta">
                   <div>
-                    <div className="label-tag" style={{ color: 'var(--text-dim)', marginBottom: '0.45rem' }}>Navigate</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.4 }}>Explore the platform, then jump straight into screening.</div>
+                    <div className="label-tag" style={{ color: 'var(--text-dim)', marginBottom: '0.45rem' }}>{t('common.navigate')}</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.4 }}>{t('common.explorePlatform')}</div>
                   </div>
                   <div className="nav-mobile-status">
                     <span className="nav-status-dot" />
-                    {backendUp ? 'Backend live' : 'Backend reconnecting'}
+                    {backendUp ? t('common.backendLive') : t('common.backendReconnecting')}
                   </div>
                 </div>
-                {NAV_LINKS.map(({ label, path }, i) => (
-                  <Link key={label} to={path}
+                {NAV_LINKS.map(({ labelKey, path }, i) => (
+                  <Link key={labelKey} to={path}
                     onClick={() => setMenuOpen(false)}
                     className="nav-mobile-link"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'inherit', textDecoration: 'none' }}>
@@ -381,7 +387,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                       transition={{ delay: i * 0.06 }}
                       style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}
                     >
-                      {label}<ChevronRight size={14} />
+                      {t(labelKey)}<ChevronRight size={14} />
                     </motion.div>
                   </Link>
                 ))}
@@ -392,13 +398,13 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                       className="btn btn-glass nav-mobile-action"
                       onClick={() => openAuth('login')}
                     >
-                      Sign In
+                      {t('common.signIn')}
                     </button>
                     <button
                       className="btn btn-glass nav-mobile-action nav-register-action"
                       onClick={() => openAuth('register')}
                     >
-                      Create Account
+                      {t('common.createAccount')}
                     </button>
                   </div>
                 )}
@@ -413,16 +419,16 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                         setShowDashboard(true);
                       }}
                     >
-                      <User size={14} /> Open Dashboard
+                      <User size={14} /> {t('common.openDashboard')}
                     </button>
                     <div className="nav-mobile-account-note">
-                      Signed in as {accountBadge.hint}
+                      {t('common.signedIn')} {accountBadge.hint}
                     </div>
                   </div>
                 )}
                 <button className="btn btn-primary nav-mobile-cta"
                   onClick={() => { setMenuOpen(false); scrollTo('screening'); }}>
-                  Start Screening
+                  {t('screening.startScreening')}
                 </button>
               </div>
             </motion.div>
@@ -450,6 +456,8 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
 }
 
 function ScreeningSection() {
+  const { t } = useTranslation();
+  const stepsMeta = useStepsMeta();
   const { isAuthenticated } = useAuth();
   const {
     step, setStep, file, previewUrl, symptoms, toggleSymptom,
@@ -525,15 +533,15 @@ function ScreeningSection() {
           viewport={{ once: true }} transition={{ duration: 0.7 }}
           className="screening-heading-shell"
           style={{ textAlign: 'center', marginBottom: 'clamp(2.5rem, 6vw, 5rem)' }}>
-          <div className="section-eyebrow" style={{ marginBottom: '1.25rem' }}>Guided Screening</div>
+          <div className="section-eyebrow" style={{ marginBottom: '1.25rem' }}>{t('screening.guidedScreening')}</div>
           <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(2.5rem,5vw,4.5rem)', fontWeight: 700, lineHeight: 1.0, letterSpacing: '-0.03em' }}>
-            Run a screening in<br />
-            <span style={{ fontStyle: 'italic', fontWeight: 300 }} className="text-gold">four clear steps.</span>
+            {t('screening.fourSteps')}<br />
+            <span style={{ fontStyle: 'italic', fontWeight: 300 }} className="text-gold">{t('screening.fourStepsHighlight')}</span>
           </h2>
         </motion.div>
 
         <div className="screening-progress" style={{ marginBottom: 'clamp(2.5rem, 6vw, 4.5rem)' }}>
-          {STEPS_META.map((s, i) => {
+          {stepsMeta.map((s, i) => {
             const isActive = step === i;
             const isDone = step > i;
             const canClick = canStep(i);
@@ -577,7 +585,7 @@ function ScreeningSection() {
                   <span className="screening-step-label" style={{ color: isActive ? '#fff' : 'var(--text-muted)' }}>{s.label}</span>
                 </motion.div>
                 
-                {i < STEPS_META.length - 1 && (
+                {i < stepsMeta.length - 1 && (
                   <div className="screening-step-line" style={{ background: 'rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
                     <motion.div 
                       style={{ position: 'absolute', top: 0, left: 0, bottom: 0, background: 'var(--teal)' }}
@@ -717,8 +725,13 @@ function ScreeningSection() {
                           transition={{ duration: 0.2 }}
                           onClick={() => loadSample(demo.imageUrl, demo.symptoms, demo.id)}
                         >
-                          <img src={demo.imageUrl} alt={demo.label} className="screening-demo-card-image" />
-                          <div className="screening-demo-card-body">
+                          <img 
+                            src={demo.imageUrl} 
+                            alt={demo.label} 
+                            className="screening-demo-card-image"
+                            loading="lazy" 
+                            decoding="async"
+                          />                          <div className="screening-demo-card-body">
                             <div className="screening-demo-card-label">{demo.label}</div>
                             <div className="screening-demo-card-note">{demo.note}</div>
                             <div className="screening-demo-card-action">Load this case</div>
@@ -777,7 +790,15 @@ function ScreeningSection() {
 
 function AppContent() {
   const { backendUp } = useScreening();
+  const { hasSeenOnboarding, isReady, completeOnboarding, resetOnboarding } = useOnboarding();
   const showSupabaseTest = import.meta.env.DEV && import.meta.env.VITE_SHOW_SUPABASE_TEST === 'true';
+
+  // Expose resetOnboarding globally for debugging (optional: remove in production)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).__resetOnboarding = resetOnboarding;
+    }
+  }, [resetOnboarding]);
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -786,13 +807,21 @@ function AppContent() {
         const el = entry.target as HTMLElement;
         const children = Array.from(el.querySelectorAll<HTMLElement>('.reveal-child'));
         if (children.length) {
-          children.forEach((child, i) => { setTimeout(() => child.classList.add('visible'), i * 80); });
+          // Use requestAnimationFrame for smoother class additions
+          requestAnimationFrame(() => {
+            children.forEach((child, i) => { 
+              setTimeout(() => {
+                child.classList.add('visible');
+              }, i * 60); 
+            });
+          });
         } else {
-          el.classList.add('visible');
+          requestAnimationFrame(() => el.classList.add('visible'));
         }
         obs.unobserve(el);
       });
-    }, { threshold: 0.1 });
+    }, { threshold: 0.05, rootMargin: '0px 0px -50px 0px' });
+    
     document.querySelectorAll('.reveal, .reveal-group').forEach(el => obs.observe(el));
     return () => obs.disconnect();
   }, []);
@@ -818,9 +847,30 @@ function AppContent() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--void)' }}>
-      <div className="cinematic-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.4 }}>
-        <div style={{ position: 'absolute', top: '10%', left: '15%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--crimson-glow) 0%, transparent 70%)', filter: 'blur(100px)' }} />
-        <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: '35vw', height: '35vw', background: 'radial-gradient(circle, var(--violet-glow) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+      {/* ── Onboarding overlay ── */}
+      <AnimatePresence>
+        {isReady && !hasSeenOnboarding && (
+          <Onboarding
+            onComplete={completeOnboarding}
+            onSkip={completeOnboarding}
+          />
+        )}
+      </AnimatePresence>
+
+      <div
+        className="cinematic-bg"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: isReady && !hasSeenOnboarding ? 0 : 1,
+          transition: 'opacity 0.5s ease',
+          background: 'var(--void)'
+        }}
+      >
+        <div style={{ position: 'absolute', top: '10%', left: '15%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, rgba(200, 0, 30, 0.12) 0%, rgba(200, 0, 30, 0.05) 40%, transparent 70%)' }} />
+        <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: '35vw', height: '35vw', background: 'radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.05) 40%, transparent 70%)' }} />
       </div>
       <ScrollProgress />
       <Navbar backendUp={backendUp} />

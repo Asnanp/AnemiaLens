@@ -1,7 +1,9 @@
 ﻿import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Activity, Zap, Wind, Eye, Droplets, Utensils } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SymptomInput } from '../../types';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -14,18 +16,9 @@ const SYMPTOM_ICONS: Record<string, React.ReactNode> = {
   poor_diet_low_iron:     <Utensils size={18} />,
 };
 
-const HINDI_LABELS: Record<string, string> = {
-  fatigue:                  'थकान',
-  dizziness:                'चक्कर आना',
-  pale_skin:                'पीली त्वचा',
-  shortness_of_breath:      'सांस की तकलीफ',
-  heavy_menstrual_bleeding: 'अत्यधिक मासिक रक्तस्राव',
-  poor_diet_low_iron:       'आयरन की कमी',
-};
-
 // Severity levels per symptom (stored in localStorage for UX, sent as boolean to backend)
 type SeverityLevel = 0 | 1 | 2; // 0=none, 1=mild, 2=severe
-const SEVERITY_LABELS = ['None', 'Mild', 'Severe'];
+const SEVERITY_LABELS_KEY = ['symptoms.none', 'symptoms.mild', 'symptoms.severe'] as const;
 const SEVERITY_COLORS = ['var(--text-dim)', '#F59E0B', '#EF4444'];
 const SEVERITY_KEY = 'anemialens.symptom-severity';
 
@@ -35,8 +28,6 @@ function loadSeverity(): Record<string, SeverityLevel> {
 function saveSeverity(s: Record<string, SeverityLevel>) {
   try { localStorage.setItem(SEVERITY_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
-
-const LANG_KEY = 'anemialens.symptom-lang';
 
 interface SymptomViewProps {
   symptoms: SymptomInput;
@@ -48,15 +39,8 @@ interface SymptomViewProps {
 }
 
 export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loading, symptomLabels }: SymptomViewProps) {
-  const [lang, setLang] = useState<'en' | 'hi'>(() => {
-    try { return (localStorage.getItem(LANG_KEY) as 'en' | 'hi') || 'en'; } catch { return 'en'; }
-  });
+  const { t, i18n } = useTranslation();
   const [severity, setSeverity] = useState<Record<string, SeverityLevel>>(loadSeverity);
-
-  const switchLang = (l: 'en' | 'hi') => {
-    setLang(l);
-    try { localStorage.setItem(LANG_KEY, l); } catch { /* ignore */ }
-  };
 
   const cycleSeverity = (key: string) => {
     setSeverity(prev => {
@@ -70,7 +54,13 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
     });
   };
 
-  const getLabel = (key: string) => lang === 'hi' ? (HINDI_LABELS[key] ?? symptomLabels[key as keyof typeof symptomLabels]) : symptomLabels[key as keyof typeof symptomLabels];
+  const getLabel = (key: string) => {
+    const translationKey = `symptoms.${key}`;
+    const translated = t(translationKey);
+    // If the translation key exists and is different from the key, use it; otherwise fall back to symptomLabels
+    if (translated !== translationKey) return translated;
+    return symptomLabels[key as keyof typeof symptomLabels];
+  };
 
   const keys = Object.keys(symptomLabels) as Array<keyof SymptomInput>;
   const selectedCount = keys.filter(k => symptoms[k] === true).length;
@@ -86,33 +76,17 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
         style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', flexWrap:'wrap', gap:'1rem' }}
       >
         <div>
-          <div className="section-eyebrow" style={{ marginBottom:'0.6rem' }}>Phase 03</div>
+          <div className="section-eyebrow" style={{ marginBottom:'0.6rem' }}>{t('symptoms.phase')}</div>
           <h3 style={{ fontFamily:'var(--serif)', fontSize:'clamp(1.8rem,3vw,2.6rem)', fontWeight:700, lineHeight:1.05, letterSpacing:'-0.03em' }}>
-            {lang === 'hi' ? 'लक्षण प्रोफ़ाइल' : 'Symptom Profile'}
+            {t('symptoms.title')}
           </h3>
           <p style={{ fontSize:'0.82rem', color:'var(--text-muted)', marginTop:'0.5rem', maxWidth:420, lineHeight:1.65 }}>
-            {lang === 'hi'
-              ? 'प्रत्येक लक्षण की गंभीरता चुनें। यह छवि बायोमार्कर के साथ मिलकर ट्राइएज सटीकता में सुधार करता है।'
-              : 'Tap each symptom to set severity. Fuses with image biomarkers for better triage accuracy.'}
+            {t('symptoms.subtitle')}
           </p>
         </div>
 
         <div style={{ display:'flex', flexDirection:'column', gap:'0.625rem', alignItems:'flex-end' }}>
-          {/* Language toggle */}
-          <div style={{ display:'flex', borderRadius:'0.625rem', overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)' }}>
-            {(['en', 'hi'] as const).map(l => (
-              <button key={l} onClick={() => switchLang(l)}
-                style={{
-                  padding:'0.35rem 0.875rem', fontSize:'0.62rem', fontFamily:'var(--mono)',
-                  fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', cursor:'pointer',
-                  background: lang === l ? 'rgba(200,0,30,0.2)' : 'rgba(255,255,255,0.03)',
-                  color: lang === l ? 'var(--accent-bright)' : 'var(--text-dim)',
-                  border:'none', transition:'all 0.2s',
-                }}>
-                {l === 'en' ? 'EN' : 'हिंदी'}
-              </button>
-            ))}
-          </div>
+          <LanguageSwitcher variant="inline" />
 
           {/* Live risk indicator */}
           <motion.div className="glass"
@@ -131,7 +105,7 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
             </div>
             <div>
               <div style={{ fontSize:'0.55rem', fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:'0.12em', textTransform:'uppercase' }}>
-                {lang === 'hi' ? 'लक्षण जोखिम' : 'Symptom Risk'}
+                {t('symptoms.symptomRisk')}
               </div>
               <div style={{ fontFamily:'var(--mono)', fontWeight:700, fontSize:'0.85rem', color:riskColor }}>{riskLevel}</div>
             </div>
@@ -142,11 +116,11 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
       {/* Severity legend */}
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.2 }}
         style={{ display:'flex', gap:'1.5rem', padding:'0.75rem 1.25rem', borderRadius:'0.75rem', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', flexWrap:'wrap' }}>
-        <span style={{ fontSize:'0.58rem', fontFamily:'var(--mono)', color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:'0.1em', alignSelf:'center' }}>Tap to cycle:</span>
-        {SEVERITY_LABELS.map((label, i) => (
-          <div key={label} style={{ display:'flex', alignItems:'center', gap:'0.4rem' }}>
+        <span style={{ fontSize:'0.58rem', fontFamily:'var(--mono)', color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:'0.1em', alignSelf:'center' }}>{t('symptoms.tapToCycle')}</span>
+        {SEVERITY_LABELS_KEY.map((labelKey, i) => (
+          <div key={labelKey} style={{ display:'flex', alignItems:'center', gap:'0.4rem' }}>
             <div style={{ width:8, height:8, borderRadius:'50%', background: SEVERITY_COLORS[i] }} />
-            <span style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color: SEVERITY_COLORS[i] }}>{label}</span>
+            <span style={{ fontSize:'0.6rem', fontFamily:'var(--mono)', color: SEVERITY_COLORS[i] }}>{t(labelKey)}</span>
           </div>
         ))}
       </motion.div>
@@ -206,7 +180,7 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
               </div>
 
               <div style={{ fontSize:'0.52rem', fontFamily:'var(--mono)', letterSpacing:'0.12em', textTransform:'uppercase', color: active ? sevColor : 'var(--text-dim)' }}>
-                {active ? `● ${SEVERITY_LABELS[sev]}` : '○ Tap to set'}
+                {active ? `● ${t(SEVERITY_LABELS_KEY[sev])}` : `○ ${t('symptoms.tapToSet')}`}
               </div>
             </motion.button>
           );
@@ -232,22 +206,22 @@ export function SymptomView({ symptoms, toggleSymptom, onContinue, onBack, loadi
           </motion.div>
           <div>
             <div style={{ fontWeight:600, fontSize:'0.85rem' }}>
-              {lang === 'hi' ? `${selectedCount} लक्षण चुने गए` : `${selectedCount} symptom${selectedCount !== 1 ? 's' : ''} selected`}
-              {severeCount > 0 && <span style={{ color:'#EF4444', marginLeft:'0.5rem', fontSize:'0.72rem' }}>({severeCount} severe)</span>}
+              {t('symptoms.selectedCount', { count: selectedCount, plural: selectedCount !== 1 ? 's' : '' })}
+              {severeCount > 0 && <span style={{ color:'#EF4444', marginLeft:'0.5rem', fontSize:'0.72rem' }}>{t('symptoms.severeCount', { count: severeCount, plural: severeCount !== 1 ? 's' : '' })}</span>}
             </div>
             <div style={{ fontSize:'0.65rem', color:'var(--text-dim)' }}>
-              {lang === 'hi' ? 'छवि बायोमार्कर के साथ मिलाया गया' : 'Fused with image biomarkers for triage'}
+              {t('symptoms.fusedWithBiomarkers')}
             </div>
           </div>
         </div>
         <div style={{ display:'flex', gap:'0.75rem' }}>
           <button className="btn btn-glass" style={{ padding:'0.65rem 1.5rem', fontSize:'0.7rem' }} onClick={onBack}>
-            {lang === 'hi' ? 'वापस' : 'Back'}
+            {t('common.back')}
           </button>
           <button className="btn btn-primary" style={{ padding:'0.65rem 1.75rem', fontSize:'0.7rem' }} onClick={onContinue} disabled={loading}>
             {loading
-              ? <><span style={{ display:'inline-block', width:11, height:11, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite', marginRight:6 }} />Analyzing...</>
-              : (lang === 'hi' ? 'निदान चलाएं' : 'Run Diagnostics')
+              ? <><span style={{ display:'inline-block', width:11, height:11, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite', marginRight:6 }} />{t('common.analyzing')}</>
+              : t('common.runDiagnostics')
             }
           </button>
         </div>

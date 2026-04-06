@@ -1,5 +1,7 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Star, Quote } from 'lucide-react';
+import { useScrollReveal } from '../hooks/useScrollAnimation';
+import { fanOutVariants, cardLiftSpring, springTransition, pulseGlow } from '../utils/springAnimations';
 
 const FADE_UP = {
   hidden: { opacity: 0, y: 30 },
@@ -37,10 +39,87 @@ const TESTIMONIALS = [
   }
 ];
 
+/** Single testimonial card with spring micro-interactions */
+function TestimonialCard({
+  testimonial,
+  index,
+  reduceMotion,
+}: {
+  testimonial: typeof TESTIMONIALS[number];
+  index: number;
+  reduceMotion: boolean;
+}) {
+  const reveal = useScrollReveal({
+    direction: 'up',
+    distance: 40,
+    spring: 'default',
+    stagger: 100,
+    index,
+    threshold: 0.1,
+  });
+
+  return (
+    <motion.div
+      ref={reveal.ref}
+      style={reduceMotion ? undefined : { y: reveal.y, opacity: reveal.opacity }}
+      className="glass p-8 md:p-10 rounded-3xl relative overflow-hidden"
+      whileHover={!reduceMotion ? cardLiftSpring.hover : undefined}
+      whileTap={!reduceMotion ? cardLiftSpring.tap : undefined}
+      transition={!reduceMotion ? springTransition('default') : undefined}
+    >
+      {/* Subtle glow accent behind quote icon */}
+      {!reduceMotion && (
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: -8,
+            right: -8,
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(94,234,212,0.06) 0%, transparent 70%)',
+            filter: 'blur(12px)',
+          }}
+          animate={pulseGlow({ duration: 4, scale: 1.15, opacity: 0.35 })}
+        />
+      )}
+
+      <Quote className="absolute top-8 right-8 w-12 h-12 text-glass-border-hi opacity-50" />
+      <div className="flex gap-1 mb-6">
+        {[...Array(testimonial.rating)].map((_, j) => (
+          <Star key={j} className="w-5 h-5 fill-brand-teal text-brand-teal" />
+        ))}
+      </div>
+      <p className="text-lg md:text-xl leading-relaxed mb-8 relative z-10">
+        "{testimonial.content}"
+      </p>
+      <div className="flex items-center gap-4">
+        <img
+          src={testimonial.avatar}
+          alt={testimonial.name}
+          className="w-14 h-14 rounded-full border-2 border-brand-purple/30 object-cover"
+        />
+        <div>
+          <div className="font-bold">{testimonial.name}</div>
+          <div className="text-sm text-text-muted">{testimonial.role}</div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Testimonials() {
+  const reduceMotion = useReducedMotion() ?? false;
+  const headerReveal = useScrollReveal({ direction: 'up', distance: 32, spring: 'gentle' });
+
   return (
     <main className="min-h-screen pt-32 pb-20 px-6 sm:px-12 max-w-7xl mx-auto">
-      <motion.div initial="hidden" animate="visible" variants={FADE_UP} className="text-center mb-20">
+      <motion.div
+        ref={headerReveal.ref}
+        style={reduceMotion ? undefined : { y: headerReveal.y, opacity: headerReveal.opacity }}
+        className="text-center mb-20"
+      >
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
           Trusted by <span className="text-brand-purple">Professionals</span>
         </h1>
@@ -51,36 +130,7 @@ export default function Testimonials() {
 
       <div className="grid md:grid-cols-2 gap-8">
         {TESTIMONIALS.map((testimonial, i) => (
-          <motion.div 
-            key={i}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={FADE_UP}
-            transition={{ delay: i * 0.1 }}
-            className="glass p-8 md:p-10 rounded-3xl relative"
-          >
-            <Quote className="absolute top-8 right-8 w-12 h-12 text-glass-border-hi opacity-50" />
-            <div className="flex gap-1 mb-6">
-              {[...Array(testimonial.rating)].map((_, j) => (
-                <Star key={j} className="w-5 h-5 fill-brand-teal text-brand-teal" />
-              ))}
-            </div>
-            <p className="text-lg md:text-xl leading-relaxed mb-8 relative z-10">
-              "{testimonial.content}"
-            </p>
-            <div className="flex items-center gap-4">
-              <img 
-                src={testimonial.avatar} 
-                alt={testimonial.name} 
-                className="w-14 h-14 rounded-full border-2 border-brand-purple/30 object-cover"
-              />
-              <div>
-                <div className="font-bold">{testimonial.name}</div>
-                <div className="text-sm text-text-muted">{testimonial.role}</div>
-              </div>
-            </div>
-          </motion.div>
+          <TestimonialCard key={i} testimonial={testimonial} index={i} reduceMotion={reduceMotion ?? false} />
         ))}
       </div>
     </main>
