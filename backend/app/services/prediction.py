@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import hashlib
 import logging
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -26,7 +24,7 @@ from app.ml.features import (
     extract_v8_clinical_features,
     framing_score as estimate_framing_score,
 )
-from app.ml.fallback_prediction import FallbackPrediction, generate_fallback
+from app.ml.fallback_prediction import generate_fallback
 from app.schemas import (
     ModelRuntimeStatus,
     PatientProfileInput,
@@ -420,7 +418,7 @@ class ScreeningPredictor:
         if not validation.is_valid:
             # Return a safe fallback result with detailed error information
             error_details = "; ".join(f"{e.field}: {e.message}" for e in validation.errors)
-            suggestion = validation.errors[0].suggestion if validation.errors else "Fix the input issues."
+            validation.errors[0].suggestion if validation.errors else "Fix the input issues."
             log.warning("Prediction input validation failed: %s", error_details)
             return self._validation_fallback_result(validation, quality)
 
@@ -1267,7 +1265,7 @@ class ScreeningPredictor:
             primary_model = "missing-model"
             artifact_path = None
 
-        is_v8_archive = (
+        (
             primary_model.startswith("archive-fusion-v8-clinical-robust")
             or _archive_model_version(self.archive_model).startswith("archive-fusion-v8-clinical-robust")
         )

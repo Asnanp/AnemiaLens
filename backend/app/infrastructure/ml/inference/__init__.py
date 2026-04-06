@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from app.ml.archive_model import clamp
+from app.ml.archive_model import clamp as clamp
 
 log = logging.getLogger("anemialens.infrastructure.ml.inference")
 

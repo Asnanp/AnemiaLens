@@ -222,7 +222,7 @@ async def register(
         return _token_response_for_user(user)
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
         log.exception("Registration failed for %s", body.email)
         # SECURITY: Don't leak internal error details to clients
         raise HTTPException(
@@ -359,7 +359,6 @@ async def me(
 # Personal stats
 # ---------------------------------------------------------------------------
 
-from sqlalchemy import func as sa_func
 from app.models.screening import Screening
 
 

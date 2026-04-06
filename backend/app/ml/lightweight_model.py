@@ -11,7 +11,6 @@ Falls back to feature-only heuristic if torch is unavailable.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +60,6 @@ _LIGHTWEIGHT_IMAGE_SIZE = 160  # smaller than EfficientNet's 224
 
 def build_lightweight_model() -> "Any":
     """Build a MobileNetV2 model with a minimal anemia-screening head."""
-    import torch
     from torch import nn
     from torchvision.models import MobileNet_V2_Weights, mobilenet_v2
 
@@ -169,9 +167,9 @@ def predict_heuristic(feature_map: dict[str, float], symptom_score: float = 0.0)
     Incorporates symptom_score to adjust Hb estimate when symptoms are present.
     This is a last-resort fallback — uncertainty is always high.
     """
-    cpi = feature_map.get("cpi", feature_map.get("mean_r", 0.4))
+    feature_map.get("cpi", feature_map.get("mean_r", 0.4))
     center_cpi = feature_map.get("center_cpi", feature_map.get("center_mean_r", 0.4))
-    rg_gap = feature_map.get("red_green_gap", 0.0)
+    feature_map.get("red_green_gap", 0.0)
     center_rg_gap = feature_map.get("center_red_green_gap", 0.0)
     brightness = feature_map.get("brightness", 0.3)
 

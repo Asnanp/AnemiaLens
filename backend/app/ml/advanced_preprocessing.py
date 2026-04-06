@@ -25,7 +25,7 @@ from typing import Literal
 
 import cv2
 import numpy as np
-from PIL import Image, ImageFilter, ImageEnhance, ImageOps, ImageStat
+from PIL import Image
 
 log = logging.getLogger("anemialens.preprocessing")
 

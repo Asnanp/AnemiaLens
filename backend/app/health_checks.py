@@ -109,7 +109,7 @@ async def check_database_tables() -> CheckResult:
     start = time.perf_counter()
     try:
         from app.database import async_session_factory
-        from sqlalchemy import inspect, text
+        from sqlalchemy import text
 
         async with async_session_factory() as session:
             # Use raw connection for inspection
@@ -163,7 +163,7 @@ def check_model_files() -> CheckResult:
     """Verify that critical model files exist and have valid sizes."""
     start = time.perf_counter()
 
-    required_files = [
+    [
         ("primary_model", settings.__dict__.get("_DEFAULT_MODEL_PATH", MODELS_DIR / "anemia_model.pt")),
     ]
 
@@ -947,7 +947,6 @@ class MetricsCollector:
 
         # Per-endpoint metrics
         for path, metrics in summary["endpoints"].items():
-            safe_path = path.replace("/", "_").strip("_") or "root"
             lines.extend(
                 [
                     f"# HELP anemialens_endpoint_requests_total{{path=\"{path}\"}} Requests for {path}",

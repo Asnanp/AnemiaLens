@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.schemas import GuidanceResult, PredictionResult, QualityAssessment, QualityIssue, SymptomInput, TriageResult
+from app.schemas import PredictionResult, QualityAssessment, QualityIssue, TriageResult
 from app.services.decision_audit import build_decision_audit
 
 

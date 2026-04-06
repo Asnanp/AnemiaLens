@@ -8,11 +8,11 @@
  * - Skeleton loader support
  */
 
-import { memo, useCallback } from 'react';
-import { FixedSizeList as List } from 'react-window';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback } from 'react';
+import { List } from 'react-window';
+import { motion } from 'framer-motion';
 import {
-  AlertTriangle, Clock, Trash2,
+  Clock, Trash2,
 } from 'lucide-react';
 import type { ScreeningHistoryItem } from '../../hooks/useHistory';
 
@@ -53,20 +53,23 @@ function formatDateTime(date: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Single row (memoized)                                             */
+/*  Single row component (react-window v2 API)                        */
 /* ------------------------------------------------------------------ */
 
-interface HistoryRowProps {
-  index: number;
-  style: React.CSSProperties;
-  data: {
-    screenings: ScreeningHistoryItem[];
-    onDelete: (uid: string) => void;
-  };
+interface HistoryRowCustomProps {
+  screenings: ScreeningHistoryItem[];
+  onDelete: (uid: string) => void;
 }
 
-const HistoryRow = memo(function HistoryRow({ index, style, data }: HistoryRowProps) {
-  const { screenings, onDelete } = data;
+function HistoryRow({ index, style, screenings, onDelete }: {
+  ariaAttributes: {
+    'aria-posinset': number;
+    'aria-setsize': number;
+    role: 'listitem';
+  };
+  index: number;
+  style: React.CSSProperties;
+} & HistoryRowCustomProps) {
   const screening = screenings[index];
   if (!screening) return null;
 
@@ -182,7 +185,7 @@ const HistoryRow = memo(function HistoryRow({ index, style, data }: HistoryRowPr
       </div>
     </motion.div>
   );
-});
+}
 
 /* ------------------------------------------------------------------ */
 /*  Main virtualized list                                             */
@@ -209,9 +212,9 @@ export function VirtualizedHistoryList({
 }: VirtualizedHistoryListProps) {
   const height = maxVisibleItems * itemHeight;
 
-  const handleLoadMore = useCallback(
-    ({ visibleStartIndex, visibleStopIndex }: { visibleStartIndex: number; visibleStopIndex: number }) => {
-      if (hasMore && !isLoading && visibleStopIndex >= screenings.length - 3) {
+  const handleRowsRendered = useCallback(
+    (visibleRows: { startIndex: number; stopIndex: number }) => {
+      if (hasMore && !isLoading && visibleRows.stopIndex >= screenings.length - 3) {
         onLoadMore();
       }
     },
@@ -236,23 +239,16 @@ export function VirtualizedHistoryList({
     );
   }
 
-  const rowData = { screenings, onDelete };
-
   return (
     <div style={{ position: 'relative' }}>
-      <List
-        height={height}
-        itemCount={screenings.length}
-        itemSize={itemHeight}
-        width="100%"
-        itemData={rowData}
-        onItemsRendered={handleLoadMore}
-        style={{
-          overflowX: 'hidden',
-        }}
-      >
-        {HistoryRow}
-      </List>
+      <List<HistoryRowCustomProps>
+        style={{ overflowX: 'hidden' }}
+        rowComponent={HistoryRow}
+        rowCount={screenings.length}
+        rowHeight={itemHeight}
+        rowProps={{ screenings, onDelete }}
+        onRowsRendered={handleRowsRendered}
+      />
 
       {/* Load more indicator */}
       {isLoading && hasMore && (

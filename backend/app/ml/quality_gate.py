@@ -27,21 +27,20 @@ Metrics Evaluated
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
 from PIL import Image, ImageFilter, ImageStat
 
-QualityGateResult = Literal["pass", "warn", "reject"]
+QualityGateDecision = Literal["pass", "warn", "reject"]
 
 
 @dataclass(frozen=True)
 class QualityGateIssue:
     """A single quality gate finding."""
     metric: str            # e.g. "blur", "brightness", "noise"
-    severity: QualityGateResult  # "reject" or "warn"
+    severity: QualityGateDecision  # "reject" or "warn"
     value: float           # Measured value
     threshold: float       # Threshold that was crossed
     message: str           # User-facing explanation
@@ -55,7 +54,7 @@ class QualityGateIssue:
 @dataclass(frozen=True)
 class QualityGateResult:
     """Result of the pre-inference quality gate."""
-    decision: QualityGateResult  # "pass", "warn", "reject"
+    decision: QualityGateDecision  # "pass", "warn", "reject"
     overall_score: float         # Composite quality score [0, 1]
     issues: list[QualityGateIssue] = field(default_factory=list)
     metrics: dict[str, float] = field(default_factory=dict)
@@ -437,7 +436,7 @@ class ImageQualityGate:
         warn_issues = [i for i in issues if i.severity == "warn"]
 
         if reject_issues:
-            decision: QualityGateResult = "reject"
+            decision: QualityGateDecision = "reject"
             rejection_reason = self._build_rejection_message(reject_issues)
             can_proceed = False
         elif warn_issues:

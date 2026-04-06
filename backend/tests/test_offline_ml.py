@@ -100,7 +100,6 @@ DATASET_PATH = ROOT / "archive" / "dataset anemia"
 @requires_pillow
 @requires_model
 def test_archive_model_predicts_valid_probability_ranges() -> None:
-    from PIL import Image
     from app.ml.archive_model import load_archive_model, predict_with_archive_model
     from app.ml.features import extract_eye_features, load_image_path
     from app.services.conjunctiva_roi import ConjunctivaRoiExtractor
