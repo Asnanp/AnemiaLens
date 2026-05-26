@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Activity, CheckCircle2, XCircle, Clock, Cpu, Database, Zap, RefreshCw } from 'lucide-react';
+import { endpoint } from '../api';
 
 const FADE_UP = {
   hidden: { opacity: 0, y: 24 },
@@ -21,7 +22,7 @@ interface ReadyzData {
   guidance_fallback_reason?: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://anemialens-backend.onrender.com';
+// Uses dynamic endpoint helper for production routing proxy
 
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -99,8 +100,8 @@ function HealthPanel() {
     setLoading(true);
     try {
       const [h, r] = await Promise.allSettled([
-        fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(8000) }).then(r => r.json()),
-        fetch(`${API_BASE}/readyz`, { signal: AbortSignal.timeout(8000) }).then(r => r.json()),
+        fetch(endpoint('/health'), { signal: AbortSignal.timeout(15000) }).then(res => res.json()),
+        fetch(endpoint('/readyz'), { signal: AbortSignal.timeout(15000) }).then(res => res.json()),
       ]);
       if (h.status === 'fulfilled') setHealth(h.value);
       if (r.status === 'fulfilled') setReadyz(r.value);
@@ -151,9 +152,9 @@ function HealthPanel() {
 }
 
 const ENDPOINT_PINGS = [
-  { label: 'Health Check', url: `${API_BASE}/health`, icon: Activity },
-  { label: 'Readiness Probe', url: `${API_BASE}/readyz`, icon: CheckCircle2 },
-  { label: 'Runtime Status', url: `${API_BASE}/api/runtime-status`, icon: Cpu },
+  { label: 'Health Check', url: endpoint('/health'), icon: Activity },
+  { label: 'Readiness Probe', url: endpoint('/readyz'), icon: CheckCircle2 },
+  { label: 'Runtime Status', url: endpoint('/api/runtime-status'), icon: Cpu },
 ];
 
 export default function StatusPage() {
@@ -183,10 +184,10 @@ export default function StatusPage() {
             <div className="glass" style={{ padding: '2rem', borderRadius: '1.5rem', background: 'rgba(15,23,42,0.03)', border: '1px solid rgba(15,23,42,0.07)' }}>
               <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.3rem', fontWeight: 700, marginBottom: '1.5rem' }}>Platform Info</h3>
               {[
-                { icon: Zap, label: 'Backend Host', value: 'Render.com (Free)' },
+                { icon: Zap, label: 'Backend Host', value: 'Hugging Face Spaces' },
                 { icon: Database, label: 'Database', value: 'Supabase PostgreSQL' },
                 { icon: Cpu, label: 'Primary Model', value: 'Archive Fusion V8' },
-                { icon: Clock, label: 'Cold Start', value: '~30s (free tier)' },
+                { icon: Clock, label: 'Cold Start', value: '60s–120s (sleeping state)' },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -217,8 +218,8 @@ export default function StatusPage() {
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={FADE_UP}
           style={{ padding: '1rem 1.5rem', borderRadius: '0.875rem', background: 'rgba(99,102,241,0.06)',
             border: '1px solid rgba(99,102,241,0.2)', fontSize: '0.75rem', color: '#a5b4fc' }}>
-          ℹ️ The Render free tier spins down after 15 min of inactivity. First request after sleep triggers a ~30s cold start.
-          Subsequent requests are fast once the service is warm.
+          ℹ️ Hugging Face Spaces enter a sleeping state after periods of inactivity. The first request triggers a 60s–120s cold-start boot.
+          Subsequent requests are fast once the Space is warm.
         </motion.div>
       </div>
     </main>

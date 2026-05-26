@@ -48,11 +48,11 @@ function _setWake(s: WakeStatus) {
 }
 
 // ── SILENT WAKE — retry with backoff until backend responds ──────────────────
-// Hugging Face Spaces can cold-start on the first request. Poll aggressively, give up after 150s.
+// Hugging Face Spaces can cold-start on the first request. Poll aggressively, give up after 180s.
 (function silentWake() {
   const url = endpoint('/readyz');
   const INTERVALS = [500, 1000, 2000, 5000, 8000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000];
-  const MAX_MS = 150_000;
+  const MAX_MS = 180_000;
   let elapsed = 0;
   let idx = 0;
 
@@ -64,9 +64,19 @@ function _setWake(s: WakeStatus) {
   };
 
   const ping = () => {
-    fetch(url, { method: 'GET', signal: AbortSignal.timeout(8000) })
-      .then(r => {
-        if (r.ok) _setWake('ready'); else schedule();
+    fetch(url, { method: 'GET', signal: AbortSignal.timeout(30000) })
+      .then(async r => {
+        if (r.ok) {
+          const contentType = r.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await r.json();
+            if (data && (data.status === 'ready' || data.status === 'degraded' || data.model_ready !== undefined)) {
+              _setWake('ready');
+              return;
+            }
+          }
+        }
+        schedule();
       })
       .catch(() => schedule());
   };
@@ -121,8 +131,12 @@ async function compressImage(file: File, maxDim = 4000, maxBytes = 2_000_000): P
 // ── API CALLS ─────────────────────────────────────────────────────────────────
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const r = await fetch(endpoint('/readyz'), { method: 'GET', signal: AbortSignal.timeout(10000) });
-    return r.ok;
+    const r = await fetch(endpoint('/readyz'), { method: 'GET', signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return false;
+    const contentType = r.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return false;
+    const data = await r.json();
+    return !!(data && (data.status === 'ready' || data.status === 'degraded' || data.model_ready !== undefined));
   } catch { return false; }
 }
 

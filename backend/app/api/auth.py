@@ -115,6 +115,7 @@ def _verify_google_id_token(credential: str) -> GoogleIdentity:
     google_client_id = (
         os.getenv("ANEMIALENS_GOOGLE_CLIENT_ID")
         or os.getenv("GOOGLE_CLIENT_ID")
+        or os.getenv("ANEMIALENS_GMAIL_CLIENT_ID")
         or os.getenv("VITE_GOOGLE_CLIENT_ID")
         or GOOGLE_CLIENT_ID
     )
@@ -130,18 +131,29 @@ def _verify_google_id_token(credential: str) -> GoogleIdentity:
             status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    try:
-        response = requests.get(
-            google_tokeninfo_url,
-            params={"id_token": credential},
-            timeout=10,
-        )
-    except requests.RequestException as exc:
-        log.exception("Google token verification request failed")
+    response = None
+    last_exc = None
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                google_tokeninfo_url,
+                params={"id_token": credential},
+                timeout=20 if attempt > 0 else 12,
+            )
+            break
+        except requests.RequestException as exc:
+            log.warning("Google token info fetch attempt %d failed: %s", attempt + 1, exc)
+            last_exc = exc
+            if attempt < 2:
+                import time
+                time.sleep(0.5 * (attempt + 1))
+
+    if response is None:
+        log.exception("Google token verification request failed completely after 3 attempts")
         raise _google_http_error(
             "Google sign-in is temporarily unavailable. Please try again.",
             status.HTTP_502_BAD_GATEWAY,
-        ) from exc
+        ) from last_exc
 
     try:
         raw_payload: dict[str, Any] = response.json()

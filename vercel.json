@@ -9,6 +9,10 @@
       "destination": "https://asnannp-anemialens.hf.space/api/:path*"
     },
     {
+      "source": "/readyz",
+      "destination": "https://asnannp-anemialens.hf.space/readyz"
+    },
+    {
       "source": "/health",
       "destination": "https://asnannp-anemialens.hf.space/health"
     },
