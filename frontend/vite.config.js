@@ -2,6 +2,30 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
+import fs from 'fs';
+import path from 'path';
+function loadEnvFile() {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf-8');
+        content.split('\n').forEach(line => {
+            const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+            if (match) {
+                const key = match[1];
+                let value = (match[2] || '').trim();
+                if (value.startsWith('"') && value.endsWith('"'))
+                    value = value.slice(1, -1);
+                if (value.startsWith("'") && value.endsWith("'"))
+                    value = value.slice(1, -1);
+                // Do not overwrite variables already set in process.env (like from webServer.env)
+                if (!process.env[key]) {
+                    process.env[key] = value;
+                }
+            }
+        });
+    }
+}
+loadEnvFile();
 const apiTarget = process.env.VITE_API_PROXY_TARGET
     ?? process.env.VITE_API_BASE_URL
     ?? 'http://127.0.0.1:8000';
