@@ -290,7 +290,7 @@ async def request_id_middleware(request: Request, call_next):
 
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as exc:
         elapsed_ms = (time.perf_counter() - request.state.started_at) * 1000
         log.exception(
             "%s %s -> %d (%.1fms) [%s]",
@@ -301,7 +301,26 @@ async def request_id_middleware(request: Request, call_next):
             request_id,
             extra={"request_id": request_id},
         )
-        raise
+        
+        # Return structured JSON so that the frontend doesn't crash on plain text errors
+        from sqlalchemy.exc import SQLAlchemyError
+        if isinstance(exc, SQLAlchemyError):
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "error": "Database Unavailable",
+                    "detail": "The database is temporarily offline or connection failed. Please ensure database services are running and restored.",
+                    "request_id": request_id,
+                },
+            )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": "Internal Server Error",
+                "detail": "An unexpected server error occurred. Please try again later.",
+                "request_id": request_id,
+            },
+        )
 
     elapsed_ms = (time.perf_counter() - request.state.started_at) * 1000
     response.headers["X-Request-ID"] = request_id
@@ -338,6 +357,39 @@ app.include_router(email_report_router)
 
 # API v1 — versioned namespace (all routes under /api/v1/*)
 app.include_router(v1_router)
+
+
+# ---------------------------------------------------------------------------
+# Global Exception Handlers
+# ---------------------------------------------------------------------------
+from sqlalchemy.exc import SQLAlchemyError
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    request_id = getattr(request.state, "request_id", "unknown")
+    log.exception("Database error occurred on %s: %s [%s]", request.url.path, exc, request_id)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "error": "Database Unavailable",
+            "detail": "The database is temporarily offline or connection failed. Please ensure database services are running and restored.",
+            "request_id": request_id,
+        },
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, "request_id", "unknown")
+    log.exception("Unhandled error occurred on %s: %s [%s]", request.url.path, exc, request_id)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": "Internal Server Error",
+            "detail": "An unexpected server error occurred. Please try again later.",
+            "request_id": request_id,
+        },
+    )
+
 
 
 # ---------------------------------------------------------------------------

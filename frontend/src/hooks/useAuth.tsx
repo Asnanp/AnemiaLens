@@ -177,8 +177,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Login failed');
+      
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(data.detail || data.error || 'Login failed');
 
       await completeAuth(data as TokenPair);
     } catch (err) {
@@ -198,8 +207,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Google sign-in failed');
+      
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(data.detail || data.error || 'Google sign-in failed');
 
       await completeAuth(data as TokenPair);
     } catch (err) {
@@ -222,8 +240,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, password, full_name: normalizedFullName }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Registration failed');
+      
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(data.detail || data.error || 'Registration failed');
 
       await completeAuth(data as TokenPair);
     } catch (err) {
