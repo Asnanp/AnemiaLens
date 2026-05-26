@@ -104,6 +104,42 @@ class TestBandRouting:
         )
         assert result.band == "moderate_risk"
 
+    def test_low_band_for_demo_like_borderline_signal_without_symptoms(self) -> None:
+        result = SERVICE.assess(
+            _quality(),
+            _prediction(
+                0.385,
+                confidence=0.54,
+                uncertainty=0.357,
+                label="uncertain",
+                predicted_hb=12.74,
+            ),
+            SymptomInput(),
+        )
+        assert result.band == "low_risk"
+
+    def test_mildly_low_hb_alone_does_not_force_moderate(self) -> None:
+        result = SERVICE.assess(
+            _quality(),
+            _prediction(0.30, label="uncertain", predicted_hb=12.4),
+            SymptomInput(),
+        )
+        assert result.band == "low_risk"
+
+    def test_borderline_image_plus_moderate_symptoms_stays_moderate(self) -> None:
+        result = SERVICE.assess(
+            _quality(),
+            _prediction(
+                0.61,
+                confidence=0.514,
+                uncertainty=0.45,
+                label="uncertain",
+                predicted_hb=12.44,
+            ),
+            SymptomInput(fatigue=True, pale_skin=True, poor_diet_low_iron=True),
+        )
+        assert result.band == "moderate_risk"
+
     def test_symptoms_alone_cannot_override_quality_failure(self) -> None:
         """Even with many symptoms, a quality failure must yield uncertain."""
         heavy_symptoms = SymptomInput(

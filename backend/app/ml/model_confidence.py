@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from app.schemas.quality import QualityAssessment
+
 
 @dataclass(frozen=True)
 class ConfidenceComponents:
@@ -420,3 +422,57 @@ def compute_confidence(
         roi_confidence=roi_confidence,
         ensemble_agreement=ensemble_agreement,
     )
+
+
+def _quality_metrics_from_assessment(quality: QualityAssessment) -> dict[str, float]:
+    framing = float(getattr(quality, "framing_score", 0.0))
+    issue_penalty = min(len(getattr(quality, "issues", [])) * 0.12, 0.48)
+    framing_score = min(max(framing / 2.0, 0.0), 1.0)
+    overall_quality = np.mean(
+        [
+            min(quality.blur_score / 200.0, 1.0),
+            max(0.0, 1.0 - abs(quality.brightness_score - 0.35) / 0.35),
+            min(quality.contrast_score / 0.25, 1.0),
+            framing_score,
+            1.0 if quality.passed else 0.25,
+            max(0.0, 1.0 - issue_penalty),
+        ]
+    )
+
+    return {
+        "blur_score": float(quality.blur_score),
+        "brightness": float(quality.brightness_score),
+        "contrast": float(quality.contrast_score),
+        "overall_quality_score": float(np.clip(overall_quality, 0.0, 1.0)),
+        "framing_score": framing_score,
+    }
+
+
+def _capture_quality_score(quality: QualityAssessment) -> float:
+    """Legacy helper kept for tests and older call sites."""
+    return float(
+        get_confidence_scorer()._compute_image_quality_confidence(
+            _quality_metrics_from_assessment(quality)
+        )
+    )
+
+
+def estimate_model_confidence(
+    quality: QualityAssessment,
+    *,
+    raw_risk: float,
+    uncertainty: float,
+    decision_threshold: float = 0.5,
+    roi_confidence: float | None = None,
+    ensemble_agreement: float | None = None,
+) -> float:
+    """Legacy compatibility wrapper around the composite confidence scorer."""
+    result = compute_confidence(
+        anemia_risk=raw_risk,
+        uncertainty=uncertainty,
+        decision_threshold=decision_threshold,
+        quality_metrics=_quality_metrics_from_assessment(quality),
+        roi_confidence=roi_confidence if roi_confidence is not None else min(max(quality.framing_score / 2.0, 0.0), 1.0),
+        ensemble_agreement=ensemble_agreement,
+    )
+    return float(result.composite_confidence)

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   motion,
@@ -102,103 +102,38 @@ const HERO_STAGE_DETAILS = [
   },
 ] as const;
 
-/* ────────── Parallax orbs for hero background ────────── */
-
-function ParallaxOrbs({ reduceMotion }: { reduceMotion: boolean }) {
-  const orb1 = useParallax({ speed: 0.15, spring: 'gentle', range: [-120, 120] });
-  const orb2 = useParallax({ speed: 0.25, spring: 'gentle', range: [-180, 180] });
-  const orb3 = useParallax({ speed: 0.1, spring: 'gentle', range: [-80, 80] });
-  const orb4 = useParallax({ speed: 0.35, spring: 'gentle', range: [-250, 250] });
-  const orb5 = useParallax({ speed: 0.2, spring: 'gentle', range: [-150, 150] });
-
-  if (reduceMotion) return null;
-
-  return (
-    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-      {/* Crimson orb – top-left, slow drift */}
-      <motion.div
-        ref={orb1.ref}
-        style={{
-          y: orb1.y,
-          position: 'absolute',
-          top: '8%',
-          left: '5%',
-          width: 280,
-          height: 280,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(200,0,30,0.12) 0%, rgba(200,0,30,0.05) 30%, rgba(200,0,30,0.01) 50%, transparent 75%)',
-        }}
-        animate={orbitalFloat({ amplitude: 14, duration: 8 })}
-      />
-
-      {/* Teal orb – mid-right, medium drift */}
-      <motion.div
-        ref={orb2.ref}
-        style={{
-          y: orb2.y,
-          position: 'absolute',
-          top: '25%',
-          right: '8%',
-          width: 200,
-          height: 200,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(94,234,212,0.10) 0%, rgba(94,234,212,0.04) 30%, rgba(94,234,212,0.01) 50%, transparent 75%)',
-        }}
-        animate={orbitalFloat({ amplitude: 10, duration: 11 })}
-      />
-
-      {/* Rose/pink orb – bottom-left, gentle float */}
-      <motion.div
-        ref={orb3.ref}
-        style={{
-          y: orb3.y,
-          position: 'absolute',
-          bottom: '15%',
-          left: '12%',
-          width: 160,
-          height: 160,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(255,107,138,0.09) 0%, rgba(255,107,138,0.03) 40%, transparent 80%)',
-        }}
-        animate={orbitalFloat({ amplitude: 8, duration: 13 })}
-      />
-
-      {/* Violet orb – top-right, fast parallax */}
-      <motion.div
-        ref={orb4.ref}
-        style={{
-          y: orb4.y,
-          position: 'absolute',
-          top: '5%',
-          right: '18%',
-          width: 140,
-          height: 140,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, rgba(139,92,246,0.03) 40%, transparent 80%)',
-        }}
-        animate={orbitalFloat({ amplitude: 16, duration: 9 })}
-      />
-
-      {/* Accent small orb – center-left, subtle */}
-      <motion.div
-        ref={orb5.ref}
-        style={{
-          y: orb5.y,
-          position: 'absolute',
-          top: '55%',
-          left: '3%',
-          width: 100,
-          height: 100,
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(200,0,30,0.08) 0%, rgba(200,0,30,0.02) 40%, transparent 80%)',
-        }}
-        animate={orbitalFloat({ amplitude: 6, duration: 15 })}
-      />
-    </div>
-  );
-}
-
 /* ────────── Letter-by-letter headline component ────────── */
+
+const containerVariant = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const lineVariant = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.025,
+    },
+  },
+};
+
+const charVariant = {
+  hidden: { opacity: 0, y: 15, filter: 'blur(4px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { ease: [0.16, 1, 0.3, 1], duration: 0.5 },
+  },
+};
 
 function AnimatedHeadline() {
   const reduceMotion = useReducedMotion();
@@ -208,39 +143,32 @@ function AnimatedHeadline() {
     { text: 'lower-eyelid image.', accent: true },
   ];
 
-  let charIndex = 0;
-
+  if (reduceMotion) {
+    return (
+      <h1 className="home-hero-title">
+        <span className="home-hero-title-line">Safer anemia screening</span>
+        <span className="home-hero-title-line">from one guided</span>
+        <span className="home-hero-title-line home-hero-title-accent">lower-eyelid image.</span>
+      </h1>
+    );
+  }
+  
   return (
     <motion.h1
       className="home-hero-title"
-      initial={{ opacity: 0 }}
+      initial={{ opacity: 1 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
     >
       {lines.map((line, lineIdx) => (
-        <span
-          key={lineIdx}
+        <motion.span 
+          key={lineIdx} 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 + lineIdx * 0.15, duration: 0.8, ease: E }}
           className={`home-hero-title-line ${line.accent ? 'home-hero-title-accent' : ''}`}
         >
-          {line.text.split('').map((char) => {
-            const i = charIndex++;
-            return (
-              <motion.span
-                key={`${lineIdx}-${i}`}
-                initial={reduceMotion ? false : { opacity: 0, y: 20, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{
-                  duration: 0.4,
-                  delay: reduceMotion ? 0 : 0.15 + i * 0.022,
-                  ease: E,
-                }}
-                style={{ display: 'inline-block', whiteSpace: char === ' ' ? 'pre' : undefined }}
-              >
-                {char}
-              </motion.span>
-            );
-          })}
-        </span>
+          {line.text}
+        </motion.span>
       ))}
     </motion.h1>
   );
@@ -266,14 +194,13 @@ export function Hero() {
   const shellY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 80]);
   const shellOpacity = useTransform(scrollYProgress, [0, 0.85], [1, reduceMotion ? 1 : 0.7]);
   const shellScale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 0.98]);
-  const metricsY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 35]);
   const supportY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 48]);
   const stageY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 60]);
   const activeStageDetail = HERO_STAGE_DETAILS[activeStage];
 
   const frameGlow = useMotionTemplate`
-    radial-gradient(circle at ${pointerXSpring}% ${pointerYSpring}%, rgba(94, 234, 212, 0.08), transparent 44%),
-    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))
+    radial-gradient(circle at ${pointerXSpring}% ${pointerYSpring}%, rgba(94, 234, 212, 0.12), transparent 44%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))
   `;
 
   const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -299,9 +226,6 @@ export function Hero() {
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
-      {/* ── Parallax orbs (scroll-driven depth) ── */}
-      <ParallaxOrbs reduceMotion={reduceMotion ?? false} />
-
       {/* ── Liquid ambient gradient background ── */}
       <motion.div
         aria-hidden="true"

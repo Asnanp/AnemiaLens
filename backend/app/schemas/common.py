@@ -82,6 +82,7 @@ ModelSource = Literal[
     "heuristic-demo",
     "ensemble",
     "missing-model",
+    "validation_failed",
 ]
 DecisionProcessingPath = Literal["roi_crop", "full_frame_rescue", "quality_blocked"]
 CalibrationBand = Literal[

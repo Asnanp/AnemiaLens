@@ -46,6 +46,7 @@ const WorkflowStepper = lazy(async () => ({ default: (await loadLandingSections(
 const Footer = lazy(async () => ({ default: (await loadLandingSections()).Footer }));
 const loadSupabaseTest = () => import('./components/SupabaseTest');
 const SupabaseTest = lazy(async () => ({ default: (await loadSupabaseTest()).SupabaseTest }));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const NAV_LINKS = [
   { labelKey: 'common.science', path: '/science' },
@@ -56,8 +57,8 @@ const NAV_LINKS = [
 const DEMO_CASES = [
   {
     id: 'low-risk-demo',
-    label: 'Low risk',
-    note: 'Balanced lighting and a cleaner lower-eyelid capture.',
+    label: 'Reference case A',
+    note: 'Balanced capture profile for baseline walkthrough testing.',
     imageUrl: '/demo-cases/low-risk-demo.jpg',
     symptoms: {
       fatigue: false,
@@ -70,8 +71,8 @@ const DEMO_CASES = [
   },
   {
     id: 'moderate-risk-demo',
-    label: 'Moderate',
-    note: 'A more borderline image-led screening with mild symptom context.',
+    label: 'Reference case B',
+    note: 'Borderline-leaning capture profile for workflow validation.',
     imageUrl: '/demo-cases/moderate-risk-demo.jpg',
     symptoms: {
       fatigue: true,
@@ -84,8 +85,8 @@ const DEMO_CASES = [
   },
   {
     id: 'high-concern-demo',
-    label: 'High concern',
-    note: 'A stronger pallor-like signal with heavier symptom burden.',
+    label: 'Reference case C',
+    note: 'Stress-case profile with heavier symptom context for QA testing.',
     imageUrl: '/demo-cases/high-concern-demo.jpg',
     symptoms: {
       fatigue: true,
@@ -342,7 +343,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
               )}
               <LanguageSwitcher variant="inline" />
               <a className="btn btn-primary nav-primary-cta" href="/#screening" style={{ textDecoration: 'none' }}>
-                {t('screening.startScreening')} <ArrowRight size={12} />
+                {t('common.startScreening')} <ArrowRight size={12} />
               </a>
             </div>
           ) : (
@@ -408,8 +409,8 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                     </button>
                   </div>
                 )}
-            {isAuthenticated && (
-              <div className="nav-mobile-actions">
+                {isAuthenticated && (
+                  <div className="nav-mobile-actions">
                     <button
                       className="btn btn-glass nav-mobile-action"
                       onMouseEnter={() => { void loadDashboardPage(); }}
@@ -428,7 +429,7 @@ function Navbar({ backendUp }: { backendUp: boolean }) {
                 )}
                 <button className="btn btn-primary nav-mobile-cta"
                   onClick={() => { setMenuOpen(false); scrollTo('screening'); }}>
-                  {t('screening.startScreening')}
+                  {t('common.startScreening')}
                 </button>
               </div>
             </motion.div>
@@ -891,6 +892,11 @@ function AppContent() {
           <Route path="/science" element={<Science />} />
           <Route path="/providers" element={<ForProviders />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="*" element={
+            <Suspense fallback={<SectionFallback minHeight={400} />}>
+              <NotFoundPage />
+            </Suspense>
+          } />
         </Routes>
       </main>
       <Suspense fallback={null}>

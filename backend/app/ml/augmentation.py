@@ -256,7 +256,12 @@ class ConjunctivaAugmenter:
         from app.ml.lighting_norm import normalize_illumination  # local import keeps circularity safe
 
         strength = random.uniform(*correction_fraction_range)
-        corrected, _ = normalize_illumination(image, clahe_strength=strength, grey_world_alpha=strength * 0.55)
+        corrected, _ = normalize_illumination(
+            image,
+            clahe_strength=strength,
+            grey_world_alpha=strength * 0.55,
+            return_score=True,
+        )
         return corrected
 
 

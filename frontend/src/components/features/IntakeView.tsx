@@ -1,11 +1,12 @@
 import { Activity, Droplets, Eye, HeartPulse, UserRound, UtensilsCrossed, Wind, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton, SkeletonText } from '../ui/Skeleton';
 import type { PatientProfileInput, SymptomInput } from '../../types';
 import { MagneticButton } from '../MagneticButton';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
@@ -49,6 +50,128 @@ function humanizeList(items: string[]) {
   if (items.length === 1) return items[0];
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+// Sub-component for 3D tilting Symptom Cards
+function SymptomCard({ 
+  symptomKey, 
+  active, 
+  icon, 
+  label, 
+  t, 
+  toggleSymptom 
+}: { 
+  symptomKey: string; 
+  active: boolean; 
+  icon: React.ReactNode; 
+  label: string; 
+  t: any; 
+  toggleSymptom: (key: any) => void; 
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const x = useMotionValue(0.5);
+  const y = useMotionValue(0.5);
+  const pointerXSpring = useSpring(x, { stiffness: 300, damping: 30 });
+  const pointerYSpring = useSpring(y, { stiffness: 300, damping: 30 });
+
+  const rotateX = useTransform(pointerYSpring, [0, 1], [12, -12]);
+  const rotateY = useTransform(pointerXSpring, [0, 1], [-12, 12]);
+  const glareX = useTransform(pointerXSpring, [0, 1], [-100, 200]);
+  const glareY = useTransform(pointerYSpring, [0, 1], [-100, 200]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    x.set((e.clientX - rect.left) / rect.width);
+    y.set((e.clientY - rect.top) / rect.height);
+  }, [x, y]);
+
+  return (
+    <motion.button
+      ref={ref}
+      type="button"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => {
+        x.set(0.5);
+        y.set(0.5);
+      }}
+      whileTap={{ scale: 0.96 }}
+      variants={{
+        hidden: { opacity: 0, y: 15 },
+        show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+      }}
+      onClick={() => toggleSymptom(symptomKey)}
+      style={{
+        rotateX,
+        rotateY,
+        transformStyle: 'preserve-3d',
+        perspective: 1000,
+        textAlign: 'left',
+        padding: '1rem',
+        borderRadius: '1rem',
+        border: active ? '1px solid rgba(200,0,30,0.4)' : '1px solid rgba(255,255,255,0.08)',
+        background: active ? 'linear-gradient(135deg, rgba(200,0,30,0.12), rgba(200,0,30,0.04))' : 'rgba(255,255,255,0.025)',
+        boxShadow: active ? '0 10px 30px -10px rgba(200,0,30,0.3)' : '0 10px 30px -10px rgba(0,0,0,0.3)',
+        cursor: 'pointer',
+        display: 'grid',
+        gap: '0.65rem',
+        position: 'relative',
+        overflow: 'hidden',
+        transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
+      }}
+    >
+      {/* Dynamic Specular Glare */}
+      <motion.div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(circle at center, rgba(255,255,255,0.1), transparent 50%)',
+          x: glareX,
+          y: glareY,
+          pointerEvents: 'none',
+          transform: 'translateZ(20px)',
+        }}
+      />
+      
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', transform: 'translateZ(30px)' }}>
+        <motion.div 
+          initial={false}
+          animate={{ scale: active ? [1, 1.15, 1] : 1 }}
+          transition={{ duration: 0.4 }}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: active ? 'rgba(200,0,30,0.2)' : 'rgba(255,255,255,0.06)',
+            color: active ? 'var(--accent-bright)' : 'var(--text-dim)',
+            boxShadow: active ? 'inset 0 0 10px rgba(200,0,30,0.4), 0 0 15px rgba(200,0,30,0.3)' : 'inset 0 1px 1px rgba(255,255,255,0.1)',
+          }}
+        >
+          {icon}
+        </motion.div>
+        <div style={{
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          border: active ? '1px solid rgba(200,0,30,0.5)' : '1px solid rgba(255,255,255,0.15)',
+          background: active ? 'var(--accent-bright)' : 'transparent',
+          boxShadow: active ? '0 0 14px rgba(200,0,30,0.6), inset 0 0 4px rgba(0,0,0,0.5)' : 'none',
+        }} />
+      </div>
+      <div style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.4, transform: 'translateZ(20px)', color: active ? '#FFF' : 'var(--text-muted)' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: active ? 'var(--accent-bright)' : 'var(--text-dim)', transform: 'translateZ(10px)' }}>
+        {active ? t('intake.includedInTriage') : t('intake.tapToInclude')}
+      </div>
+    </motion.button>
+  );
 }
 
 // Skeleton form fields for intake preparation loading state
@@ -420,62 +543,15 @@ export function IntakeView({
             const active = symptoms[key] === true;
             const icon = SYMPTOM_ICONS[key as string] ?? <HeartPulse size={16} />;
             return (
-              <motion.button
+              <SymptomCard
                 key={key}
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                variants={{
-                  hidden: { opacity: 0, y: 15 },
-                  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
-                }}
-                onClick={() => toggleSymptom(key)}
-                style={{
-                  textAlign: 'left',
-                  padding: '1rem',
-                  borderRadius: '1rem',
-                  border: active ? '1px solid rgba(200,0,30,0.3)' : '1px solid rgba(255,255,255,0.08)',
-                  background: active ? 'rgba(200,0,30,0.08)' : 'rgba(255,255,255,0.025)',
-                  cursor: 'pointer',
-                  display: 'grid',
-                  gap: '0.65rem',
-                  transition: 'border-color 0.22s ease, background 0.22s ease',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <motion.div 
-                    initial={false}
-                    animate={{ scale: active ? [1, 1.15, 1] : 1 }}
-                    transition={{ duration: 0.4 }}
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: '0.85rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: active ? 'rgba(200,0,30,0.16)' : 'rgba(255,255,255,0.05)',
-                      color: active ? 'var(--accent-bright)' : 'var(--text-dim)',
-                    }}
-                  >
-                    {icon}
-                  </motion.div>
-                  <div style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    border: active ? '1px solid rgba(200,0,30,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                    background: active ? 'rgba(200,0,30,0.22)' : 'transparent',
-                    boxShadow: active ? '0 0 14px rgba(200,0,30,0.18)' : 'none',
-                  }} />
-                </div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.4 }}>
-                  {symptomLabels[key]}
-                </div>
-                <div style={{ fontSize: '0.58rem', fontFamily: 'var(--mono)', letterSpacing: '0.12em', textTransform: 'uppercase', color: active ? 'var(--accent-bright)' : 'var(--text-dim)' }}>
-                  {active ? t('intake.includedInTriage') : t('intake.tapToInclude')}
-                </div>
-              </motion.button>
+                symptomKey={key}
+                active={active}
+                icon={icon}
+                label={symptomLabels[key]}
+                t={t}
+                toggleSymptom={toggleSymptom}
+              />
             );
           })}
         </motion.div>

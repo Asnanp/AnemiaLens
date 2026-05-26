@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import IssueCode
 
@@ -69,6 +69,42 @@ class QualityAssessment(BaseModel):
         description="Estimated risk that shadows or underexposure are hiding useful signal.",
     )
     issues: list[QualityIssue] = Field(default_factory=list)
+
+    @field_validator("issues", mode="before")
+    @classmethod
+    def _coerce_legacy_issues(cls, value: object) -> object:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            return value
+
+        def from_string(raw: str) -> dict[str, str]:
+            normalized = raw.strip().lower().replace("-", "_").replace(" ", "_")
+            if normalized in {"blurry", "blur", "soft"}:
+                return {
+                    "code": "blur_detected",
+                    "severity": "blocking",
+                    "title": "Image looks blurry",
+                    "message": "Hold steady, tap to focus, and retake the photo without motion.",
+                }
+            if normalized in {"overexposed", "glare", "bright", "poor_lighting"}:
+                return {
+                    "code": "poor_lighting",
+                    "severity": "blocking",
+                    "title": "Lighting is not usable",
+                    "message": "Use bright, even light without flash glare or heavy shadows.",
+                }
+            return {
+                "code": "poor_lighting",
+                "severity": "warning",
+                "title": "Capture quality warning",
+                "message": raw.strip() or "Review the capture quality before screening.",
+            }
+
+        coerced: list[object] = []
+        for item in value:
+            coerced.append(from_string(item) if isinstance(item, str) else item)
+        return coerced
 
     @cached_property
     def blocking_issues(self) -> list[QualityIssue]:

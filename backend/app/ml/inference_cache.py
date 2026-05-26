@@ -38,7 +38,7 @@ from PIL import Image
 log = logging.getLogger("anemialens.cache")
 
 
-@dataclass(frozen=True)
+@dataclass
 class CacheEntry:
     """A single cached prediction result."""
     image_hash: str
@@ -50,7 +50,7 @@ class CacheEntry:
     quality_metrics: dict[str, float] = field(default_factory=dict)
 
 
-@dataclass(frozen=True)
+@dataclass
 class FeatureCacheEntry:
     """Cached feature extraction result."""
     image_hash: str
@@ -257,8 +257,8 @@ class InferenceCache:
     def put(
         self,
         image_hash: str,
-        phash: int,
-        prediction: dict[str, Any],
+        phash: int | dict[str, Any],
+        prediction: dict[str, Any] | None = None,
         model_version: str = "",
         quality_metrics: dict[str, float] | None = None,
         ahash: int | None = None,
@@ -275,6 +275,13 @@ class InferenceCache:
         quality_metrics : Quality metrics at prediction time
         ahash : Average hash for fast pre-filtering
         """
+        if prediction is None and isinstance(phash, dict):
+            prediction = phash
+            phash = 0
+
+        if prediction is None:
+            raise ValueError("prediction payload is required when phash is provided explicitly")
+
         now = time.time()
 
         # Evict if at capacity
@@ -283,7 +290,7 @@ class InferenceCache:
 
         entry = CacheEntry(
             image_hash=image_hash,
-            phash=phash,
+            phash=int(phash),
             prediction=prediction,
             timestamp=now,
             model_version=model_version,
@@ -553,3 +560,8 @@ def get_cached_features(
     cache = get_inference_cache()
     image_hash = cache.compute_hash(image)
     return cache.get_cached_features(image_hash, config_hash)
+
+
+def _compute_image_hash(image: Image.Image) -> str:
+    """Legacy helper preserved for existing tests and scripts."""
+    return get_inference_cache().compute_hash(image)

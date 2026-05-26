@@ -17,8 +17,8 @@ from playwright.sync_api import Page, expect, BrowserContext
 from pathlib import Path
 
 # Test configuration
-BASE_URL = "http://localhost:5173"
-API_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:3000"
+API_URL = "http://localhost:5000"
 TIMEOUT = 30000  # 30 seconds for slow operations
 
 

@@ -303,7 +303,7 @@ class Settings(BaseSettings):
 
     # --- Triage band thresholds ------------------------------------------
     high_concern_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
-    moderate_risk_threshold: float = Field(default=0.40, ge=0.0, le=1.0)
+    moderate_risk_threshold: float = Field(default=0.28, ge=0.0, le=1.0)
 
     # --- Request validation ----------------------------------------------
     max_field_length: int = Field(default=48, ge=8, le=512)

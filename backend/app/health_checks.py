@@ -882,6 +882,37 @@ class MetricsCollector:
                 "collected_at": time.time(),
             }
 
+    async def get_metrics_dict(self) -> dict[str, Any]:
+        """Backward-compatible metrics payload expected by older tests/tools."""
+        summary = await self.get_summary()
+        return {
+            "request": summary["requests"],
+            "inference": summary["inference"],
+            "cache": summary["cache"],
+            "users": summary["users"],
+            "endpoint": summary["endpoints"],
+            "internal": summary["internal"],
+            "collected_at": summary["collected_at"],
+        }
+
+    async def reset(self) -> None:
+        """Clear in-memory counters for test isolation and diagnostics."""
+        async with self._lock:
+            self._request_count = 0
+            self._request_errors = 0
+            self._request_latencies.clear()
+            self._request_latencies_sum = 0.0
+
+            self._inference_count = 0
+            self._inference_errors = 0
+            self._inference_latencies.clear()
+            self._inference_latencies_sum = 0.0
+
+            self._cache_hits = 0
+            self._cache_misses = 0
+            self._active_users.clear()
+            self._endpoint_metrics.clear()
+
     async def get_prometheus_format(self) -> str:
         """Export metrics in Prometheus text exposition format."""
         summary = await self.get_summary()

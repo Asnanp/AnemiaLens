@@ -4,13 +4,13 @@ import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 // Mock i18n
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
+  useTranslation: vi.fn(() => ({
     i18n: {
       language: 'en',
       changeLanguage: vi.fn(),
     },
-  }),
-  initReactI18next: {},
+  })),
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
 // Mock lucide-react
@@ -133,7 +133,6 @@ describe('LanguageSwitcher', () => {
       await user.click(toggle);
 
       // Active language should have a check icon
-      const englishButton = screen.getByRole('button', { name: '' }).closest('button');
       expect(screen.getByTestId('check-icon')).toBeInTheDocument();
     });
 

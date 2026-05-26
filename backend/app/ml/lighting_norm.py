@@ -55,7 +55,8 @@ def normalize_illumination(
     *,
     clahe_strength: float = 1.0,
     grey_world_alpha: float = _GREY_WORLD_ALPHA,
-) -> tuple[Image.Image, float]:
+    return_score: bool = False,
+) -> Image.Image | tuple[Image.Image, float]:
     """
     Apply illumination normalization and return (corrected_image, lighting_score).
 
@@ -101,7 +102,9 @@ def normalize_illumination(
     lighting_score = _compute_lighting_score(np.asarray(image.convert("RGB"), dtype=np.uint8))
 
     corrected = Image.fromarray(rgb, mode="RGB")
-    return corrected, lighting_score
+    if return_score:
+        return corrected, lighting_score
+    return corrected
 
 
 def classify_lighting(image: Image.Image) -> str:
@@ -146,7 +149,9 @@ def compute_illumination_bias(image: Image.Image) -> dict[str, float]:
     r = rgb[:, :, 0]
     b = rgb[:, :, 2]
     rb_sum = r + b
-    spectral_tilt_rb = float(np.where(rb_sum > 0, (r - b) / rb_sum, 0.0).mean())
+    spectral_tilt = np.zeros_like(r, dtype=np.float32)
+    np.divide(r - b, rb_sum, out=spectral_tilt, where=rb_sum > 0)
+    spectral_tilt_rb = float(spectral_tilt.mean())
 
     n_pixels = rgb.shape[0] * rgb.shape[1]
     highlight_fraction = float(np.any(rgb > 230, axis=2).sum() / max(n_pixels, 1))
@@ -160,6 +165,8 @@ def compute_illumination_bias(image: Image.Image) -> dict[str, float]:
     clahe_gain = float(abs(l_clahe.mean() - l_orig.mean()) / 255.0)
 
     return {
+        "mean": mean_l,
+        "bias": spectral_tilt_rb,
         "illumination_mean": mean_l,
         "illumination_std": std_l,
         "spectral_tilt_rb": spectral_tilt_rb,

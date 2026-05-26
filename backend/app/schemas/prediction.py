@@ -50,11 +50,11 @@ class PredictionResult(BaseModel):
     model_source: ModelSource = Field(
         description="Which model or pipeline produced this prediction."
     )
-    confidence_breakdown: dict[str, float | bool | str] | None = Field(
+    confidence_breakdown: dict[str, object] | None = Field(
         default=None,
         description="Decomposed confidence view covering capture quality, model stability, threshold stability, and guardrail effects.",
     )
-    xai_data: dict[str, str | dict[str, float] | list[float] | list[dict[str, float]]] | None = Field(
+    xai_data: dict[str, str | dict[str, float | list[float]] | list[float] | list[dict[str, float | list[float] | str]]] | None = Field(
         default=None,
         description="Explainable AI data including Grad-CAM heatmaps, bounding boxes, and Conjunctiva Pallor Analysis."
     )

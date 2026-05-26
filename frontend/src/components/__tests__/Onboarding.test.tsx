@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Onboarding } from '../Onboarding';
 
@@ -13,6 +13,15 @@ vi.mock('framer-motion', async () => {
       ),
       button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
         <button {...props}>{children}</button>
+      ),
+      h2: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { children?: React.ReactNode }) => (
+        <h2 {...props}>{children}</h2>
+      ),
+      p: ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement> & { children?: React.ReactNode }) => (
+        <p {...props}>{children}</p>
+      ),
+      li: ({ children, ...props }: React.LiHTMLAttributes<HTMLLIElement> & { children?: React.ReactNode }) => (
+        <li {...props}>{children}</li>
       ),
     },
     AnimatePresence: ({ children, mode }: { children: React.ReactNode; mode?: string }) => children,
@@ -109,21 +118,21 @@ describe('Onboarding', () => {
     const startButton = screen.getByRole('button', { name: /start screening/i });
     await user.click(startButton);
 
-    expect(mockComplete).toHaveBeenCalled();
+    await waitFor(() => expect(mockComplete).toHaveBeenCalled());
   });
 
   it('calls onSkip when Skip is clicked', async () => {
     render(<Onboarding onComplete={mockComplete} onSkip={mockSkip} />);
     const skipButton = screen.getByRole('button', { name: /skip onboarding/i });
     await user.click(skipButton);
-    expect(mockSkip).toHaveBeenCalled();
+    await waitFor(() => expect(mockSkip).toHaveBeenCalled());
   });
 
   it('calls onComplete when Close button is clicked', async () => {
     render(<Onboarding onComplete={mockComplete} onSkip={mockSkip} />);
     const closeButton = screen.getByRole('button', { name: /close onboarding/i });
     await user.click(closeButton);
-    expect(mockComplete).toHaveBeenCalled();
+    await waitFor(() => expect(mockComplete).toHaveBeenCalled());
   });
 
   it('navigates back when back button is clicked', async () => {

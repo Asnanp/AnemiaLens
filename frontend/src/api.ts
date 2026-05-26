@@ -50,7 +50,7 @@ function _setWake(s: WakeStatus) {
 // ── SILENT WAKE — retry with backoff until backend responds ──────────────────
 // Hugging Face Spaces can cold-start on the first request. Poll aggressively, give up after 150s.
 (function silentWake() {
-  const url = endpoint('/health');
+  const url = endpoint('/readyz');
   const INTERVALS = [500, 1000, 2000, 5000, 8000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000];
   const MAX_MS = 150_000;
   let elapsed = 0;
@@ -65,7 +65,9 @@ function _setWake(s: WakeStatus) {
 
   const ping = () => {
     fetch(url, { method: 'GET', signal: AbortSignal.timeout(8000) })
-      .then(r => { if (r.ok) _setWake('ready'); else schedule(); })
+      .then(r => {
+        if (r.ok) _setWake('ready'); else schedule();
+      })
       .catch(() => schedule());
   };
 
@@ -119,7 +121,7 @@ async function compressImage(file: File, maxDim = 4000, maxBytes = 2_000_000): P
 // ── API CALLS ─────────────────────────────────────────────────────────────────
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const r = await fetch(endpoint('/health'), { method: 'GET', signal: AbortSignal.timeout(10000) });
+    const r = await fetch(endpoint('/readyz'), { method: 'GET', signal: AbortSignal.timeout(10000) });
     return r.ok;
   } catch { return false; }
 }
@@ -170,7 +172,7 @@ export async function analyzeScreening(
     method: 'POST',
     body: form,
     headers: authHeaders(),
-    signal: AbortSignal.timeout(90000), // 90s — Mistral can be slow
+    signal: AbortSignal.timeout(90000),
   });
   if (!r.ok) {
     let msg = 'Screening request failed.';

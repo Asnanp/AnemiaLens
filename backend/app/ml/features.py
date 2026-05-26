@@ -283,6 +283,7 @@ def extract_eye_features(
     *,
     apply_lighting_norm: bool = True,
     lighting_norm_strength: float = 1.0,
+    include_extended: bool = False,
 ) -> dict[str, float]:
     """
     Extract all engineered features from a conjunctiva image.
@@ -306,6 +307,7 @@ def extract_eye_features(
         image, _lighting_score = normalize_illumination(
             image,
             clahe_strength=lighting_norm_strength,
+            return_score=True,
         )
 
     normalized = image.resize((160, 160))
@@ -402,7 +404,7 @@ def extract_eye_features(
     # ── v7 Vascular pattern features ────────────────────────────────────────
     vascular_features = _extract_vascular_features(normalized, center, grayscale)
 
-    return {
+    base_features = {
         # RGB
         "mean_r": mean_r,
         "mean_g": mean_g,
@@ -469,6 +471,12 @@ def extract_eye_features(
         **lab_features,
         # v7 advanced color
         **advanced_color_features,
+    }
+    if not include_extended:
+        return base_features
+
+    return {
+        **base_features,
         # v7 texture (LBP, edge, symmetry, vascular)
         **lbp_features,
         **edge_features,
@@ -889,7 +897,12 @@ def _extract_symmetry_features(image: Image.Image, grayscale: Image.Image) -> di
                         left_idx = y * img_w + x
                         right_idx = (img_h - 1 - y) * img_w + x
                     if left_idx < len(pixels) and right_idx < len(pixels):
-                        total_diff += abs(pixels[left_idx] - pixels[right_idx])
+                        p_left = pixels[left_idx]
+                        p_right = pixels[right_idx]
+                        if isinstance(p_left, tuple):
+                            total_diff += sum(abs(a - b) for a, b in zip(p_left, p_right)) / len(p_left)
+                        else:
+                            total_diff += abs(p_left - p_right)
                         count += 1
             if count == 0:
                 return 0.5
@@ -1184,7 +1197,7 @@ def extract_ultimate_clinical_features(
     age: int | None = None,
     sex: str = "not_specified",
 ) -> dict[str, float]:
-    base = extract_eye_features(image)
+    base = extract_eye_features(image, include_extended=True)
 
     red_mean = float(base.get("center_mean_r", base.get("mean_r", 0.0))) * 255.0
     green_mean = float(base.get("center_mean_g", base.get("mean_g", 0.0))) * 255.0
@@ -1350,7 +1363,7 @@ def extract_v8_clinical_features(
     sex: str = "not_specified",
     source_hint: str = "roi_original",
 ) -> dict[str, float]:
-    base = extract_eye_features(image)
+    base = extract_eye_features(image, include_extended=True)
     clinical = extract_ultimate_clinical_features(
         image,
         quality,
@@ -1466,11 +1479,14 @@ def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
-def framing_score(feature_map: dict[str, float]) -> float:
+def framing_score(feature_map: Image.Image | dict[str, float]) -> float:
+    if isinstance(feature_map, Image.Image):
+        feature_map = extract_eye_features(feature_map)
     center_detail_ratio = feature_map["center_blur_score"] / max(feature_map["blur_score"], 1e-6)
     center_focus = feature_map["center_contrast"] / max(feature_map["contrast"], 1e-6)
     redness_signal = max(0.0, feature_map["center_red_green_gap"] + 0.06) * 4.0
-    return center_detail_ratio + (center_focus * 0.5) + redness_signal
+    geometry_signal = max(float(feature_map.get("aspect_ratio", 1.0)), 0.25) * 0.08
+    return center_detail_ratio + (center_focus * 0.5) + redness_signal + geometry_signal
 
 
 def edge_blur_baseline(image: Image.Image) -> float:

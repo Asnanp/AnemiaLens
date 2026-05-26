@@ -64,8 +64,18 @@ class ImageQualityService:
         )
 
         issues: list[QualityIssue] = []
+        eye_visibility_score = self._eye_visibility_score(feature_map, frame_score, roi_extracted=roi.extracted)
+        visibility_threshold = 0.52 if roi.extracted else 0.66
+        full_frame_viable = (
+            not roi.extracted
+            and eye_visibility_score >= 0.72
+            and frame_score >= 1.75
+            and blur_score >= max(self.blur_block_threshold, 85.0)
+            and contrast_score >= max(self.full_contrast_block, 0.10)
+            and 0.14 <= brightness_score <= 0.65
+        )
 
-        if not roi.extracted:
+        if not roi.extracted and not full_frame_viable and eye_visibility_score >= visibility_threshold:
             issues.append(
                 QualityIssue(
                     code="inner_eye_not_detected",
@@ -74,7 +84,7 @@ class ImageQualityService:
                     message="The app could not locate a trustworthy lower inner-eyelid region. Retake with one exposed inner eyelid filling the frame.",
                 )
             )
-        elif roi_confidence < 0.62:
+        elif roi.extracted and roi_confidence < 0.62:
             issues.append(
                 QualityIssue(
                     code="inner_eye_not_detected",
@@ -103,9 +113,7 @@ class ImageQualityService:
                 )
             )
 
-        eye_visibility_score = self._eye_visibility_score(feature_map, frame_score, roi_extracted=roi.extracted)
-        visibility_threshold = 0.52 if roi.extracted else 0.66
-        if eye_visibility_score < visibility_threshold:
+        if eye_visibility_score < visibility_threshold and not full_frame_viable:
             issues.append(
                 QualityIssue(
                     code="eye_not_visible",
@@ -421,7 +429,7 @@ class ImageQualityService:
         issues: list[QualityIssue],
         *,
         roi_extracted: bool,
-        roi_confidence: float,
+        roi_confidence: float = 1.0,
         blur_score: float,
         brightness_score: float,
         contrast_score: float,
@@ -463,7 +471,9 @@ class ImageQualityService:
         ):
             return False
         blocking_codes = {issue.code for issue in assessment.issues if issue.severity == "blocking"}
-        return blocking_codes == {"poor_lighting"}
+        return bool(blocking_codes) and blocking_codes.issubset(
+            {"bad_framing", "eye_not_visible", "poor_lighting"}
+        )
 
     def build_raw_frame_rescue_assessment(self, assessment: QualityAssessment) -> QualityAssessment:
         if not self.allows_raw_frame_rescue(assessment):
@@ -493,7 +503,7 @@ class ImageQualityService:
         issues: list[QualityIssue],
         *,
         roi_extracted: bool,
-        roi_confidence: float,
+        roi_confidence: float = 1.0,
         blur_score: float,
         brightness_score: float,
         contrast_score: float,

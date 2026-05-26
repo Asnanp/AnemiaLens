@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&family=Noto+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
 @import "tailwindcss";
 
 /* ── DESIGN TOKENS — hyper-premium medical AI ──────────────────────────────── */
@@ -34,15 +34,17 @@
   --glass-shine: rgba(255, 255, 255, 0.10);
   --text-primary: #F0F0F5;
   --text: #E8EAF0;
-  --text-secondary: #94A3B8;
-  --text-muted: #5F6B80;
+  --text-secondary: #A7B5C7;
+  --text-muted: #708198;
   --text-dim: rgba(255, 255, 255, 0.32);
-  --serif: 'Sora', system-ui, sans-serif;
-  --sans: 'Inter', system-ui, sans-serif;
+  --serif: 'Figtree', system-ui, sans-serif;
+  --sans: 'Noto Sans', system-ui, sans-serif;
   --mono: 'DM Mono', 'Fira Mono', monospace;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --focus-ring: rgba(94, 234, 212, 0.92);
+  --focus-shadow: rgba(94, 234, 212, 0.24);
 }
 
 /* ── RESET ─────────────────────────────────────────────────────────────────── */
@@ -69,9 +71,34 @@ body {
   /* Custom cursor removed for accessibility - users can opt-in via settings */
 }
 
+::selection {
+  background: rgba(94, 234, 212, 0.26);
+  color: #ffffff;
+}
+
 a {
   color: inherit;
   text-decoration: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--focus-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── SCROLLBAR ─────────────────────────────────────────────────────────────── */
@@ -380,6 +407,28 @@ body:has(a:hover) #cursor-ring {
   letter-spacing: -0.04em;
 }
 
+.home-hero-title {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 5.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 1.5rem 0 2.2rem;
+  text-align: center;
+  color: var(--text);
+  z-index: 10;
+  position: relative;
+}
+
+.home-hero-title-line {
+  display: block;
+}
+
+.home-hero-title-accent {
+  color: var(--accent-bright);
+  font-style: italic;
+  font-weight: 500;
+}
+
 .label-tag {
   font-family: var(--mono);
   font-size: 0.6rem;
@@ -516,6 +565,7 @@ body:has(a:hover) #cursor-ring {
   color: var(--text-dim);
   font-size: 0.64rem;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .nav-status-chip {

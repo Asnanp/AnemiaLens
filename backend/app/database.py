@@ -28,49 +28,85 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(BACKEND_ROOT / ".env")
 
 log = logging.getLogger("anemialens.db")
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./anemialens.db").strip()
-
-# For managed PostgreSQL providers, postgres:// must be normalized to postgresql+asyncpg://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+DEFAULT_SQLITE_DATABASE_URL = "sqlite+aiosqlite:///./anemialens.db"
 
 # ---------------------------------------------------------------------------
 # Connection pooling configuration
 # ---------------------------------------------------------------------------
 
-# Environment variables for pool tuning (with sensible defaults)
 POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
 MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
-POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))  # 30 minutes
-POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))  # seconds
+POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 POOL_PRE_PING = os.getenv("DB_POOL_PRE_PING", "true").lower() == "true"
-
-connect_args = {}
-if "sqlite" in DATABASE_URL:
-    connect_args["check_same_thread"] = False
-elif "postgres" in DATABASE_URL:
-    connect_args["ssl"] = "require"
+SLOW_QUERY_THRESHOLD_MS = int(os.getenv("SLOW_QUERY_THRESHOLD_MS", "0"))
 
 
-def _build_engine_kwargs() -> dict:
+def _normalize_database_url(database_url: str) -> str:
+    url = database_url.strip()
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
+def _resolve_database_url() -> str:
+    return _normalize_database_url(
+        os.getenv("DATABASE_URL", DEFAULT_SQLITE_DATABASE_URL)
+    )
+
+
+def _runtime_environment() -> str:
+    return (
+        os.getenv("ANEMIALENS_ENVIRONMENT")
+        or os.getenv("ENVIRONMENT")
+        or "development"
+    ).strip().lower()
+
+
+def _truthy_env(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _development_database_fallback_enabled() -> bool:
+    explicit = _truthy_env(os.getenv("ANEMIALENS_ENABLE_DEV_DB_FALLBACK"))
+    if explicit is not None:
+        return explicit
+    return _runtime_environment() != "production"
+
+
+def _development_fallback_database_url() -> str:
+    return _normalize_database_url(
+        os.getenv("ANEMIALENS_DEV_DATABASE_URL", DEFAULT_SQLITE_DATABASE_URL)
+    )
+
+
+def _build_connect_args(database_url: str) -> dict[str, object]:
+    connect_args: dict[str, object] = {}
+    if "sqlite" in database_url:
+        connect_args["check_same_thread"] = False
+    elif "postgres" in database_url:
+        connect_args["ssl"] = "require"
+    return connect_args
+
+
+def _build_engine_kwargs(database_url: str) -> dict[str, object]:
     """Build engine configuration based on database type."""
-    base = {
+    connect_args = _build_connect_args(database_url)
+    base: dict[str, object] = {
         "echo": False,
         "pool_pre_ping": POOL_PRE_PING,
         "connect_args": connect_args,
     }
 
-    if "sqlite" in DATABASE_URL:
-        # SQLite: use OptimizedSQLiteMixin for better performance
+    if "sqlite" in database_url:
         base["connect_args"] = {**connect_args, "timeout": 30}
-        # SQLite doesn't use pool_size; use StaticPool for single-writer
         base["pool_size"] = 1
         base["max_overflow"] = 0
-    elif "postgres" in DATABASE_URL:
-        # PostgreSQL: use connection pooling
+    elif "postgres" in database_url:
         base["pool_size"] = POOL_SIZE
         base["max_overflow"] = MAX_OVERFLOW
         base["pool_recycle"] = POOL_RECYCLE
@@ -80,18 +116,15 @@ def _build_engine_kwargs() -> dict:
     return base
 
 
-engine = create_async_engine(DATABASE_URL, **_build_engine_kwargs())
+def _attach_slow_query_logging(target_engine) -> None:
+    if SLOW_QUERY_THRESHOLD_MS <= 0:
+        return
 
-
-# Log slow queries (optional, enabled via SLOW_QUERY_THRESHOLD_MS env var)
-SLOW_QUERY_THRESHOLD_MS = int(os.getenv("SLOW_QUERY_THRESHOLD_MS", "0"))
-
-if SLOW_QUERY_THRESHOLD_MS > 0:
-    @event.listens_for(engine.sync_engine, "before_cursor_execute")
+    @event.listens_for(target_engine.sync_engine, "before_cursor_execute")
     def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         conn.info.setdefault("query_start_time", []).append(__import__("time").time())
 
-    @event.listens_for(engine.sync_engine, "after_cursor_execute")
+    @event.listens_for(target_engine.sync_engine, "after_cursor_execute")
     def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         start_times = conn.info.get("query_start_time", [])
         if start_times:
@@ -105,15 +138,59 @@ if SLOW_QUERY_THRESHOLD_MS > 0:
                 )
 
 
-async_session_factory = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+def _build_engine_and_session(database_url: str):
+    current_engine = create_async_engine(
+        database_url,
+        **_build_engine_kwargs(database_url),
+    )
+    _attach_slow_query_logging(current_engine)
+    session_factory = async_sessionmaker(
+        current_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    return current_engine, session_factory
+
+
+DATABASE_URL = _resolve_database_url()
+_configured_database_url = DATABASE_URL
+engine, async_session_factory = _build_engine_and_session(DATABASE_URL)
+
+
+async def _rebind_engine(database_url: str) -> None:
+    global DATABASE_URL, _configured_database_url, engine, async_session_factory
+
+    current_engine = engine
+    DATABASE_URL = database_url
+    _configured_database_url = database_url
+    engine, async_session_factory = _build_engine_and_session(database_url)
+    os.environ["DATABASE_URL"] = database_url
+
+    if current_engine is not engine:
+        await current_engine.dispose()
+
+    database_kind = "sqlite" if "sqlite" in database_url else "postgresql"
+    log.info("Database engine rebound for %s runtime.", database_kind)
+
+
+def _ensure_engine_current() -> None:
+    current_database_url = _resolve_database_url()
+    if current_database_url == _configured_database_url:
+        return
+
+    globals()["DATABASE_URL"] = current_database_url
+    globals()["_configured_database_url"] = current_database_url
+    globals()["engine"], globals()["async_session_factory"] = _build_engine_and_session(
+        current_database_url
+    )
+
+    database_kind = "sqlite" if "sqlite" in current_database_url else "postgresql"
+    log.info("Database engine rebound for %s runtime.", database_kind)
 
 
 class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
+
     pass
 
 
@@ -124,6 +201,7 @@ async def get_db_session():
 
     Preferred over the dependency version for service-layer code.
     """
+    _ensure_engine_current()
     async with async_session_factory() as session:
         try:
             yield session
@@ -137,6 +215,7 @@ async def get_db_session():
 
 async def get_db():
     """FastAPI dependency that yields an async database session."""
+    _ensure_engine_current()
     async with async_session_factory() as session:
         try:
             yield session
@@ -149,35 +228,67 @@ async def get_db():
 
 
 async def create_tables() -> None:
-    """Create all ORM tables — called once during app startup."""
-    # For Supabase transaction pooler, use a separate direct engine for DDL
-    ddl_url = DATABASE_URL
-    if "pooler.supabase.com:6543" in ddl_url:
-        ddl_url = ddl_url.replace(":6543/", ":5432/")
-        log.info("Using session pooler (port 5432) for DDL operations.")
+    """Create all ORM tables - called once during app startup."""
+    _ensure_engine_current()
+    primary_database_url = DATABASE_URL
 
     try:
-        from sqlalchemy.ext.asyncio import create_async_engine as _make_engine
-
-        ddl_engine = _make_engine(
-            ddl_url,
-            echo=False,
-            pool_pre_ping=True,
-            connect_args={"ssl": "require"} if "postgres" in ddl_url else {},
-        )
-        async with ddl_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        await ddl_engine.dispose()
+        await _create_all_tables_for_url(primary_database_url)
         log.info("Database tables created/verified successfully.")
     except Exception as exc:
         log.error("Database table creation FAILED: %s", exc, exc_info=True)
+        fallback_url = await _activate_development_database_fallback(exc)
+        if fallback_url is not None:
+            await _create_all_tables_for_url(fallback_url)
+            log.info("Database tables created/verified successfully using SQLite fallback.")
+            return
         log.warning("Continuing startup despite table creation error.")
 
 
 async def close_engine() -> None:
-    """Dispose of the engine — called during app shutdown."""
+    """Dispose of the engine - called during app shutdown."""
+    _ensure_engine_current()
     await engine.dispose()
     log.info("Database engine disposed.")
+
+
+async def _create_all_tables_for_url(database_url: str) -> None:
+    ddl_url = database_url
+    if "pooler.supabase.com:6543" in ddl_url:
+        ddl_url = ddl_url.replace(":6543/", ":5432/")
+        log.info("Using session pooler (port 5432) for DDL operations.")
+
+    ddl_engine = create_async_engine(
+        ddl_url,
+        echo=False,
+        pool_pre_ping=True,
+        connect_args={"ssl": "require"} if "postgres" in ddl_url else {},
+    )
+    try:
+        async with ddl_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    finally:
+        await ddl_engine.dispose()
+
+
+async def _activate_development_database_fallback(exc: Exception) -> str | None:
+    if "sqlite" in DATABASE_URL:
+        return None
+    if not _development_database_fallback_enabled():
+        return None
+
+    fallback_url = _development_fallback_database_url()
+    if fallback_url == DATABASE_URL:
+        return None
+
+    log.warning(
+        "Primary database unavailable in %s mode; falling back to local SQLite runtime. "
+        "Original error: %s",
+        _runtime_environment(),
+        exc,
+    )
+    await _rebind_engine(fallback_url)
+    return fallback_url
 
 
 # ---------------------------------------------------------------------------
@@ -197,13 +308,12 @@ async def cached_count(session: AsyncSession, model, cache_key: str | None = Non
     For large tables, count(*) is expensive; this caches the result.
     """
     from app.services.cache import response_cache
+    from sqlalchemy import func, select
 
     key = cache_key or f"count:{model.__tablename__}"
     cached = await response_cache.get(key)
     if cached is not None:
         return cached
-
-    from sqlalchemy import func, select
 
     result = await session.execute(select(func.count()).select_from(model))
     count = result.scalar() or 0

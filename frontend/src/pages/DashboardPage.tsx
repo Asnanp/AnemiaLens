@@ -16,19 +16,17 @@ import { useStats } from '../hooks/useStats';
 
 const E = [0.22, 1, 0.36, 1] as const;
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
+import { AnimatedLineChart } from '../components/dashboard/AnimatedLineChart';
+import { StatCard } from '../components/dashboard/StatCard';
+import { DistributionDonut, DistributionBars, bandColor } from '../components/dashboard/DistributionCharts';
+import { HealthInsightsCard, type Insight } from '../components/dashboard/HealthInsightsCard';
 
-function bandColor(band?: string | null): string {
-  switch (band) {
-    case 'low_risk': return '#10B981';
-    case 'moderate_risk': return '#F59E0B';
-    case 'high_concern': return '#EF4444';
-    case 'uncertain_retake_needed': return '#8B5CF6';
-    default: return '#64748B';
-  }
-}
+const RISK_IMAGES: Record<string, string> = {
+  low_risk: '/demo-cases/low-risk-demo.jpg',
+  moderate_risk: '/demo-cases/moderate-risk-demo.jpg',
+  high_concern: '/demo-cases/high-concern-demo.jpg',
+  uncertain_retake_needed: '/demo-cases/low-risk-demo.jpg',
+};
 
 function bandLabel(band?: string | null): string {
   switch (band) {
@@ -69,37 +67,6 @@ function formatMaybeDateTime(date: string | null | undefined): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Animated counter hook                                              */
-/* ------------------------------------------------------------------ */
-
-function useAnimatedCounter(end: number, durationMs = 1200, enabled = true) {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef<number>();
-
-  useEffect(() => {
-    if (!enabled) { setValue(end); return; }
-    const start = performance.now();
-    const from = 0;
-
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / durationMs, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(from + (end - from) * eased));
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(tick);
-      }
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [end, durationMs, enabled]);
-
-  return value;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Skeleton                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -131,308 +98,8 @@ function StatCardSkeleton() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Animated Line Chart (replaces sparkline)                           */
+/*  Health Insights Builder                                            */
 /* ------------------------------------------------------------------ */
-
-function AnimatedLineChart({ values, color, height = 100 }: { values: number[]; color: string; height?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-20px' });
-
-  if (values.length === 0) {
-    return (
-      <div style={{ height: 72, borderRadius: '1rem', border: '1px dashed rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: '0.7rem' }}>
-        No trend data yet
-      </div>
-    );
-  }
-
-  const padding = 8;
-  const w = 260;
-  const h = height;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-
-  const points = values.map((v, i) => ({
-    x: padding + (values.length === 1 ? w / 2 : (i / (values.length - 1)) * (w - padding * 2)),
-    y: padding + (1 - (v - min) / range) * (h - padding * 2),
-  }));
-
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaPath = `${linePath} L${points[points.length - 1].x},${h} L${points[0].x},${h} Z`;
-
-  // Grid lines
-  const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => ({
-    y: padding + (1 - t) * (h - padding * 2),
-    label: Math.round(min + t * range),
-  }));
-
-  return (
-    <div ref={ref} style={{ width: '100%', height }}>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={`areaGrad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-          </linearGradient>
-          <linearGradient id={`lineGrad-${color.replace('#', '')}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={color} stopOpacity="1" />
-          </linearGradient>
-          <filter id={`glow-${color.replace('#', '')}`}>
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        {/* Grid */}
-        {gridLines.map((g, i) => (
-          <g key={i}>
-            <line x1={padding} x2={w - padding} y1={g.y} y2={g.y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="3 3" />
-            <text x={2} y={g.y + 3} fill="rgba(255,255,255,0.25)" fontSize="7" fontFamily="var(--mono, monospace)">{g.label}</text>
-          </g>
-        ))}
-
-        {/* Area fill */}
-        <motion.path
-          d={areaPath}
-          fill={`url(#areaGrad-${color.replace('#', '')})`}
-          initial={{ opacity: 0 }}
-          animate={inView ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        />
-
-        {/* Line */}
-        <motion.path
-          d={linePath}
-          fill="none"
-          stroke={`url(#lineGrad-${color.replace('#', '')})`}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          filter={`url(#glow-${color.replace('#', '')})`}
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={inView ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
-          transition={{ duration: 1.2, ease: 'easeInOut', delay: 0.1 }}
-        />
-
-        {/* Dots */}
-        {points.map((p, i) => (
-          <motion.circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r="3"
-            fill={color}
-            stroke="rgba(4,4,10,0.6)"
-            strokeWidth="1.5"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={inView ? { scale: 1, opacity: 1 } : { scale: 0, opacity: 0 }}
-            transition={{ duration: 0.35, delay: 0.4 + i * 0.08, type: 'spring', stiffness: 200 }}
-          />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Stat Card with animated counter                                    */
-/* ------------------------------------------------------------------ */
-
-function StatCard({
-  icon,
-  label,
-  value,
-  tint,
-  sub,
-  delay = 0,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  tint: string;
-  sub?: string;
-  delay?: number;
-}) {
-  const numericValue = parseInt(value.replace(/[^0-9-]/g, ''), 10);
-  const isNumeric = !isNaN(numericValue) && value.includes(String(numericValue));
-  const animatedValue = useAnimatedCounter(numericValue, 1100, isNumeric);
-  const displayValue = isNumeric ? (value.includes('%') ? `${animatedValue}%` : String(animatedValue)) : value;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: E, delay }}
-      style={{
-        padding: '1.1rem 1rem',
-        borderRadius: '1rem',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.7rem',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-dim)' }}>{label}</span>
-        <motion.div
-          whileHover={{ scale: 1.08, rotate: -4 }}
-          style={{ width: 34, height: 34, borderRadius: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${tint}14`, border: `1px solid ${tint}28`, color: tint }}
-        >
-          {icon}
-        </motion.div>
-      </div>
-      <motion.div
-        style={{ fontFamily: 'var(--serif)', fontSize: '1.55rem', fontWeight: 700, lineHeight: 1.05 }}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: delay + 0.15 }}
-      >
-        {displayValue}
-      </motion.div>
-      {sub && <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', lineHeight: 1.55 }}>{sub}</div>}
-    </motion.div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Distribution Bars (enhanced with donut + animated bars)            */
-/* ------------------------------------------------------------------ */
-
-function DistributionDonut({ counts, total }: { counts: Record<string, number>; total: number }) {
-  const ref = useRef<SVGSVGElement>(null);
-  const inView = useInView(ref, { once: true });
-
-  const rows = [
-    { key: 'low_risk', label: 'Low Risk' },
-    { key: 'moderate_risk', label: 'Moderate' },
-    { key: 'high_concern', label: 'High Concern' },
-    { key: 'uncertain_retake_needed', label: 'Retake Needed' },
-  ] as const;
-
-  const segments = rows.map((r) => ({ ...r, count: counts[r.key] ?? 0, color: bandColor(r.key) }));
-  const nonEmpty = segments.filter((s) => s.count > 0);
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
-
-  if (total === 0 || nonEmpty.length === 0) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--text-dim)', fontSize: '0.72rem' }}>
-        No distribution data yet
-      </div>
-    );
-  }
-
-  let accumulatedOffset = 0;
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-      {/* Donut */}
-      <svg ref={ref} width="110" height="110" viewBox="0 0 110 110">
-        {segments.map((seg) => {
-          const pct = total > 0 ? seg.count / total : 0;
-          const dashLen = pct * circumference;
-          const dashGap = circumference - dashLen;
-          const offset = accumulatedOffset;
-          accumulatedOffset += dashLen;
-
-          return (
-            <motion.circle
-              key={seg.key}
-              cx="55"
-              cy="55"
-              r={radius}
-              fill="none"
-              stroke={seg.color}
-              strokeWidth="10"
-              strokeDasharray={`${dashLen} ${dashGap}`}
-              strokeDashoffset={-offset}
-              strokeLinecap="round"
-              transform="rotate(-90 55 55)"
-              initial={{ strokeDasharray: `0 ${circumference}`, opacity: 0 }}
-              animate={inView ? { strokeDasharray: `${dashLen} ${dashGap}`, opacity: 1 } : { strokeDasharray: `0 ${circumference}`, opacity: 0 }}
-              transition={{ duration: 0.9, ease: E, delay: 0.15 }}
-            />
-          );
-        })}
-        <text x="55" y="52" textAnchor="middle" fill="var(--text)" fontSize="18" fontWeight="700" fontFamily="var(--serif, serif)">{total}</text>
-        <text x="55" y="64" textAnchor="middle" fill="var(--text-dim)" fontSize="8" fontFamily="var(--mono, monospace)">TOTAL</text>
-      </svg>
-
-      {/* Legend bars */}
-      <div style={{ flex: 1, minWidth: 140, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-        {segments.map((seg, idx) => {
-          const pct = total > 0 ? (seg.count / total) * 100 : 0;
-          return (
-            <div key={seg.key}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.68rem' }}>
-                <span style={{ color: seg.color }}>{seg.label}</span>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{seg.count} ({pct.toFixed(0)}%)</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.8, ease: E, delay: 0.2 + idx * 0.1 }}
-                  style={{ height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${seg.color}44, ${seg.color})` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function DistributionBars({ counts, total }: { counts: Record<string, number>; total: number }) {
-  const rows = [
-    { key: 'low_risk', label: 'Low risk' },
-    { key: 'moderate_risk', label: 'Moderate' },
-    { key: 'high_concern', label: 'High concern' },
-    { key: 'uncertain_retake_needed', label: 'Retake needed' },
-  ] as const;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {rows.map((row, idx) => {
-        const count = counts[row.key] ?? 0;
-        const pct = total > 0 ? (count / total) * 100 : 0;
-        const color = bandColor(row.key);
-        return (
-          <div key={row.key}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              <span>{row.label}</span>
-              <span style={{ fontFamily: 'var(--mono)', color }}>{count}</span>
-            </div>
-            <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${pct}%` }}
-                transition={{ duration: 0.9, ease: E, delay: idx * 0.1 }}
-                style={{ height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${color}55, ${color})` }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Health Insights                                                    */
-/* ------------------------------------------------------------------ */
-
-interface Insight {
-  icon: ReactNode;
-  tint: string;
-  title: string;
-  body: string;
-  action?: string;
-}
 
 function buildInsights(
   screenings: Array<{ triage_band?: string | null; anemia_risk: number | null; confidence: number | null; created_at: string }>,
@@ -521,75 +188,6 @@ function buildInsights(
   }
 
   return insights;
-}
-
-function HealthInsightsCard({ insights }: { insights: Insight[] }) {
-  if (insights.length === 0) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: E }}
-      style={{
-        padding: '1.25rem 1.35rem',
-        borderRadius: '1.15rem',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.95rem',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Lightbulb size={14} style={{ color: '#FFD700' }} />
-        <span style={{ fontSize: '0.62rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#FFD700' }}>
-          Health Insights
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-        <AnimatePresence>
-          {insights.map((insight, idx) => (
-            <motion.div
-              key={insight.title}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 12 }}
-              transition={{ duration: 0.4, ease: E, delay: idx * 0.08 }}
-              whileHover={{ x: 4, background: 'rgba(255,255,255,0.04)' }}
-              style={{
-                padding: '0.9rem 1rem',
-                borderRadius: '0.9rem',
-                background: 'rgba(255,255,255,0.02)',
-                border: `1px solid ${insight.tint}18`,
-                display: 'grid',
-                gridTemplateColumns: '32px 1fr',
-                gap: '0.75rem',
-                alignItems: 'start',
-              }}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `${insight.tint}12`, border: `1px solid ${insight.tint}22`, color: insight.tint, flexShrink: 0,
-              }}>
-                {insight.icon}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>{insight.title}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', lineHeight: 1.6 }}>{insight.body}</div>
-                {insight.action && (
-                  <div style={{ fontSize: '0.66rem', color: insight.tint, fontFamily: 'var(--mono)', marginTop: '0.15rem' }}>
-                    {insight.action}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -1021,7 +619,16 @@ export default function DashboardPage({ onClose }: { onClose: () => void }) {
                     transition: 'background 0.2s, border-color 0.2s',
                   }}
                 >
-                  <div style={{ borderRadius: '999px', background: bandColor(screening.triage_band), boxShadow: `0 0 12px ${bandColor(screening.triage_band)}55` }} />
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: 52, height: 52, borderRadius: '0.6rem', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.06)', background: '#000' }}>
+                      <img 
+                        src={RISK_IMAGES[screening.triage_band] || RISK_IMAGES.low_risk} 
+                        alt="" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} 
+                      />
+                    </div>
+                    <div style={{ borderRadius: '999px', width: 4, height: 40, background: bandColor(screening.triage_band), boxShadow: `0 0 12px ${bandColor(screening.triage_band)}55`, flexShrink: 0 }} />
+                  </div>
                   <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.52rem', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0.16rem 0.45rem', borderRadius: '0.35rem', background: `${bandColor(screening.triage_band)}15`, color: bandColor(screening.triage_band), border: `1px solid ${bandColor(screening.triage_band)}30`, fontWeight: 700 }}>

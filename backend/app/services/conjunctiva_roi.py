@@ -331,6 +331,7 @@ class ConjunctivaRoiExtractor:
             image,
             clahe_strength=1.08,
             grey_world_alpha=0.30,
+            return_score=True,
         )
         corrected = Image.blend(corrected, image.convert("RGB"), 0.28)
         corrected = self._rebalance_preview_tone(corrected)

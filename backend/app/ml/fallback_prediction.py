@@ -33,7 +33,9 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
-from PIL import Image, ImageStat
+from PIL import Image
+
+from app.schemas.patient import PatientProfileInput
 
 log = logging.getLogger("anemialens.fallback")
 
@@ -45,6 +47,7 @@ FallbackReason = Literal[
     "feature_extraction_failure",
     "no_model_available",
 ]
+AgeGroup = Literal["child", "school", "adolescent", "adult", "pregnant", "elderly"]
 
 
 @dataclass(frozen=True)
@@ -141,6 +144,7 @@ class FallbackPredictor:
         age: int | None = None,
         is_pregnant: bool = False,
         feature_map: dict[str, float] | None = None,
+        age_group_override: str | None = None,
     ) -> FallbackPrediction:
         """
         Generate a fallback prediction.
@@ -158,14 +162,17 @@ class FallbackPredictor:
         -------
         FallbackPrediction
         """
-        age_group = self._classify_age_group(age)
+        if age_group_override == "pregnant":
+            is_pregnant = True
+        feature_map = feature_map or self._derive_feature_map_from_image(image)
+        age_group = _normalise_age_group(age_group_override) or self._classify_age_group(age)
         sex_key = sex.lower() if sex in POPULATION_PRIORS else "not_specified"
 
         # Determine best fallback method
-        if feature_map is not None and reason in ("quality_gate_rejection", "low_confidence"):
-            # Can still use heuristic if features are available
+        if feature_map is not None:
+            # Prefer a signal-bearing heuristic over a flat prior when we have image evidence.
             method: FallbackMethod = "heuristic"
-        elif sex_key != "not_specified" or age is not None:
+        elif sex_key != "not_specified" or age is not None or is_pregnant or age_group_override is not None:
             method = "population_prior"
         else:
             method = "conservative_default"
@@ -189,7 +196,7 @@ class FallbackPredictor:
         This is the safest fallback when no information is available.
         """
         risk = 0.50  # Neutral prior
-        uncertainty = 0.45  # Very high uncertainty
+        uncertainty = 0.55  # Very high uncertainty
         hb_interval = (8.0, 16.0)  # Very wide interval
 
         return FallbackPrediction(
@@ -225,6 +232,8 @@ class FallbackPredictor:
         """
         sex_key = sex if sex in POPULATION_PRIORS else "not_specified"
         age_key = age_group if age_group in POPULATION_PRIORS[sex_key] else "adult"
+        if is_pregnant and "pregnant" in POPULATION_PRIORS[sex_key]:
+            age_key = "pregnant"
 
         prior_risk = POPULATION_PRIORS[sex_key].get(age_key, 0.27)
 
@@ -357,6 +366,39 @@ class FallbackPredictor:
             return "adult"
         return "elderly"
 
+    @staticmethod
+    def _derive_feature_map_from_image(image: Image.Image | None) -> dict[str, float] | None:
+        """Build a lightweight heuristic feature map directly from an image."""
+        if image is None:
+            return None
+
+        try:
+            rgb = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+        except Exception:
+            return None
+
+        if rgb.size == 0:
+            return None
+
+        mean_r, mean_g, mean_b = rgb.mean(axis=(0, 1)).tolist()
+        channel_max = rgb.max(axis=2)
+        channel_min = rgb.min(axis=2)
+        saturation = np.where(
+            channel_max > 0,
+            (channel_max - channel_min) / np.clip(channel_max, 1e-6, None),
+            0.0,
+        )
+
+        return {
+            "cpi": float(np.clip((mean_r * 0.65) + ((mean_r - mean_g) * 0.35), 0.0, 1.0)),
+            "red_green_gap": float(max(0.0, mean_r - mean_g)),
+            "brightness": float(rgb.mean()),
+            "saturation": float(np.mean(saturation)),
+            "mean_r": float(mean_r),
+            "mean_g": float(mean_g),
+            "mean_b": float(mean_b),
+        }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Module-level convenience
@@ -373,6 +415,89 @@ def get_fallback_predictor() -> FallbackPredictor:
     return _default_fallback
 
 
+def _normalise_age_group(age_group: str | None) -> AgeGroup | None:
+    if not age_group:
+        return None
+
+    normalised = age_group.strip().lower()
+    valid_groups = {"child", "school", "adolescent", "adult", "pregnant", "elderly"}
+    return normalised if normalised in valid_groups else None
+
+
+def _extract_patient_demographics(
+    patient_profile: PatientProfileInput | None,
+) -> tuple[str, int | None, bool, AgeGroup | None]:
+    if patient_profile is None:
+        return "not_specified", None, False, None
+
+    age_group = _normalise_age_group(getattr(patient_profile, "age_group", None))
+    is_pregnant = bool(getattr(patient_profile, "is_pregnant", False)) or age_group == "pregnant"
+
+    return (
+        str(getattr(patient_profile, "sex", "not_specified") or "not_specified"),
+        getattr(patient_profile, "age", None),
+        is_pregnant,
+        age_group,
+    )
+
+
+def _hb_to_risk(hb: float, *, threshold: float = 12.0, slope: float = 1.35) -> float:
+    """Map hemoglobin estimates onto a conservative risk curve."""
+    return float(1.0 / (1.0 + math.exp((hb - threshold) / max(slope, 1e-6))))
+
+
+def _risk_to_hb(risk: float, *, threshold: float = 12.0, slope: float = 1.35) -> float:
+    """Inverse of `_hb_to_risk`, clamped to avoid infinities."""
+    clipped_risk = float(np.clip(risk, 1e-6, 1.0 - 1e-6))
+    return float(threshold + (slope * math.log((1.0 - clipped_risk) / clipped_risk)))
+
+
+def conservative_default_prediction(
+    reason: FallbackReason = "quality_gate_rejection",
+) -> FallbackPrediction:
+    return get_fallback_predictor().predict(reason=reason)
+
+
+def population_prior_prediction(
+    patient_profile: PatientProfileInput | None = None,
+    reason: FallbackReason = "low_confidence",
+    *,
+    sex: str | None = None,
+    age: int | None = None,
+    is_pregnant: bool | None = None,
+    age_group: str | None = None,
+) -> FallbackPrediction:
+    profile_sex, profile_age, profile_is_pregnant, profile_age_group = _extract_patient_demographics(patient_profile)
+
+    return get_fallback_predictor().predict(
+        reason=reason,
+        sex=sex or profile_sex,
+        age=profile_age if age is None else age,
+        is_pregnant=profile_is_pregnant if is_pregnant is None else is_pregnant,
+        age_group_override=age_group or profile_age_group,
+    )
+
+
+def heuristic_prediction(
+    image: Image.Image,
+    reason: FallbackReason = "low_confidence",
+    *,
+    feature_map: dict[str, float] | None = None,
+    patient_profile: PatientProfileInput | None = None,
+) -> FallbackPrediction:
+    profile_sex, profile_age, profile_is_pregnant, profile_age_group = _extract_patient_demographics(patient_profile)
+
+    return get_fallback_predictor().predict(
+        reason=reason,
+        image=image,
+        sex=profile_sex,
+        age=profile_age,
+        is_pregnant=profile_is_pregnant,
+        feature_map=feature_map,
+        age_group_override=profile_age_group,
+    )
+
+
 def generate_fallback(
     reason: FallbackReason,
     image: Image.Image | None = None,
@@ -380,13 +505,18 @@ def generate_fallback(
     age: int | None = None,
     is_pregnant: bool = False,
     feature_map: dict[str, float] | None = None,
+    patient_profile: PatientProfileInput | None = None,
+    age_group: str | None = None,
 ) -> FallbackPrediction:
     """Convenience function to generate a fallback prediction."""
+    profile_sex, profile_age, profile_is_pregnant, profile_age_group = _extract_patient_demographics(patient_profile)
+
     return get_fallback_predictor().predict(
         reason=reason,
         image=image,
-        sex=sex,
-        age=age,
-        is_pregnant=is_pregnant,
+        sex=sex if sex != "not_specified" else profile_sex,
+        age=age if age is not None else profile_age,
+        is_pregnant=is_pregnant or profile_is_pregnant,
         feature_map=feature_map,
+        age_group_override=age_group or profile_age_group,
     )

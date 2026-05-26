@@ -2,13 +2,39 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
+import fs from 'fs';
+import path from 'path';
+
+function loadEnvFile() {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    content.split('\n').forEach(line => {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let value = (match[2] || '').trim();
+        if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+        if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+        // Do not overwrite variables already set in process.env (like from webServer.env)
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    });
+  }
+}
+loadEnvFile();
 
 const apiTarget =
   process.env.VITE_API_PROXY_TARGET
   ?? process.env.VITE_API_BASE_URL
-  ?? 'http://127.0.0.1:5000';
+  ?? 'http://127.0.0.1:8000';
 
 const enableBundleAnalysis = process.env.ANALYZE_BUNDLE === 'true';
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS
+  ? process.env.VITE_ALLOWED_HOSTS.split(',').map((host) => host.trim()).filter(Boolean)
+  : undefined;
 
 export default defineConfig({
   plugins: [
@@ -34,9 +60,16 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+          if (
+            id.includes('react')
+            || id.includes('scheduler')
+            || id.includes('react-router')
+            || id.includes('@remix-run')
+          ) {
+            return 'vendor-react';
+          }
           if (id.includes('framer-motion')) return 'vendor-motion';
-          if (id.includes('three')) return 'vendor-three';
+
           if (id.includes('lucide-react')) return 'vendor-icons';
           if (id.includes('@radix-ui')) return 'vendor-radix';
           if (id.includes('jspdf-autotable')) return 'vendor-autotable';
@@ -46,9 +79,7 @@ export default defineConfig({
           if (id.includes('lenis')) return 'vendor-lenis';
           if (id.includes('i18next')) return 'vendor-i18n';
           if (id.includes('@stripe')) return 'vendor-stripe';
-          if (id.includes('@supabase')) return 'vendor-supabase';
-          if (id.includes('@react-spring')) return 'vendor-spring';
-          return 'vendor';
+          return undefined;
         },
       },
     },
@@ -64,12 +95,14 @@ export default defineConfig({
     target: 'es2020',
   },
   server: {
-    host: '0.0.0.0',
-    port: 3000,
-    allowedHosts: ['.emergentagent.com', '.preview.emergentagent.com'],
+    host: process.env.VITE_DEV_HOST ?? '127.0.0.1',
+    port: Number(process.env.VITE_PORT ?? 3000),
+    strictPort: true,
+    allowedHosts,
     proxy: {
       '/api': { target: apiTarget, changeOrigin: true },
       '/health': { target: apiTarget, changeOrigin: true },
+      '/readyz': { target: apiTarget, changeOrigin: true },
     }
   },
   // Optimize dependencies pre-bundling
@@ -83,6 +116,6 @@ export default defineConfig({
       'lucide-react',
     ],
     // Exclude heavy deps from pre-bundling (they'll be lazy-loaded)
-    exclude: ['three', '@react-spring/web'],
+    exclude: [],
   },
 });

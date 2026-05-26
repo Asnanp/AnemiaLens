@@ -1,17 +1,30 @@
 from __future__ import annotations
 
+import json
+import time
 from pathlib import Path
 
-from app.config import SCREENING_DISCLAIMER
+from app.config import SCREENING_DISCLAIMER, settings
 from app.ml.learned_fusion import LearnedFusionModel
 from app.schemas import PredictionResult, QualityAssessment, SignalBreakdown, SymptomInput, TriageResult
 
 _FUSION_MODEL_PATH = Path(__file__).parent.parent / "artifacts" / "fusion_model.pkl"
 
 
+#region agent log
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    pass  # Debug instrumentation disabled for production
+#endregion
+
+
 class TriageService:
     IMAGE_WEIGHT = 0.55
     SYMPTOM_WEIGHT = 0.45
+    HIGH_CONCERN_HB_THRESHOLD = 10.5
+    MODERATE_HB_THRESHOLD = 12.5
+    MODERATE_HB_RISK_FLOOR = 0.45
+    MODERATE_HB_SYMPTOM_FLOOR = 0.28
+    HIGH_CONCERN_SYMPTOM_FLOOR = 0.70
     # Weights calibrated to clinical literature: pallor + dyspnoea are strongest
     _WEIGHTS = {
         "fatigue": 0.16,
@@ -64,18 +77,34 @@ class TriageService:
 
         fused_score = breakdown.fused_score
         predicted_hb = prediction.predicted_hemoglobin
-        strong_hb_flag = predicted_hb is not None and predicted_hb <= 10.5
-        moderate_hb_flag = predicted_hb is not None and predicted_hb <= 12.8
+        high_concern_threshold = settings.high_concern_threshold
+        moderate_risk_threshold = settings.moderate_risk_threshold
+        strong_hb_flag = predicted_hb is not None and predicted_hb <= self.HIGH_CONCERN_HB_THRESHOLD
+        moderate_hb_flag = (
+            predicted_hb is not None
+            and predicted_hb <= self.MODERATE_HB_THRESHOLD
+            and (
+                prediction.screening_label == "anemia_likely"
+                or prediction.anemia_risk >= self.MODERATE_HB_RISK_FLOOR
+                or symptom_score >= self.MODERATE_HB_SYMPTOM_FLOOR
+            )
+        )
 
         # Symptom-driven escalation: severe symptoms alone can push to high concern
-        if fused_score >= 0.52 or strong_hb_flag or (
-            prediction.anemia_risk >= 0.62 and symptom_score >= 0.28
-        ) or symptom_score >= 0.55:
+        if (
+            fused_score >= high_concern_threshold
+            or strong_hb_flag
+            or (
+                prediction.anemia_risk >= max(0.62, high_concern_threshold - 0.03)
+                and symptom_score >= 0.28
+            )
+            or symptom_score >= self.HIGH_CONCERN_SYMPTOM_FLOOR
+        ):
             band = "high_concern"
             label = "High concern"
             summary = "This screening suggests a higher level of concern. Arrange formal medical review soon, especially if symptoms are increasing."
         elif (
-            fused_score >= 0.28
+            fused_score >= moderate_risk_threshold
             or (prediction.anemia_risk >= 0.52 and prediction.screening_label == "anemia_likely")
             or moderate_hb_flag
             or symptom_score >= 0.22
@@ -92,7 +121,31 @@ class TriageService:
             band = "uncertain_retake_needed"
             label = "Uncertain, retake needed"
             summary = "The model uncertainty is high, so the safest next step is to retake the image and repeat the screening."
+        elif (
+            band == "high_concern"
+            and prediction.screening_label == "anemia_unlikely"
+        ):
+            summary = (
+                "The image-only signal looks lower risk, but the symptom burden remains high concern. "
+                "Arrange formal medical review soon, especially if symptoms are worsening."
+            )
 
+        #region agent log
+        _agent_debug_log(
+            "run9",
+            "H19",
+            "backend/app/services/triage.py:assess:decision",
+            "Triage decision computed",
+            {
+                "band": band,
+                "score": round(fused_score, 3),
+                "predictionLabel": prediction.screening_label,
+                "predictionRisk": prediction.anemia_risk,
+                "symptomScore": round(symptom_score, 3),
+                "predictedHemoglobin": prediction.predicted_hemoglobin,
+            },
+        )
+        #endregion
         return TriageResult(
             band=band,
             score=round(fused_score, 3),

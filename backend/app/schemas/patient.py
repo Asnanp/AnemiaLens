@@ -142,6 +142,10 @@ class PatientProfileInput(BaseModel):
         default="not_specified",
         description="Self-reported sex used only for screening context.",
     )
+    is_pregnant: bool = Field(
+        default=False,
+        description="Optional pregnancy context for population-level fallback heuristics.",
+    )
     diet_type: DietType = Field(
         default="not_specified",
         description="Self-reported diet pattern relevant to iron intake context.",
@@ -160,6 +164,13 @@ class PatientProfileInput(BaseModel):
         if isinstance(value, (int, float)):
             return int(value)
         raise ValueError("age must be an integer or null")
+
+    @field_validator("is_pregnant", mode="before")
+    @classmethod
+    def _normalise_bool(cls, value: object) -> bool:
+        result = _coerce_boolean(value, allow_none=False)
+        assert isinstance(result, bool)
+        return result
 
     @field_validator("sex", "diet_type", mode="before")
     @classmethod

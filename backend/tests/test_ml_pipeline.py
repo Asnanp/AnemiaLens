@@ -187,7 +187,7 @@ class TestConservativeDefaultPrediction:
 
 class TestPopulationPriorPrediction:
     def test_with_demographics(self) -> None:
-        profile = PatientProfileInput(sex="female", age_group="adult")
+        profile = PatientProfileInput(sex="female", age=30)
         pred = population_prior_prediction(profile)
         assert 0.0 <= pred.anemia_risk <= 1.0
         assert pred.method == "population_prior"
@@ -198,13 +198,13 @@ class TestPopulationPriorPrediction:
         assert 0.0 <= pred.anemia_risk <= 1.0
 
     def test_male_adult(self) -> None:
-        profile = PatientProfileInput(sex="male", age_group="adult")
+        profile = PatientProfileInput(sex="male", age=35)
         pred = population_prior_prediction(profile)
         # Male adult prevalence is lower (~15%)
         assert pred.anemia_risk < 0.35
 
     def test_pregnant_female(self) -> None:
-        profile = PatientProfileInput(sex="female", age_group="pregnant")
+        profile = PatientProfileInput(sex="female", age=30, is_pregnant=True)
         pred = population_prior_prediction(profile)
         # Pregnant women have higher prevalence (~36%)
         assert pred.anemia_risk > 0.30
@@ -248,7 +248,7 @@ class TestGenerateFallback:
         assert pred.reason == "model_failure"
 
     def test_generate_with_demographics(self) -> None:
-        profile = PatientProfileInput(sex="female", age_group="adult")
+        profile = PatientProfileInput(sex="female", age=30)
         pred = generate_fallback(
             reason="low_confidence",
             patient_profile=profile,

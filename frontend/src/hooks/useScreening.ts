@@ -151,6 +151,7 @@ export function useScreening() {
       setIsOfflineMode(false);
       setStep(1);
     } catch (err) {
+
       setError(err instanceof Error ? err.message : 'Image quality check failed.');
     } finally {
       setLoading(false);
@@ -159,6 +160,7 @@ export function useScreening() {
 
   const runAnalysis = async () => {
     if (!file) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -181,6 +183,7 @@ export function useScreening() {
       }
       setStep(3);
     } catch (err) {
+
       const msg = err instanceof Error ? err.message : 'Screening failed.';
       // Surface scan limit errors clearly
       if (

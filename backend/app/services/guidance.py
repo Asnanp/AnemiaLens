@@ -4,7 +4,9 @@ import ast
 import json
 import logging
 import re
+import time
 from collections import OrderedDict
+from pathlib import Path
 from typing import Literal
 
 import requests as _requests
@@ -41,6 +43,13 @@ _SAFE_DIAGNOSTIC_CONTEXT_PATTERNS = (
 log = logging.getLogger("anemialens.guidance")
 
 _MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
+_MISTRAL_TIMEOUT_CAP_SECONDS = 8.0
+
+
+#region agent log
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    pass  # Debug instrumentation disabled for production
+#endregion
 
 
 class GuidanceService:
@@ -52,6 +61,7 @@ class GuidanceService:
         self.api_key_configured = bool(settings.mistral_api_key.strip())
         self._fallback_reason: str | None = None
         self._last_provider_error: str | None = None
+        self._provider_cooldown_until = 0.0
         self._response_cache: OrderedDict[str, GuidanceResult] = OrderedDict()
         self._response_cache_size = 64
 
@@ -68,15 +78,46 @@ class GuidanceService:
         language: str | None = None,
         region: str | None = None,
     ) -> GuidanceResult:
+        started = time.perf_counter()
+        #region agent log
+        _agent_debug_log(
+            "run3",
+            "H9",
+            "backend/app/services/guidance.py:generate:entry",
+            "Guidance generation entered",
+            {
+                "triageBand": triage.band,
+                "hasPrediction": prediction is not None,
+                "mistralEnabled": self.mistral_enabled,
+                "apiKeyConfigured": self.api_key_configured,
+                "timeoutSeconds": self.guidance_timeout,
+            },
+        )
+        #endregion
         if not self._should_use_llm(triage, prediction):
             log.info("Skipping LLM: prediction=%s, band=%s", prediction is not None, triage.band)
-            return self.generate_smart_fallback(
+            fallback_result = self.generate_smart_fallback(
                 triage.band,
                 prediction.predicted_hemoglobin if prediction else None,
                 prediction.confidence if prediction else None,
                 symptoms,
                 region,
             )
+            #region agent log
+            _agent_debug_log(
+                "run4",
+                "H13",
+                "backend/app/services/guidance.py:generate:earlyFallback",
+                "Guidance fallback returned from low-confidence gate",
+                {
+                    "source": fallback_result.source,
+                    "latencyMs": round((time.perf_counter() - started) * 1000, 1),
+                    "reliabilityFlag": prediction.reliability_flag if prediction is not None else None,
+                    "confidence": prediction.confidence if prediction is not None else None,
+                },
+            )
+            #endregion
+            return fallback_result
 
         payload = self._build_payload(triage, symptoms, prediction, language, region)
         cache_key = self._cache_key(payload)
@@ -101,6 +142,18 @@ class GuidanceService:
                 region=region,
             )
             if result is not None:
+                #region agent log
+                _agent_debug_log(
+                    "run3",
+                    "H10",
+                    "backend/app/services/guidance.py:generate:result",
+                    "Guidance result resolved",
+                    {
+                        "source": result.source,
+                        "latencyMs": round((time.perf_counter() - started) * 1000, 1),
+                    },
+                )
+                #endregion
                 log.info("Guidance source: %s", result.source)
                 if result.source == "mistral":
                     self._last_provider_error = None
@@ -112,13 +165,28 @@ class GuidanceService:
                 self.mistral_enabled, self.api_key_configured, self._fallback_reason,
             )
 
-        return self.generate_smart_fallback(
+        fallback_result = self.generate_smart_fallback(
             triage.band,
             prediction.predicted_hemoglobin if prediction else None,
             prediction.confidence if prediction else None,
             symptoms,
             region,
         )
+        #region agent log
+        _agent_debug_log(
+            "run4",
+            "H13",
+            "backend/app/services/guidance.py:generate:fallbackReturn",
+            "Guidance fallback returned without provider call",
+            {
+                "source": fallback_result.source,
+                "latencyMs": round((time.perf_counter() - started) * 1000, 1),
+                "cooldownActive": time.time()
+                < getattr(self, "_provider_cooldown_until", 0.0),
+            },
+        )
+        #endregion
+        return fallback_result
 
     def reply_to_message(
         self,
@@ -129,6 +197,66 @@ class GuidanceService:
         cleaned_message = " ".join(message.split()).strip()
         if not cleaned_message:
             raise ValueError("Message cannot be empty.")
+        #region agent log
+        _agent_debug_log(
+            "run15",
+            "H31",
+            "backend/app/services/guidance.py:reply_to_message:entry",
+            "Guidance chat entry",
+            {
+                "triageBand": analysis.triage.band,
+                "historyLen": len(history or []),
+                "mistralReady": self._mistral_ready(),
+                "configuredTimeoutSeconds": float(self.guidance_timeout),
+            },
+        )
+        #endregion
+
+        # Apply the same gating philosophy as the main guidance generator:
+        # - Skip provider calls for low-risk / retake-needed bands
+        # - Skip when reliability is low or confidence is low
+        triage_band = (analysis.triage.band or "").lower()
+        prediction = analysis.prediction
+        chat_should_use_llm = True
+        chat_reason = "default"
+        if triage_band in {"low_risk", "uncertain_retake_needed"}:
+            chat_should_use_llm = False
+            chat_reason = f"triage_band_{triage_band}"
+        elif prediction is None:
+            chat_should_use_llm = False
+            chat_reason = "missing_prediction"
+        elif prediction.reliability_flag == "low":
+            chat_should_use_llm = False
+            chat_reason = "low_reliability"
+        elif prediction.confidence < 0.5:
+            chat_should_use_llm = False
+            chat_reason = "low_confidence"
+
+        #region agent log
+        _agent_debug_log(
+            "run15",
+            "H34",
+            "backend/app/services/guidance.py:reply_to_message:gate",
+            "Guidance chat LLM gating decision",
+            {
+                "triageBand": triage_band,
+                "useLLM": chat_should_use_llm,
+                "reason": chat_reason,
+                "mistralReady": self._mistral_ready(),
+                "reliabilityFlag": prediction.reliability_flag if prediction is not None else None,
+                "confidence": prediction.confidence if prediction is not None else None,
+            },
+        )
+        #endregion
+
+        if not chat_should_use_llm or not self._mistral_ready():
+            fallback = self._build_chat_fallback(analysis, cleaned_message)
+            return GuidanceChatResponse(
+                source="fallback",
+                model_used=None,
+                provider_used=None,
+                message=self._sanitize_text(fallback, limit=720),
+            )
 
         if self._mistral_ready():
             try:
@@ -145,7 +273,18 @@ class GuidanceService:
                     message=self._sanitize_text(response_text, limit=720),
                 )
             except Exception as exc:
+                #region agent log
+                _agent_debug_log(
+                    "run15",
+                    "H33",
+                    "backend/app/services/guidance.py:reply_to_message:mistralException",
+                    "Guidance chat provider exception",
+                    {"error": self._summarize_error(exc)},
+                )
+                #endregion
                 self._last_provider_error = self._summarize_error(exc)
+                self._provider_cooldown_until = time.time() + 300.0
+                self._fallback_reason = "Mistral cooldown active after chat provider timeout/error."
                 log.warning("Mistral chat request failed: %s", exc)
 
         fallback = self._build_chat_fallback(analysis, cleaned_message)
@@ -349,7 +488,18 @@ class GuidanceService:
                 provider_used="mistral",
             )
         except Exception as exc:
+            #region agent log
+            _agent_debug_log(
+                "run3",
+                "H11",
+                "backend/app/services/guidance.py:_generate_mistral:exception",
+                "Mistral guidance failed and fallback used",
+                {"error": self._summarize_error(exc)},
+            )
+            #endregion
             self._last_provider_error = self._summarize_error(exc)
+            self._provider_cooldown_until = time.time() + 300.0
+            self._fallback_reason = "Mistral cooldown active after provider timeout/error."
             log.warning("Mistral guidance request failed: %s", exc)
             return self.generate_smart_fallback(
                 triage_band,
@@ -375,7 +525,17 @@ class GuidanceService:
             "response_format": {"type": "json_object"},
         }
         log.info("POST %s model=%s max_tokens=%s", _MISTRAL_API_URL, self.mistral_model, self.guidance_max_tokens)
-        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
+        timeout_seconds = min(float(self.guidance_timeout), _MISTRAL_TIMEOUT_CAP_SECONDS)
+        #region agent log
+        _agent_debug_log(
+            "run4",
+            "H12",
+            "backend/app/services/guidance.py:_call_mistral_api:timeout",
+            "Calling Mistral with effective timeout",
+            {"configuredTimeoutSeconds": float(self.guidance_timeout), "effectiveTimeoutSeconds": timeout_seconds},
+        )
+        #endregion
+        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=timeout_seconds)
         log.info("Mistral HTTP %s", resp.status_code)
         if not resp.ok:
             log.error("Mistral error body: %s", resp.text[:400])
@@ -415,7 +575,20 @@ class GuidanceService:
             "temperature": 0.45,
         }
         log.info("POST %s model=%s chat_turns=%s", _MISTRAL_API_URL, self.mistral_model, len(messages))
-        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=self.guidance_timeout)
+        timeout_seconds = min(float(self.guidance_timeout), _MISTRAL_TIMEOUT_CAP_SECONDS)
+        #region agent log
+        _agent_debug_log(
+            "run15",
+            "H32",
+            "backend/app/services/guidance.py:_call_mistral_chat_api:timeout",
+            "Guidance chat timeout configuration",
+            {
+                "configuredTimeoutSeconds": float(self.guidance_timeout),
+                "effectiveTimeoutSeconds": timeout_seconds,
+            },
+        )
+        #endregion
+        resp = _requests.post(_MISTRAL_API_URL, headers=headers, json=body, timeout=timeout_seconds)
         if not resp.ok:
             log.error("Mistral chat error body: %s", resp.text[:400])
         resp.raise_for_status()
@@ -429,10 +602,46 @@ class GuidanceService:
         return text
 
     def _mistral_ready(self) -> bool:
-        return self.mistral_enabled and self.api_key_configured
+        if not (self.mistral_enabled and self.api_key_configured):
+            return False
+        return time.time() >= getattr(self, "_provider_cooldown_until", 0.0)
 
     def _should_use_llm(self, triage: TriageResult, prediction: PredictionResult | None) -> bool:
-        return prediction is not None
+        triage_band = (triage.band or "").lower()
+        use_llm = True
+        reason = "default"
+        if prediction is None:
+            use_llm = False
+            reason = "missing_prediction"
+        elif triage_band in {"low_risk", "uncertain_retake_needed"}:
+            # Fast deterministic guidance is enough for low-risk or retake-needed cases.
+            use_llm = False
+            reason = f"triage_band_{triage_band}"
+        # Avoid expensive provider calls when model confidence/reliability
+        # already indicates fallback-style guidance is safer.
+        elif prediction.reliability_flag == "low":
+            use_llm = False
+            reason = "low_reliability"
+        elif prediction.confidence < 0.5:
+            use_llm = False
+            reason = "low_confidence"
+        #region agent log
+        _agent_debug_log(
+            "run13",
+            "H29",
+            "backend/app/services/guidance.py:_should_use_llm:decision",
+            "Guidance LLM usage decision",
+            {
+                "triageBand": triage_band,
+                "hasPrediction": prediction is not None,
+                "reliabilityFlag": prediction.reliability_flag if prediction is not None else None,
+                "confidence": prediction.confidence if prediction is not None else None,
+                "useLLM": use_llm,
+                "reason": reason,
+            },
+        )
+        #endregion
+        return use_llm
 
     def _cache_key(self, payload: dict[str, object]) -> str:
         return json.dumps(payload, sort_keys=True, ensure_ascii=False)
@@ -573,8 +782,10 @@ class GuidanceService:
     ) -> GuidanceResult:
         band = (triage_band or "").lower()
         hb = predicted_hemoglobin
+        fallback_path = "default"
 
         if band == "uncertain_retake_needed" or hb is None:
+            fallback_path = "uncertain_or_missing_hb"
             explanation = (
                 "Image signal was not strong enough for a confident prediction. "
                 "This is not a clear result."
@@ -585,7 +796,35 @@ class GuidanceService:
                 "Pull lower eyelid gently and hold camera steady",
                 "If you feel dizzy or very tired, visit a clinic anyway",
             ]
-        elif band == "high_concern" or hb < 8.0:
+        elif band == "high_concern":
+            if hb is not None and hb >= 12.0:
+                fallback_path = "high_concern_symptom_escalation"
+                explanation = (
+                    "This result was escalated to high concern mainly because symptom burden is high, "
+                    "not because the hemoglobin estimate is severely low."
+                )
+                urgency = "Seek medical attention within 24 to 48 hours to assess symptoms and confirm with blood testing."
+                next_steps = [
+                    "Arrange an urgent clinic review within 24-48 hours",
+                    "Request a full blood count (CBC) and iron studies",
+                    "Share your symptom timeline with the clinician",
+                    "Seek immediate care if breathlessness, chest pain, or fainting worsens",
+                ]
+            else:
+                fallback_path = "high_concern_low_hb"
+                explanation = (
+                    "Severely low hemoglobin may mean the blood cannot carry enough oxygen well. "
+                    "Fatigue, dizziness, and breathlessness are expected at this level."
+                )
+                urgency = "Seek medical attention within 24 to 48 hours. Do not delay."
+                next_steps = [
+                    "Visit nearest clinic or hospital today",
+                    "Request a full blood count (CBC) test",
+                    "Ask a doctor about iron or B12 treatment options",
+                    "Avoid strenuous physical activity until reviewed",
+                ]
+        elif hb < 8.0:
+            fallback_path = "critical_hb_without_high_concern_band"
             explanation = (
                 "Severely low hemoglobin may mean the blood cannot carry enough oxygen well. "
                 "Fatigue, dizziness, and breathlessness are expected at this level."
@@ -598,6 +837,7 @@ class GuidanceService:
                 "Avoid strenuous physical activity until reviewed",
             ]
         elif band == "moderate_risk" or (hb is not None and 8.0 <= hb <= 10.9):
+            fallback_path = "moderate_or_mild_low_hb"
             explanation = (
                 "Mild to moderate anemia-like signal detected. "
                 "Hemoglobin appears below the healthy threshold, which may cause tiredness and reduced concentration."
@@ -610,6 +850,7 @@ class GuidanceService:
                 "Rescreen in 4 weeks after dietary changes",
             ]
         else:
+            fallback_path = "low_risk_normal_hb"
             explanation = (
                 "Conjunctival pallor signal is within the normal range for this screening. "
                 "The hemoglobin estimate suggests adequate red blood cell levels."
@@ -626,6 +867,20 @@ class GuidanceService:
 
         food_advice = self._food_advice_for_region(region)
         next_steps = self._augment_next_steps(next_steps, symptoms)
+        #region agent log
+        _agent_debug_log(
+            "run16",
+            "H35",
+            "backend/app/services/guidance.py:generate_smart_fallback:path",
+            "Fallback guidance path selected",
+            {
+                "triageBand": band,
+                "predictedHemoglobin": hb,
+                "confidence": confidence,
+                "path": fallback_path,
+            },
+        )
+        #endregion
 
         return GuidanceResult(
             source="fallback",

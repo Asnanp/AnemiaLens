@@ -1,4 +1,4 @@
-"""
+/*
 Playwright Configuration for E2E Tests
 
 Run tests:
@@ -6,7 +6,7 @@ Run tests:
   npx playwright test --ui
   npx playwright test --headed
   npx playwright test --browser=chromium
-"""
+*/
 
 import { defineConfig, devices } from '@playwright/test';
 
@@ -28,7 +28,7 @@ export default defineConfig({
   
   // Shared settings
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -62,8 +62,12 @@ export default defineConfig({
   // Start dev server before tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      VITE_API_PROXY_TARGET: 'http://127.0.0.1:5000',
+      VITE_API_BASE_URL: 'http://127.0.0.1:5000',
+    }
   },
 });

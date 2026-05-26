@@ -10,6 +10,10 @@
 
 import { memo, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
+// Type augmentation for react-window if missing
+declare module 'react-window' {
+  export const FixedSizeList: any;
+}
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, Clock, Trash2,

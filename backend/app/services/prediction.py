@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -35,6 +36,11 @@ from app.schemas import (
 )
 
 log = logging.getLogger("anemialens.prediction")
+
+#region agent log
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    pass  # Debug instrumentation disabled for production
+#endregion
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,7 +111,7 @@ def validate_prediction_input(
         pixels = list(image.resize((16, 16)).getdata())
         unique_colors = set(pixels)
         if len(unique_colors) <= 2:
-            errors.append(ValidationError(
+            warnings.append(ValidationError(
                 field="image_content",
                 message="The image appears to be a solid or near-solid color.",
                 suggestion="Capture a real photo of the eye conjunctiva.",
@@ -122,13 +128,13 @@ def validate_prediction_input(
     gray_pixels = list(grayscale.resize((16, 16)).getdata())
     mean_brightness = sum(gray_pixels) / len(gray_pixels)
     if mean_brightness < 2:
-        errors.append(ValidationError(
+        warnings.append(ValidationError(
             field="image_brightness",
             message="The image is completely or nearly completely black.",
             suggestion="Ensure the camera lens is uncovered and lighting is adequate.",
         ))
     elif mean_brightness > 253:
-        errors.append(ValidationError(
+        warnings.append(ValidationError(
             field="image_brightness",
             message="The image is completely or nearly completely white.",
             suggestion="Check that the camera is not pointed at a bright light source.",
@@ -154,6 +160,30 @@ def validate_prediction_input(
         is_valid=len(errors) == 0,
         errors=errors,
         warnings=warnings,
+    )
+
+
+def _relax_validation_with_quality(
+    validation: ValidationResult,
+    quality: QualityAssessment | None,
+) -> ValidationResult:
+    if quality is None or validation.is_valid:
+        return validation
+
+    relaxed_errors: list[ValidationError] = []
+    relaxed_warnings = list(validation.warnings)
+    relaxable_fields = {"image_content", "image_brightness"}
+
+    for error in validation.errors:
+        if error.field in relaxable_fields:
+            relaxed_warnings.append(error)
+            continue
+        relaxed_errors.append(error)
+
+    return ValidationResult(
+        is_valid=len(relaxed_errors) == 0,
+        errors=relaxed_errors,
+        warnings=relaxed_warnings,
     )
 
 
@@ -415,8 +445,32 @@ class ScreeningPredictor:
         quality: QualityAssessment | None = None,
         patient_profile: PatientProfileInput | None = None,
     ) -> PredictionResult:
+        #region agent log
+        _agent_debug_log(
+            "run1",
+            "H5",
+            "backend/app/services/prediction.py:predict:entry",
+            "Predictor invoked",
+            {
+                "modelPathExists": getattr(
+                    self,
+                    "model_path",
+                    Path(DEFAULT_ARCHIVE_MODEL_PATH),
+                ).exists(),
+                "efficientnetPathExists": getattr(
+                    self,
+                    "efficientnet_path",
+                    Path(DEFAULT_EFFICIENTNET_MODEL_PATH),
+                ).exists(),
+                "hasQuality": quality is not None,
+            },
+        )
+        #endregion
         # ── Input validation ────────────────────────────────────────────────
-        validation = validate_prediction_input(image, patient_profile)
+        validation = _relax_validation_with_quality(
+            validate_prediction_input(image, patient_profile),
+            quality,
+        )
         if not validation.is_valid:
             # Return a safe fallback result with detailed error information
             error_details = "; ".join(f"{e.field}: {e.message}" for e in validation.errors)
@@ -972,6 +1026,24 @@ class ScreeningPredictor:
             )
             else "low"
         )
+        #region agent log
+        _agent_debug_log(
+            "run8",
+            "H17",
+            "backend/app/services/prediction.py:predict:reliabilityInputs",
+            "Reliability classification inputs",
+            {
+                "confidence": round(confidence, 3),
+                "uncertainty": round(uncertainty, 3),
+                "captureQualityScore": round(capture_quality_score, 3),
+                "thresholdStability": round(threshold_stability, 3),
+                "qualityPassed": bool(quality.passed),
+                "severeLightingCase": bool(severe_lighting_case),
+                "guardrailTriggered": bool(guardrail_triggered),
+                "clearNegativeCase": bool(clear_negative_case),
+            },
+        )
+        #endregion
         if (
             reliability_flag == "low"
             and quality.passed
@@ -982,6 +1054,23 @@ class ScreeningPredictor:
             and threshold_stability >= 0.72
         ):
             reliability_flag = "medium"
+        if reliability_flag == "low" and confidence > 0.62:
+            # Keep confidence consistent with reliability messaging.
+            confidence = 0.62
+            uncertainty = max(uncertainty, 0.38)
+        #region agent log
+        _agent_debug_log(
+            "run8",
+            "H18",
+            "backend/app/services/prediction.py:predict:reliabilityOutput",
+            "Reliability classification output",
+            {
+                "reliabilityFlag": reliability_flag,
+                "confidence": round(confidence, 3),
+                "screeningLabel": base_screening_label,
+            },
+        )
+        #endregion
         confidence_breakdown = {
             "capture_quality": round(capture_quality_score, 3),
             "model_stability": round(model_stability, 3),
@@ -1045,6 +1134,27 @@ class ScreeningPredictor:
                 predicted_hemoglobin=predicted_hemoglobin_raw,
             ),
         }
+        #region agent log
+        _agent_debug_log(
+            "run12",
+            "H26",
+            "backend/app/services/prediction.py:predict:finalDecisionInputs",
+            "Final screening decision inputs",
+            {
+                "risk": round(refined_risk, 3),
+                "uncertainty": round(uncertainty, 3),
+                "decisionThreshold": round(decision_threshold, 3),
+                "reliabilityFlag": reliability_flag,
+                "confidence": round(confidence, 3),
+                "predictedHemoglobinRaw": (
+                    None
+                    if predicted_hemoglobin_raw is None
+                    else round(float(predicted_hemoglobin_raw), 2)
+                ),
+                "qualityPassed": bool(quality.passed),
+            },
+        )
+        #endregion
         screening_label, screening_text = self._screening_decision(
             refined_risk,
             uncertainty,
@@ -1052,6 +1162,62 @@ class ScreeningPredictor:
             predicted_hemoglobin=predicted_hemoglobin_raw,
             signal_guardrail_triggered=guardrail_triggered,
         )
+        reliability_overrode_label = False
+        retain_low_reliability_negative = (
+            screening_label == "anemia_unlikely"
+            and quality.passed
+            and (
+                clear_negative_case
+                or (
+                    refined_risk <= (decision_threshold - 0.12)
+                    and uncertainty <= 0.62
+                    and threshold_stability >= 0.5
+                )
+            )
+        )
+        if (
+            reliability_flag == "low"
+            and screening_label != "uncertain"
+            and not retain_low_reliability_negative
+        ):
+            reliability_overrode_label = True
+            screening_label = "uncertain"
+            screening_text = (
+                "The image signal leans one way, but reliability is low due to capture limitations, "
+                "so the safest interpretation is uncertain. Retake under better conditions if possible."
+            )
+            confidence_breakdown["summary"] = (
+                "Reliability is low for this scan, so the final interpretation is kept uncertain even if "
+                "some model signals lean in one direction."
+            )
+        #region agent log
+        _agent_debug_log(
+            "run12",
+            "H28",
+            "backend/app/services/prediction.py:predict:reliabilityOverride",
+            "Reliability override applied",
+            {
+                "applied": bool(reliability_overrode_label),
+                "reliabilityFlag": reliability_flag,
+                "finalScreeningLabel": screening_label,
+                "summaryAfterOverride": str(confidence_breakdown.get("summary", ""))[:180],
+            },
+        )
+        #endregion
+        #region agent log
+        _agent_debug_log(
+            "run12",
+            "H27",
+            "backend/app/services/prediction.py:predict:finalDecisionOutput",
+            "Final screening decision output",
+            {
+                "screeningLabel": screening_label,
+                "reliabilityFlag": reliability_flag,
+                "confidence": round(confidence, 3),
+                "summaryReason": str(confidence_breakdown.get("summary", ""))[:180],
+            },
+        )
+        #endregion
         if use_v8_archive and not self._should_display_v8_hemoglobin(
             risk=refined_risk,
             threshold=decision_threshold,
@@ -1100,6 +1266,20 @@ class ScreeningPredictor:
                 feature_map=feature_map,
             )
 
+        #region agent log
+        _agent_debug_log(
+            "run1",
+            "H5",
+            "backend/app/services/prediction.py:predict:exit",
+            "Predictor produced primary result",
+            {
+                "screeningLabel": primary_result.screening_label,
+                "anemiaRisk": primary_result.anemia_risk,
+                "confidence": primary_result.confidence,
+                "reliabilityFlag": primary_result.reliability_flag,
+            },
+        )
+        #endregion
         return primary_result
 
     def _ensure_efficientnet_model_loaded(self) -> dict[str, object] | None:

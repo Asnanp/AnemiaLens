@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import time
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -10,6 +12,12 @@ from app.schemas import PatientProfileInput, SymptomInput
 
 class InvalidRequestPayload(ValueError):
     pass
+
+
+#region agent log
+def _agent_debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    pass  # Debug instrumentation disabled for production
+#endregion
 
 
 def parse_symptoms(raw: str | None) -> SymptomInput:
@@ -38,6 +46,22 @@ def parse_patient_profile(raw: str | None) -> PatientProfileInput:
         payload = json.loads(raw)
         if not isinstance(payload, dict):
             raise InvalidRequestPayload("Invalid patient profile payload: expected a JSON object.")
+        removed_legacy_symptoms = "symptoms" in payload
+        if removed_legacy_symptoms:
+            payload = dict(payload)
+            payload.pop("symptoms", None)
+        #region agent log
+        _agent_debug_log(
+            "run14",
+            "H30",
+            "backend/app/services/request_parsing.py:parse_patient_profile:payload",
+            "Patient profile payload normalized",
+            {
+                "hadLegacySymptomsField": removed_legacy_symptoms,
+                "keys": sorted(payload.keys()),
+            },
+        )
+        #endregion
         return PatientProfileInput.model_validate(payload)
     except InvalidRequestPayload:
         raise

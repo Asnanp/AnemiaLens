@@ -209,15 +209,14 @@ def test_training_report_selected_mode_is_valid() -> None:
 def test_efficientnet_checkpoint_loads_and_predicts() -> None:
     from PIL import Image
     from app.ml.efficientnet_model import (
+        EFFICIENTNET_ARCHITECTURE_CURRENT,
+        EFFICIENTNET_ARCHITECTURE_LEGACY,
         EFFICIENTNET_VERSION,
         load_efficientnet_checkpoint,
         predict_with_efficientnet_model,
     )
 
-    try:
-        bundle = load_efficientnet_checkpoint(EFFICIENTNET_PATH)
-    except RuntimeError as exc:
-        pytest.skip(f"EfficientNet checkpoint is incompatible with the current loader: {exc}")
+    bundle = load_efficientnet_checkpoint(EFFICIENTNET_PATH)
     prediction = predict_with_efficientnet_model(
         bundle,
         Image.new("RGB", (320, 180), color=(180, 120, 115)),
@@ -225,6 +224,10 @@ def test_efficientnet_checkpoint_loads_and_predicts() -> None:
     )
 
     assert bundle["version"] == EFFICIENTNET_VERSION
+    assert bundle["architecture"] in {
+        EFFICIENTNET_ARCHITECTURE_CURRENT,
+        EFFICIENTNET_ARCHITECTURE_LEGACY,
+    }
     assert 0.0 <= prediction["anemia_risk"] <= 1.0
     assert 0.0 <= prediction["uncertainty"] <= 1.0
 

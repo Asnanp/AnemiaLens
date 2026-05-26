@@ -49,3 +49,38 @@ async def v1_meta() -> dict:
             "email-report",
         ],
     }
+
+
+@router.get("/model-info", summary="Active model information")
+async def model_info() -> dict:
+    """Returns information about the currently loaded ML model, its version, and capabilities."""
+    from app.config import settings
+    from app.services.prediction import ScreeningPredictor
+
+    try:
+        predictor = ScreeningPredictor()
+        model_version = getattr(predictor, "_model_version", "unknown")
+        model_type = getattr(predictor, "_model_type", "archive-fusion")
+        is_loaded = getattr(predictor, "_model", None) is not None
+    except Exception:
+        model_version = "unavailable"
+        model_type = "unavailable"
+        is_loaded = False
+
+    return {
+        "model_version": model_version,
+        "model_type": model_type,
+        "is_loaded": is_loaded,
+        "pipeline_version": "v8",
+        "capabilities": [
+            "conjunctival_image_screening",
+            "quality_gating",
+            "symptom_fusion",
+            "confidence_scoring",
+            "triage_banding",
+            "explainability",
+        ],
+        "efficientnet_fallback": settings.enable_efficientnet_fallback,
+        "quality_gate_enabled": True,
+    }
+
