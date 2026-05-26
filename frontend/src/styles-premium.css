@@ -827,6 +827,24 @@ h1, h2, h3, .text-premium-title {
   align-items: center;
   gap: 0.35rem;
   color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 3;
+}
+
+.onboarding-badge:nth-of-type(1) {
+  top: 25%;
+  left: 15%;
+}
+
+.onboarding-badge:nth-of-type(2) {
+  top: 35%;
+  right: 15%;
+}
+
+.onboarding-badge:nth-of-type(3) {
+  bottom: 22%;
+  left: 20%;
 }
 
 .onboarding-ring {
