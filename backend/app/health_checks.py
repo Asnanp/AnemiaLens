@@ -433,10 +433,10 @@ def check_disk_space() -> CheckResult:
         usage = psutil.disk_usage(str(BACKEND_ROOT))
         usage_percent = usage.percent
 
-        if usage_percent < 80:
+        if usage_percent < 85:
             status = "ok"
             message = "Disk space healthy"
-        elif usage_percent < 90:
+        elif usage_percent < 95:
             status = "degraded"
             message = f"Disk usage at {usage_percent:.1f}% — approaching capacity"
         else:
@@ -476,15 +476,18 @@ def check_memory_usage() -> CheckResult:
         system_percent = system_mem.percent
 
         # Determine status based on process memory
-        if process_percent < 50 and system_percent < 80:
+        # In multi-tenant container environments (e.g., Hugging Face Spaces), host-wide system memory is shared
+        # and almost always >95%. We ignore system_percent to prevent false-alarm critical statuses,
+        # focusing purely on process memory health.
+        if process_percent < 50:
             status = "ok"
             message = "Memory usage healthy"
-        elif process_percent < 80 and system_percent < 90:
+        elif process_percent < 80:
             status = "degraded"
-            message = f"Process memory at {process_percent:.1f}%, system at {system_percent:.1f}%"
+            message = f"Process memory elevated at {process_percent:.1f}%"
         else:
             status = "error"
-            message = f"Memory usage critical — process: {process_percent:.1f}%, system: {system_percent:.1f}%"
+            message = f"Memory usage critical — process: {process_percent:.1f}%"
 
         return CheckResult(
             status=status,
@@ -516,15 +519,19 @@ def check_cpu_usage() -> CheckResult:
         process = psutil.Process(os.getpid())
         process_cpu = process.cpu_percent(interval=0.1)
 
-        if cpu_percent < 80:
+        # Determine health status based on our process load normalized per core.
+        # In multi-tenant environments (e.g., Hugging Face Spaces), system-wide CPU can be elevated by other spaces.
+        # If our own process is behaving well, we should remain 'ok'.
+        process_cpu_per_core = process_cpu / cpu_count if cpu_count else process_cpu
+        if process_cpu_per_core < 80:
             status = "ok"
             message = "CPU usage healthy"
-        elif cpu_percent < 90:
+        elif process_cpu_per_core < 95:
             status = "degraded"
-            message = f"CPU usage elevated at {cpu_percent:.1f}%"
+            message = f"Process CPU usage elevated at {process_cpu_per_core:.1f}% per core"
         else:
             status = "error"
-            message = f"CPU usage critical at {cpu_percent:.1f}%"
+            message = f"Process CPU usage critical at {process_cpu_per_core:.1f}% per core"
 
         return CheckResult(
             status=status,

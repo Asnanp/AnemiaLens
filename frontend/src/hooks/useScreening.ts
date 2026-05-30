@@ -91,7 +91,7 @@ export function useScreening() {
   const [recent, setRecent] = useState<RecentScreening[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [backendUp, setBackendUp] = useState(false);
+  const [backendUp, setBackendUp] = useState(true);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   useEffect(() => {
