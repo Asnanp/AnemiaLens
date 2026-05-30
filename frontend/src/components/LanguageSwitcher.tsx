@@ -12,6 +12,7 @@ interface LanguageSwitcherProps {
 
 export function LanguageSwitcher({ variant = 'inline' }: LanguageSwitcherProps) {
   const { i18n } = useTranslation();
+  if (SUPPORTED_LANGUAGES.length <= 1) return null;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

@@ -2,6 +2,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
+// Mock i18n module
+vi.mock('../../i18n', () => ({
+  SUPPORTED_LANGUAGES: [
+    { code: 'en', label: 'English', native: 'English' },
+    { code: 'es', label: 'Spanish', native: 'Español' },
+    { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
+  ],
+}));
+
 // Mock i18n
 vi.mock('react-i18next', () => ({
   useTranslation: vi.fn(() => ({
