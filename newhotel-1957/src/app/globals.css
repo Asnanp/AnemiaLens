@@ -1,0 +1,808 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Luxurious Kerala-inspired Design System ── */
+    /* Warm earth tones: deep heritage browns, creams, signature gold #c8901e */
+    --ink-900: #15110d;
+    --ink-800: #1f1813;
+    --ink-700: #2c1810;
+    --ink-600: #3d2418;
+    --ink-500: #5a4030;
+    --ink-400: #7a6552;
+    --ink-300: #a8907a;
+    --ink-200: #d4c4b0;
+    --ink-100: #ede5d8;
+    --ink-50: #faf7f2;
+    --paper: #fffdf9;
+
+    /* Signature Kerala Gold - primary accent #c8901e */
+    --gold-700: #8c6a15;
+    --gold-600: #a47c1a;
+    --gold-500: #c8901e;
+    --gold-400: #d9a84a;
+    --gold-300: #e8c07a;
+    --gold-100: #f8f0d9;
+    --gold-50: #fdf8eb;
+
+    /* Legacy warm gold aliases for backward compat */
+    --gold-legacy-500: #d4840a;
+    --gold-legacy-700: #a16808;
+
+    --veg-700: #15803d;
+    --veg-500: #16a34a;
+    --veg-100: #dcfce7;
+    --nonveg-700: #b91c1c;
+    --nonveg-500: #dc2626;
+    --nonveg-100: #fee2e2;
+
+    /* Enhanced luxury elevations & surfaces for premium feel */
+    --surface-cream: #fdfbf7;
+    --surface-warm: #f8f4ed;
+    --border-subtle: #e8e0d4;
+    --text-primary: #2c1810;
+    --text-secondary: #5a4030;
+    --text-muted: #7a6552;
+
+    /* High contrast for a11y */
+    --focus-ring: #c8901e;
+    --focus-ring-offset: #faf7f2;
+
+    /* Aliases for legacy */
+    --color-cream: var(--ink-50);
+    --color-warm-white: var(--paper);
+    --color-brown-900: var(--ink-700);
+    --color-brown-700: var(--ink-600);
+    --color-brown-500: var(--ink-500);
+    --color-brown-100: var(--ink-100);
+    --color-amber-warm: var(--gold-500);
+    --color-veg: var(--veg-700);
+    --color-nonveg: var(--nonveg-700);
+
+    --sat: env(safe-area-inset-top);
+    --sab: env(safe-area-inset-bottom);
+
+    /* ── Elevation (warm, soft) ── */
+    --shadow-xs: 0 1px 2px rgba(44, 24, 16, 0.04);
+    --shadow-sm: 0 1px 3px rgba(44, 24, 16, 0.05), 0 1px 2px rgba(44, 24, 16, 0.04);
+    --shadow-md: 0 4px 12px rgba(44, 24, 16, 0.06), 0 1px 3px rgba(44, 24, 16, 0.03);
+    --shadow-lg: 0 8px 24px rgba(44, 24, 16, 0.08), 0 2px 6px rgba(44, 24, 16, 0.04);
+    --shadow-xl: 0 16px 40px rgba(44, 24, 16, 0.12), 0 4px 10px rgba(44, 24, 16, 0.05);
+    --shadow-gold: 0 10px 30px rgba(212, 132, 10, 0.25);
+
+    /* ── Motion ── */
+    --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-quick: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family:
+      var(--font-dm-sans),
+      system-ui,
+      -apple-system,
+      sans-serif;
+    @apply bg-[var(--ink-50)] text-[var(--ink-700)] antialiased;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .font-display {
+    font-family: var(--font-playfair), Georgia, serif;
+    letter-spacing: -0.015em;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Safe area ── */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Animations ── */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.03);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s var(--ease-out-quick);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.18s var(--ease-out-soft);
+}
+
+.animate-pop-in {
+  animation: popIn 0.35s var(--ease-out-soft);
+}
+
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2.2s ease-in-out infinite;
+}
+
+.animate-ring-pulse {
+  animation: ringPulse 1.6s var(--ease-out-soft) infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ── Elevation utilities ── */
+.shadow-warm-xs {
+  box-shadow: var(--shadow-xs);
+}
+
+.shadow-warm-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-warm {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-warm-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+.shadow-warm-xl {
+  box-shadow: var(--shadow-xl);
+}
+
+.shadow-gold {
+  box-shadow: var(--shadow-gold);
+}
+
+/* ── Premium gradients ── */
+.bg-grain {
+  background-image:
+    radial-gradient(at 20% 20%, rgba(212, 132, 10, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(212, 132, 10, 0.06) 0px, transparent 40%),
+    radial-gradient(at 0% 100%, rgba(212, 132, 10, 0.04) 0px, transparent 50%);
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #e3a234, #d4840a, #b8720a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Marquee scroll ── */
+@keyframes scrollX {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: scrollX 30s linear infinite;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-slide-down {
+  animation: slideDown 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ── Mobile motion polish ── */
+
+/* GPU-accelerated transforms (60fps) */
+.gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Horizontal snap scroll for category chips, bestseller cards */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.snap-x-proximity {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+.snap-center {
+  scroll-snap-align: center;
+}
+.snap-stop {
+  scroll-snap-stop: always;
+}
+
+/* Tactile button press */
+.tap {
+  transition:
+    transform 120ms var(--ease-out-quick),
+    opacity 120ms ease;
+}
+.tap:active {
+  transform: scale(0.96);
+}
+
+/* Bottom sheet — GPU layer + drag affordance */
+.sheet {
+  transform: translateZ(0);
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  margin: 8px auto 0;
+}
+
+/* Smooth state transitions */
+.transition-smooth {
+  transition:
+    transform 300ms var(--ease-out-soft),
+    opacity 300ms ease,
+    background-color 200ms ease;
+}
+
+/* Prevent layout jank during animations */
+.contain-paint {
+  contain: paint;
+}
+.contain-layout {
+  contain: layout;
+}
+
+/* View transitions (Chrome 111+, Safari 18+) */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 280ms;
+    animation-timing-function: var(--ease-out-soft);
+  }
+}
+
+/* Image fade-in on load */
+@keyframes imgFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.img-fade-in {
+  animation: imgFadeIn 350ms var(--ease-out-soft);
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--ink-100) 0%, #f5ede0 50%, var(--ink-100) 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s linear infinite;
+}
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Enhanced mobile touch feedback */
+.btn-press {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 150ms var(--ease-out-soft),
+    box-shadow 150ms var(--ease-out-soft);
+}
+.btn-press:active {
+  transform: scale(0.96);
+}
+.btn-press::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+.btn-press:active::after {
+  opacity: 1;
+  transform: scale(2);
+}
+
+/* Ripple effect for touch feedback */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0);
+  animation: ripple-animation 0.6s ease-out;
+  pointer-events: none;
+}
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Staggered animation delays */
+.animate-delay-100 {
+  animation-delay: 100ms;
+}
+.animate-delay-200 {
+  animation-delay: 200ms;
+}
+.animate-delay-300 {
+  animation-delay: 300ms;
+}
+.animate-delay-400 {
+  animation-delay: 400ms;
+}
+.animate-delay-500 {
+  animation-delay: 500ms;
+}
+
+/* Card hover/touch states */
+.card-hover {
+  transition:
+    transform 200ms var(--ease-out-soft),
+    box-shadow 200ms var(--ease-out-soft);
+}
+.card-hover:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Smooth quantity counter animation */
+@keyframes quantityBump {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.quantity-bump {
+  animation: quantityBump 0.3s var(--ease-out-soft);
+}
+
+/* Cart badge pulse */
+@keyframes cartPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+.cart-pulse {
+  animation: cartPulse 0.4s var(--ease-out-soft);
+}
+
+/* Smooth scroll snapping improvements */
+.snap-scroll {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Enhanced focus states for accessibility */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* ── 10000x Kerala Luxury Enhancements ── */
+
+/* Premium dish card treatments - incredible images + hover delight */
+.dish-card {
+  transition:
+    transform 420ms var(--ease-out-soft),
+    box-shadow 420ms var(--ease-out-soft),
+    border-color 200ms ease;
+  will-change: transform;
+}
+.dish-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--gold-500);
+}
+.dish-card img {
+  transition:
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 400ms ease;
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
+}
+.dish-card:hover img {
+  transform: scale(1.08);
+  filter: contrast(1.05) saturate(1.08);
+}
+.dish-card .image-container {
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, var(--ink-100), var(--ink-50));
+}
+.dish-card .image-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 60%, rgba(44, 24, 16, 0.08) 100%);
+  opacity: 0.6;
+  transition: opacity 300ms ease;
+}
+.dish-card:hover .image-container::after {
+  opacity: 0.35;
+}
+
+/* Elegant quick-add buttons with luxury micro-interactions */
+.quick-add {
+  position: relative;
+  overflow: hidden;
+  border: 1.5px solid var(--gold-500);
+  color: var(--gold-500);
+  background: transparent;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 180ms var(--ease-out-quick);
+}
+.quick-add:hover {
+  background: var(--gold-500);
+  color: white;
+  border-color: var(--gold-500);
+}
+.quick-add:active {
+  transform: scale(0.96);
+}
+.quick-add::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.4s,
+    height 0.4s;
+}
+.quick-add:active::before {
+  width: 180px;
+  height: 180px;
+}
+
+/* Tab / chip switches with smooth Framer-friendly states */
+.tab-chip {
+  position: relative;
+  transition:
+    color 200ms ease,
+    background 200ms ease,
+    border-color 200ms ease;
+}
+.tab-chip.active {
+  background: var(--ink-900);
+  color: white;
+  border-color: var(--ink-900);
+}
+.tab-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Status badges - real-time animated */
+.status-badge {
+  transition: all 280ms var(--ease-out-soft);
+}
+.status-badge.approved {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status-badge.preparing {
+  background: #ffedd5;
+  color: #9a3412;
+}
+.status-badge.ready {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-badge.served {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+/* Modal / sheet luxury polish */
+.modal {
+  box-shadow: var(--shadow-xl);
+}
+.sheet {
+  box-shadow:
+    0 -20px 60px -15px rgba(0, 0, 0, 0.25),
+    var(--shadow-xl);
+}
+
+/* Parallax subtle hero layers (for landing & menu) */
+.parallax-layer {
+  will-change: transform;
+}
+
+/* Beautiful admin dashboard cards & chart containers */
+.chart-bar {
+  transition:
+    height 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 200ms ease;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold-500), var(--gold-400));
+}
+.chart-bar:hover {
+  filter: brightness(1.1);
+}
+
+/* Accessibility: improved focus, contrast, keyboard */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+.tab-chip:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px var(--focus-ring-offset);
+}
+.text-high-contrast {
+  color: var(--text-primary);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Image loading beauty: blur-up + fade */
+img[loading="lazy"] {
+  transition:
+    opacity 400ms ease,
+    filter 400ms ease;
+}
+img.loaded {
+  filter: none;
+}
+
+/* Ultra premium button system */
+.btn-lux {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: all 200ms var(--ease-out-soft);
+  position: relative;
+}
+.btn-lux:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-gold);
+}
+.btn-lux:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* Responsive mobile-first delight: larger taps on phones */
+@media (max-width: 640px) {
+  .dish-card {
+    padding-bottom: 4px;
+  }
+  button,
+  .tab-chip,
+  .quick-add {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Offline / PWA install prompt styles */
+.install-prompt {
+  animation: slideUp 0.4s var(--ease-out-soft);
+  background: linear-gradient(135deg, var(--ink-800), var(--ink-700));
+  border: 1px solid var(--gold-500);
+}
+
+/* Live update pulse for kitchen/waiter real-time */
+.live-dot {
+  animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@import '../styles/design-system.css';
+
+@import '../styles/mobile-optimization.css';
